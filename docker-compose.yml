@@ -1,0 +1,108 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: epos-app
+    volumes:
+      - ./portal:/var/www/portal
+    networks:
+      - epos-network
+    depends_on:
+      - postgres
+      - redis
+
+  nginx:
+    image: nginx:alpine
+    container_name: epos-nginx
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./portal:/var/www/portal
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - epos-network
+    depends_on:
+      - app
+
+  frontend:
+    image: node:20-alpine
+    container_name: epos-frontend
+    working_dir: /var/www/frontend
+    volumes:
+      - ./portal/frontend:/var/www/frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    command: sh -c "npm install && npm run dev"
+    networks:
+      - epos-network
+    depends_on:
+      - nginx
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: epos-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-epos_portal}
+      POSTGRES_USER: ${DB_USERNAME:-epos}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-epos_secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - epos-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: epos-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - epos-network
+
+  queue:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: epos-queue
+    command: php artisan horizon
+    volumes:
+      - ./portal:/var/www/portal
+    networks:
+      - epos-network
+    depends_on:
+      - app
+      - postgres
+      - redis
+    restart: unless-stopped
+    profiles:
+      - worker
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: epos-scheduler
+    command: sh -c "while true; do php artisan schedule:run --verbose --no-interaction >> /dev/null 2>&1; sleep 60; done"
+    volumes:
+      - ./portal:/var/www/portal
+    networks:
+      - epos-network
+    depends_on:
+      - app
+      - postgres
+      - redis
+    restart: unless-stopped
+    profiles:
+      - worker
+
+networks:
+  epos-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,0 +1,25 @@
+# Docker volumes
+docker/volumes/
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Laravel vendor (managed by Composer inside Docker)
+portal/vendor/
+
+# Frontend build
+portal/frontend/.next/
+portal/frontend/node_modules/
