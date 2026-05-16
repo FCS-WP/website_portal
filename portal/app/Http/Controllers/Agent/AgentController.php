@@ -421,13 +421,14 @@ class AgentController extends Controller
         $job->refresh();
         $sites = $job->sites;
 
-        $pending = $sites->whereIn('status', ['pending', 'running', 'success'])->count();
+        // Sites still in intermediate states
+        $inProgress = $sites->whereIn('status', ['pending', 'running'])->count();
 
-        if ($pending === 0) {
+        if ($inProgress === 0) {
             $job->update([
                 'status' => 'completed',
-                'success_count' => $sites->where('status', 'healthy')->count(),
-                'failed_count' => $sites->where('status', 'failed')->count() + $sites->where('status', 'rolled_back')->count(),
+                'success_count' => $sites->whereIn('status', ['success', 'healthy'])->count(),
+                'failed_count' => $sites->whereIn('status', ['failed', 'rolled_back'])->count(),
                 'finished_at' => now(),
             ]);
         }

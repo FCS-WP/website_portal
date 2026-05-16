@@ -43,11 +43,11 @@ class PushPluginToSite implements ShouldQueue
             // POST to the agent's install endpoint
             $response = Http::timeout(90)
                 ->withHeaders([
-                    'X-Agent-Key' => $site->api_secret_key,
+                    'X-Agent-Key' => decrypt($site->api_key_encrypted),
                     'X-Site-Url' => $site->url,
                     'Accept' => 'application/json',
                 ])
-                ->post(rtrim($site->url, '/') . '/wp-json/epos-agent/v1/plugins/install', [
+                ->post(rtrim($site->url, '/') . '/wp-json/epos-agent/v1/plugin/install', [
                     'plugin_slug' => $pluginVersion->plugin->slug,
                     'version' => $pluginVersion->version,
                     'download_url' => $downloadInfo['url'],
@@ -84,16 +84,19 @@ class PushPluginToSite implements ShouldQueue
      */
     protected function checkDeploymentCompletion(DeploymentJob $deploymentJob): void
     {
-        $pending = $deploymentJob->sites()->whereIn('status', ['pending', 'running'])->count();
+        $deploymentJob->refresh();
+        $sites = $deploymentJob->sites;
 
-        if ($pending === 0) {
-            $successCount = $deploymentJob->sites()->where('status', 'success')->count();
-            $failedCount = $deploymentJob->sites()->where('status', 'failed')->count();
+        // Sites that are still in-progress
+        $inProgress = $sites->whereIn('status', ['pending', 'running'])->count();
 
-            $status = $failedCount > 0 ? ($successCount > 0 ? 'completed' : 'failed') : 'completed';
+        if ($inProgress === 0) {
+            // All sites have reported back
+            $successCount = $sites->whereIn('status', ['success', 'healthy'])->count();
+            $failedCount = $sites->whereIn('status', ['failed', 'rolled_back'])->count();
 
             $deploymentJob->update([
-                'status' => $status,
+                'status' => 'completed',
                 'success_count' => $successCount,
                 'failed_count' => $failedCount,
                 'finished_at' => now(),

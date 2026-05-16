@@ -19,6 +19,7 @@ class Site extends Model
         'url',
         'description',
         'api_secret_key',
+        'api_key_encrypted',
         'status',
         'wp_version',
         'php_version',
@@ -38,6 +39,7 @@ class Site extends Model
 
     protected $hidden = [
         'api_secret_key',
+        'api_key_encrypted',
     ];
 
     public function hosting(): BelongsTo

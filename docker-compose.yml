@@ -68,7 +68,8 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: epos-queue
-    command: php artisan horizon
+    working_dir: /var/www/portal
+    command: php artisan queue:work --queue=default,deployments --tries=3 --timeout=90 --sleep=3
     volumes:
       - ./portal:/var/www/portal
     networks:
@@ -86,7 +87,8 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: epos-scheduler
-    command: sh -c "while true; do php artisan schedule:run --verbose --no-interaction >> /dev/null 2>&1; sleep 60; done"
+    working_dir: /var/www/portal
+    command: sh -c "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
     volumes:
       - ./portal:/var/www/portal
     networks:

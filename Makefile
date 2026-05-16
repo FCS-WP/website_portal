@@ -3,12 +3,13 @@
        dev build lint typecheck fe-install \
        db-shell \
        queue queue-stop queue-restart schedule schedule-run \
+       workers-up workers-down workers-logs \
        fresh setup
 
 # Variables
 DC = docker-compose
-EXEC = $(DC) exec -T app
-EXEC_IT = $(DC) exec app
+EXEC = $(DC) exec -T -w /var/www/portal app
+EXEC_IT = $(DC) exec -w /var/www/portal app
 FRONTEND_DIR = portal/frontend
 
 # Default target
@@ -88,7 +89,7 @@ fe-install: ## Install frontend dependencies with pnpm
 # ─── Queue & Scheduler ──────────────────────────────────────────────────────
 
 queue: ## Start queue worker (foreground)
-	$(EXEC) php artisan queue:work --tries=3 --timeout=90
+	$(EXEC) php artisan queue:work --queue=default,deployments --tries=3 --timeout=90
 
 queue-stop: ## Stop all queue workers gracefully
 	$(EXEC) php artisan queue:restart
@@ -102,6 +103,17 @@ schedule: ## Run the scheduler daemon (every minute)
 
 schedule-run: ## Run scheduled commands once (for testing)
 	$(EXEC) php artisan schedule:run
+
+# ─── Workers (Production) ───────────────────────────────────────────────────
+
+workers-up: ## Start queue + scheduler containers (production)
+	$(DC) --profile worker up -d queue scheduler
+
+workers-down: ## Stop queue + scheduler containers
+	$(DC) --profile worker stop queue scheduler
+
+workers-logs: ## Tail queue + scheduler logs
+	$(DC) --profile worker logs -f queue scheduler
 
 # ─── Database ────────────────────────────────────────────────────────────────
 

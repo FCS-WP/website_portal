@@ -68,6 +68,7 @@ class SiteController extends Controller
         $site = Site::create([
             ...$request->validated(),
             'api_secret_key' => $hashedKey,
+            'api_key_encrypted' => encrypt($plainKey),
             'status' => 'pending',
             'created_by' => $request->user()->id,
         ]);
@@ -165,6 +166,7 @@ class SiteController extends Controller
 
         $site->update([
             'api_secret_key' => $hashedKey,
+            'api_key_encrypted' => encrypt($plainKey),
             'status' => 'pending', // Reset status since old key is invalid
         ]);
 

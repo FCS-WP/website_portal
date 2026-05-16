@@ -46,14 +46,45 @@ class Epos_Agent_Plugin_Installer {
         require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
-        $tmp_file = download_url($download_url, 300);
+        // Security: Only allow downloads from the configured Portal URL
+        $portal_url = get_option('epos_agent_portal_url', '');
+        if (!empty($portal_url)) {
+            $allowed_domain = parse_url($portal_url, PHP_URL_HOST);
+            $download_domain = parse_url($download_url, PHP_URL_HOST);
 
-        if (is_wp_error($tmp_file)) {
+            if ($download_domain !== $allowed_domain) {
+                return new WP_REST_Response(array(
+                    'success' => false,
+                    'message' => 'Download URL host not allowed. Expected: ' . $allowed_domain . ', Got: ' . $download_domain,
+                ), 403);
+            }
+        }
+
+        // Use wp_remote_get (not download_url/wp_safe_remote_get) to avoid
+        // WordPress SSRF protection blocking private/local IPs in dev environments
+        $response = wp_remote_get($download_url, array(
+            'timeout' => 300,
+            'stream'  => true,
+            'filename' => wp_tempnam($download_url),
+        ));
+
+        if (is_wp_error($response)) {
             return new WP_REST_Response(array(
                 'success' => false,
-                'message' => 'Failed to download plugin: ' . $tmp_file->get_error_message(),
+                'message' => 'Failed to download plugin: ' . $response->get_error_message(),
             ), 500);
         }
+
+        $response_code = wp_remote_retrieve_response_code($response);
+        if ($response_code !== 200) {
+            @unlink($response['filename']);
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Failed to download plugin: HTTP ' . $response_code,
+            ), 500);
+        }
+
+        $tmp_file = $response['filename'];
 
         // Verify SHA256 hash if provided
         if (!empty($file_hash)) {
