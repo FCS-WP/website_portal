@@ -16,4 +16,5 @@ use App\Http\Controllers\Agent\AgentController;
 Route::middleware(\App\Http\Middleware\AgentAuthMiddleware::class)->group(function () {
     Route::post('/handshake', [AgentController::class, 'handshake']);
     Route::post('/ping', [AgentController::class, 'ping']);
+    Route::post('/plugin-updates', [AgentController::class, 'pluginUpdates']);
 });

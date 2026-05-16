@@ -12,6 +12,8 @@ import { Site } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Globe, Server, Calendar, Code, Plug } from "lucide-react";
+import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
+import { SiteActivityTab } from "@/components/sites/site-activity-tab";
 
 export default function SiteDetailPage() {
   const params = useParams();
@@ -199,13 +201,7 @@ export default function SiteDetailPage() {
         </TabsContent>
 
         <TabsContent value="plugins" className="mt-6">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">
-                Plugin management coming in Phase 2.
-              </p>
-            </CardContent>
-          </Card>
+          <SitePluginsTab siteId={site.id} />
         </TabsContent>
 
         <TabsContent value="orders" className="mt-6">
@@ -229,13 +225,7 @@ export default function SiteDetailPage() {
         </TabsContent>
 
         <TabsContent value="activity" className="mt-6">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">
-                Activity log coming in Phase 2.
-              </p>
-            </CardContent>
-          </Card>
+          <SiteActivityTab siteId={site.id} />
         </TabsContent>
       </Tabs>
     </div>

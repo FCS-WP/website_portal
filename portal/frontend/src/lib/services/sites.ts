@@ -10,4 +10,5 @@ export const siteService = {
   regenerateKey: (id: number) => api.post(`/sites/${id}/regenerate-key`),
   activity: (id: number, params?: Record<string, unknown>) =>
     api.get(`/sites/${id}/activity`, { params }),
+  plugins: (id: number) => api.get(`/sites/${id}/plugins`),
 };

@@ -86,7 +86,7 @@ class SiteController extends Controller
 
         // Return the plain key ONCE (it cannot be retrieved again)
         $siteData = $site->toArray();
-        $siteData['api_secret_key_plain'] = $plainKey;
+        $siteData['api_key'] = $plainKey;
 
         return $this->successResponse($siteData, 'Site created successfully. Save the API key — it will not be shown again.', 201);
     }
@@ -176,7 +176,7 @@ class SiteController extends Controller
         );
 
         return $this->successResponse([
-            'api_secret_key_plain' => $plainKey,
+            'api_key' => $plainKey,
             'message' => 'API key regenerated. The site agent will need to be reconfigured with the new key.',
         ]);
     }

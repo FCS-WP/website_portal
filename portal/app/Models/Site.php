@@ -59,6 +59,16 @@ class Site extends Model
             ->where('subject_type', self::class);
     }
 
+    public function sitePlugins(): HasMany
+    {
+        return $this->hasMany(SitePlugin::class);
+    }
+
+    public function deploymentJobSites(): HasMany
+    {
+        return $this->hasMany(DeploymentJobSite::class);
+    }
+
     /**
      * Scope to filter sites by user assignment (for dev/mkt users)
      */
