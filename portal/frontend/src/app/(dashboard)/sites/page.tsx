@@ -26,7 +26,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, MoreHorizontal, Trash2, ExternalLink } from "lucide-react";
+import { ApiKeyDialog } from "@/components/sites/api-key-dialog";
 import { siteService } from "@/lib/services/sites";
 import { hostingService } from "@/lib/services/hostings";
 import { Site, Hosting } from "@/types";
@@ -45,6 +62,10 @@ export default function SitesPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterHosting, setFilterHosting] = useState<string>("all");
   const [search, setSearch] = useState("");
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -121,9 +142,21 @@ export default function SitesPage() {
     }
   };
 
-  const copyApiKey = () => {
-    navigator.clipboard.writeText(newApiKey);
-    toast.success("API key copied to clipboard");
+
+  const handleDelete = async () => {
+    if (!siteToDelete) return;
+    setDeleting(true);
+    try {
+      await siteService.delete(siteToDelete.id);
+      toast.success(`Site "${siteToDelete.name}" deleted successfully`);
+      setDeleteDialogOpen(false);
+      setSiteToDelete(null);
+      fetchData();
+    } catch {
+      toast.error("Failed to delete site");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const columns: ColumnDef<Site>[] = [
@@ -131,12 +164,17 @@ export default function SitesPage() {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <button
-          className="font-medium text-primary hover:underline"
-          onClick={() => router.push(`/sites/${row.original.id}`)}
-        >
-          {row.getValue("name")}
-        </button>
+        <div className="flex items-center">
+          <button
+            className="font-medium text-primary hover:underline"
+            onClick={() => router.push(`/sites/${row.original.id}`)}
+          >
+            {row.getValue("name")}
+          </button>
+          {row.original.is_beta_tester && (
+            <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full ml-2">BETA</span>
+          )}
+        </div>
       ),
     },
     {
@@ -191,6 +229,60 @@ export default function SitesPage() {
                 +{tags.length - 3}
               </Badge>
             )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => {
+        const isOnline = ["connected", "online"].includes(row.original.status);
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {isOnline && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    const res = await siteService.autologin(row.original.id);
+                    const redirectUrl = res.data.data.redirect_url;
+                    if (redirectUrl) {
+                      window.open(redirectUrl, "_blank");
+                    } else {
+                      toast.error("No redirect URL returned");
+                    }
+                  } catch {
+                    toast.error("Failed to open WP Admin");
+                  }
+                }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                WP Admin
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => {
+                    setSiteToDelete(row.original);
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
@@ -334,28 +426,34 @@ export default function SitesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Site</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{siteToDelete?.name}&rdquo;? This action can be undone by an admin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* API Key Dialog */}
-      <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Site API Key</DialogTitle>
-            <DialogDescription>
-              Save this API key now. You won&apos;t be able to see it again.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="flex items-center gap-2">
-              <Input value={newApiKey} readOnly className="font-mono text-sm" />
-              <Button variant="outline" onClick={copyApiKey}>
-                Copy
-              </Button>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setApiKeyDialogOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ApiKeyDialog
+        open={apiKeyDialogOpen}
+        onOpenChange={setApiKeyDialogOpen}
+        apiKey={newApiKey}
+      />
     </div>
   );
 }

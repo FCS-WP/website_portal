@@ -22,6 +22,17 @@ class Epos_Agent_Plugin_Installer {
         $download_url = esc_url_raw($request->get_param('download_url'));
         $file_hash    = sanitize_text_field($request->get_param('file_hash'));
 
+        // Store health check / rollback settings from Portal
+        if ($request->get_param('health_check_delay') !== null) {
+            update_option('epos_health_check_delay', intval($request->get_param('health_check_delay')));
+        }
+        if ($request->get_param('health_check_second_delay') !== null) {
+            update_option('epos_health_check_second_delay', intval($request->get_param('health_check_second_delay')));
+        }
+        if ($request->get_param('rollback_enabled') !== null) {
+            update_option('epos_rollback_enabled', (bool) $request->get_param('rollback_enabled'));
+        }
+
         if (empty($plugin_slug) || empty($version) || empty($download_url)) {
             return new WP_REST_Response(array(
                 'success' => false,
@@ -55,6 +66,11 @@ class Epos_Agent_Plugin_Installer {
                 ), 422);
             }
         }
+
+        // Backup current version before upgrading
+        require_once plugin_dir_path(__FILE__) . 'class-rollback.php';
+        $rollback = new Epos_Agent_Rollback();
+        $rollback->backup_current_version($plugin_slug);
 
         // Check if plugin already exists
         $plugin_dir = WP_PLUGIN_DIR . '/' . $plugin_slug;
@@ -96,6 +112,21 @@ class Epos_Agent_Plugin_Installer {
             if (!is_plugin_active($plugin_file)) {
                 activate_plugin($plugin_file);
             }
+        }
+
+        // Store deployment context for health checks
+        $deployment_job_site_id = $request->get_param('deployment_job_site_id');
+        if ($deployment_job_site_id) {
+            update_option('epos_last_deployment_' . $plugin_slug, [
+                'deployment_job_site_id' => $deployment_job_site_id,
+                'installed_version' => $version,
+                'previous_version' => $rollback->get_backup_version($plugin_slug),
+                'installed_at' => time(),
+            ]);
+
+            // Schedule post-deployment health checks
+            require_once plugin_dir_path(__FILE__) . 'class-health-check.php';
+            Epos_Agent_Health_Check::schedule_checks($plugin_slug);
         }
 
         return new WP_REST_Response(array(

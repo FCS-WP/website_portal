@@ -17,6 +17,7 @@ const statusColors: Record<string, string> = {
   completed: "bg-green-100 text-green-800 hover:bg-green-100",
   failed: "bg-red-100 text-red-800 hover:bg-red-100",
   cancelled: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+  scheduled: "bg-purple-100 text-purple-800 hover:bg-purple-100",
 };
 
 export default function DeploymentsPage() {
@@ -75,13 +76,21 @@ export default function DeploymentsPage() {
       header: "Status",
       cell: ({ row }) => {
         const status = row.original.status;
+        const scheduledAt = row.original.scheduled_at;
         return (
-          <Badge
-            variant="secondary"
-            className={statusColors[status] || "bg-gray-100 text-gray-800"}
-          >
-            {status}
-          </Badge>
+          <div className="flex flex-col gap-0.5">
+            <Badge
+              variant="secondary"
+              className={statusColors[status] || "bg-gray-100 text-gray-800"}
+            >
+              {status}
+            </Badge>
+            {status === "scheduled" && scheduledAt && (
+              <span className="text-xs text-muted-foreground">
+                {format(new Date(scheduledAt), "MMM d, HH:mm")}
+              </span>
+            )}
+          </div>
         );
       },
     },

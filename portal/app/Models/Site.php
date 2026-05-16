@@ -26,12 +26,14 @@ class Site extends Model
         'last_ping_at',
         'tags',
         'created_by',
+        'is_beta_tester',
     ];
 
     protected $casts = [
         'woo_active' => 'boolean',
         'last_ping_at' => 'datetime',
         'tags' => 'array',
+        'is_beta_tester' => 'boolean',
     ];
 
     protected $hidden = [

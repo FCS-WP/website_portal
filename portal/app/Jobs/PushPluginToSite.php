@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\DeploymentJob;
 use App\Models\DeploymentJobSite;
+use App\Models\PortalSetting;
 use App\Services\SignedUrlService;
 use App\Services\TelegramNotificationService;
 use Illuminate\Bus\Queueable;
@@ -51,6 +52,10 @@ class PushPluginToSite implements ShouldQueue
                     'version' => $pluginVersion->version,
                     'download_url' => $downloadInfo['url'],
                     'file_hash' => $pluginVersion->file_hash,
+                    'deployment_job_site_id' => $djs->id,
+                    'health_check_delay' => (int) (PortalSetting::where('key', 'rollback_check_delay_minutes')->value('value') ?? 2),
+                    'health_check_second_delay' => (int) (PortalSetting::where('key', 'rollback_second_check_delay_minutes')->value('value') ?? 5),
+                    'rollback_enabled' => (bool) (PortalSetting::where('key', 'rollback_enabled')->value('value') ?? true),
                 ]);
 
             if ($response->successful()) {

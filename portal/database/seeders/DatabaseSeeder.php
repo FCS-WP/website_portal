@@ -44,5 +44,7 @@ class DatabaseSeeder extends Seeder
                 ['value' => $value]
             );
         }
+
+        $this->call(CredentialTypeSeeder::class);
     }
 }

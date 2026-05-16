@@ -11,7 +11,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(\App\Services\CredentialEncryptionService::class);
+        $this->app->singleton(\App\Services\VaultAuditService::class);
     }
 
     /**

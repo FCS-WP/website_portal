@@ -16,8 +16,18 @@
 - [agent.php](file://portal/routes/agent.php)
 - [AgentAuthMiddleware.php](file://portal/app/Http/Middleware/AgentAuthMiddleware.php)
 - [AgentController.php](file://portal/app/Http/Controllers/Agent/AgentController.php)
+- [SignedUrlService.php](file://portal/app/Services/SignedUrlService.php)
+- [PluginDownloadController.php](file://portal/app/Http/Controllers/Portal/PluginDownloadController.php)
 - [mail.php](file://portal/config/mail.php)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced plugin synchronization with bidirectional communication between WordPress agent and Laravel portal
+- Added plugin updates endpoint with signed URL generation for secure downloads
+- Improved plugin installer/updater logic with comprehensive integrity verification
+- Implemented full plugin lifecycle management with secure download and verification
+- Added portal-side plugin version management with changelog support
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -25,19 +35,21 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Security and Authentication](#security-and-authentication)
-9. [Troubleshooting Guide](#troubleshooting-guide)
-10. [Conclusion](#conclusion)
+6. [Bidirectional Plugin Synchronization](#bidirectional-plugin-synchronization)
+7. [Enhanced Plugin Lifecycle Management](#enhanced-plugin-lifecycle-management)
+8. [Dependency Analysis](#dependency-analysis)
+9. [Performance Considerations](#performance-considerations)
+10. [Security and Authentication](#security-and-authentication)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the WordPress Agent plugin integration system that connects WordPress sites to the EPOS Portal. It covers the agent plugin architecture, the REST API bridge between WordPress and the Laravel backend, the heartbeat mechanism for periodic status updates, plugin management (installation, updates, and compatibility), order synchronization for WooCommerce, SMTP configuration and email service integration, security and authentication, and troubleshooting guidance for common communication issues.
+This document explains the WordPress Agent plugin integration system that connects WordPress sites to the EPOS Portal. The system now features enhanced bidirectional plugin synchronization, secure plugin updates with signed URLs, and comprehensive plugin lifecycle management. It covers the agent plugin architecture, the REST API bridge between WordPress and the Laravel backend, the heartbeat mechanism for periodic status updates, plugin management (installation, updates, and compatibility), order synchronization for WooCommerce, SMTP configuration and email service integration, security and authentication, and troubleshooting guidance for common communication issues.
 
 ## Project Structure
 The integration consists of two parts:
-- WordPress plugin (agent): Provides REST endpoints, heartbeat, plugin management, SMTP configuration, and order synchronization.
-- Laravel Portal backend: Validates agent requests, handles handshake and ping, and prepares for future plugin and order synchronization features.
+- WordPress plugin (agent): Provides REST endpoints, heartbeat, bidirectional plugin management, SMTP configuration, and order synchronization.
+- Laravel Portal backend: Validates agent requests, handles handshake and ping, manages plugin versions with signed URL generation, and orchestrates bidirectional plugin synchronization.
 
 ```mermaid
 graph TB
@@ -45,7 +57,8 @@ subgraph "WordPress Site"
 WP_Plugin["EPOS WP Agent Plugin"]
 WP_API["REST API Endpoints"]
 WP_Ping["Heartbeat Ping"]
-WP_Plugins["Plugin Installer / Updater"]
+WP_Plugins["Bidirectional Plugin Sync"]
+WP_Plugin_Updater["Plugin Updater Hooks"]
 WP_SMTP["SMTP Config"]
 WP_Order["Order Sync"]
 end
@@ -53,16 +66,23 @@ subgraph "EPOS Portal (Laravel)"
 Portal_Routes["Agent Routes"]
 Portal_MW["AgentAuthMiddleware"]
 Portal_Ctrl["AgentController"]
+Portal_SignedURL["SignedUrlService"]
+Portal_Download["PluginDownloadController"]
+Portal_DB["Plugin Registry & Versions"]
 end
 WP_Plugin --> WP_API
 WP_Plugin --> WP_Ping
 WP_Plugin --> WP_Plugins
+WP_Plugin --> WP_Plugin_Updater
 WP_Plugin --> WP_SMTP
 WP_Plugin --> WP_Order
 WP_API --> Portal_Routes
 WP_Ping --> Portal_Routes
 Portal_Routes --> Portal_MW
 Portal_Routes --> Portal_Ctrl
+Portal_Ctrl --> Portal_SignedURL
+Portal_SignedURL --> Portal_Download
+Portal_DB --> Portal_Ctrl
 ```
 
 **Diagram sources**
@@ -70,11 +90,14 @@ Portal_Routes --> Portal_Ctrl
 - [class-api.php:8-45](file://agent/epos-wp-agent/includes/class-api.php#L8-L45)
 - [class-ping.php:7-13](file://agent/epos-wp-agent/includes/class-ping.php#L7-L13)
 - [class-plugin-installer.php:13-92](file://agent/epos-wp-agent/includes/class-plugin-installer.php#L13-L92)
+- [class-plugin-updater.php:16-45](file://agent/epos-wp-agent/includes/class-plugin-updater.php#L16-L45)
 - [class-smtp-config.php:13-41](file://agent/epos-wp-agent/includes/class-smtp-config.php#L13-L41)
 - [class-order-sync.php:13-47](file://agent/epos-wp-agent/includes/class-order-sync.php#L13-L47)
 - [agent.php:16-19](file://portal/routes/agent.php#L16-L19)
 - [AgentAuthMiddleware.php:20-55](file://portal/app/Http/Middleware/AgentAuthMiddleware.php#L20-L55)
 - [AgentController.php:16-97](file://portal/app/Http/Controllers/Agent/AgentController.php#L16-L97)
+- [SignedUrlService.php:17-36](file://portal/app/Services/SignedUrlService.php#L17-L36)
+- [PluginDownloadController.php:16-43](file://portal/app/Http/Controllers/Portal/PluginDownloadController.php#L16-L43)
 
 **Section sources**
 - [epos-wp-agent.php:26-53](file://agent/epos-wp-agent/epos-wp-agent.php#L26-L53)
@@ -83,15 +106,18 @@ Portal_Routes --> Portal_Ctrl
 ## Core Components
 - REST API Bridge: Exposes endpoints under a dedicated namespace for plugin management, SMTP configuration, and status reporting.
 - Heartbeat Mechanism: Periodic pings to the Portal with site status and optionally recent orders.
-- Plugin Management: Installs and updates EPOS company plugins with integrity verification and activation.
+- Bidirectional Plugin Synchronization: Real-time plugin state synchronization with the Portal for both directions.
+- Enhanced Plugin Management: Installs and updates EPOS company plugins with integrity verification, secure downloads, and full lifecycle management.
+- Plugin Updates Endpoint: Generates signed URLs for secure plugin downloads with token-based access control.
 - SMTP Configuration: Applies remote SMTP settings and sends test emails.
 - Order Synchronization: Collects recent WooCommerce orders for sync to the Portal.
-- Authentication and Security: Uses a shared secret validated via a middleware on the Portal.
+- Authentication and Security: Uses a shared secret validated via a middleware on the Portal with enhanced security measures.
 
 **Section sources**
 - [class-api.php:15-45](file://agent/epos-wp-agent/includes/class-api.php#L15-L45)
 - [class-ping.php:29-81](file://agent/epos-wp-agent/includes/class-ping.php#L29-L81)
 - [class-plugin-installer.php:13-92](file://agent/epos-wp-agent/includes/class-plugin-installer.php#L13-L92)
+- [class-plugin-updater.php:16-45](file://agent/epos-wp-agent/includes/class-plugin-updater.php#L16-L45)
 - [class-smtp-config.php:13-78](file://agent/epos-wp-agent/includes/class-smtp-config.php#L13-L78)
 - [class-order-sync.php:13-47](file://agent/epos-wp-agent/includes/class-order-sync.php#L13-L47)
 - [AgentAuthMiddleware.php:20-55](file://portal/app/Http/Middleware/AgentAuthMiddleware.php#L20-L55)
@@ -100,10 +126,10 @@ Portal_Routes --> Portal_Ctrl
 The agent plugin initializes and registers:
 - REST API endpoints for the Portal to issue commands.
 - A cron-based heartbeat that periodically pings the Portal.
-- Plugin updater hooks for EPOS company plugins.
+- Plugin updater hooks for EPOS company plugins with bidirectional synchronization.
 - Admin settings page for Portal URL and API key.
 
-The Portal validates each request using a custom middleware that verifies the X-Agent-Key against a hashed secret stored per site and attaches the site context to the request.
+The Portal validates each request using a custom middleware that verifies the X-Agent-Key against a hashed secret stored per site and attaches the site context to the request. The system now supports bidirectional plugin synchronization with secure signed URL generation for downloads.
 
 ```mermaid
 sequenceDiagram
@@ -116,12 +142,18 @@ API->>MW : "Validate X-Agent-Key and X-Site-Url"
 MW-->>API : "Attach site context"
 API->>CTRL : "Dispatch handshake"
 CTRL-->>API : "200 OK"
-API-->>WP : "Connected"
+Note over WP,CTRL : "Bidirectional Plugin Sync"
+WP->>API : "POST /api/agent/plugin-updates"
+API->>MW : "Validate headers"
+MW-->>API : "Attach site context"
+API->>CTRL : "Check installed plugins"
+CTRL->>CTRL : "Generate signed URL"
+CTRL-->>API : "200 OK with updates"
 Note over WP,CTRL : "Periodic heartbeat"
 WP->>API : "POST /api/agent/ping"
 API->>MW : "Validate headers"
 MW-->>API : "Attach site context"
-API->>CTRL : "Dispatch ping"
+API->>CTRL : "Sync plugin states"
 CTRL-->>API : "200 OK"
 ```
 
@@ -131,6 +163,7 @@ CTRL-->>API : "200 OK"
 - [agent.php:16-19](file://portal/routes/agent.php#L16-L19)
 - [AgentAuthMiddleware.php:20-55](file://portal/app/Http/Middleware/AgentAuthMiddleware.php#L20-L55)
 - [AgentController.php:16-97](file://portal/app/Http/Controllers/Agent/AgentController.php#L16-L97)
+- [AgentController.php:178-241](file://portal/app/Http/Controllers/Agent/AgentController.php#L178-L241)
 
 ## Detailed Component Analysis
 
@@ -193,14 +226,14 @@ Stop --> End
 - [class-ping.php:18-24](file://agent/epos-wp-agent/includes/class-ping.php#L18-L24)
 - [class-ping.php:29-81](file://agent/epos-wp-agent/includes/class-ping.php#L29-L81)
 
-### Plugin Management
+### Enhanced Plugin Management
 The installer accepts parameters for slug, version, download URL, and file hash. It:
 - Downloads the plugin archive
 - Verifies SHA-256 integrity
 - Uses the WordPress upgrader to install or update
 - Activates the plugin if needed
 
-The updater stub currently does not contact the Portal but is prepared to fetch updates and plugin info in future phases.
+The updater now implements bidirectional synchronization with the Portal, checking for updates and providing plugin information for WordPress update system integration.
 
 ```mermaid
 flowchart TD
@@ -230,7 +263,7 @@ The SMTP module:
 - Hooks into PHPMailer to apply settings for all outgoing emails
 - Sends a test email and returns success/failure
 
-The Portal’s mail configuration supports multiple mailers and global “From” settings.
+The Portal's mail configuration supports multiple mailers and global "From" settings.
 
 ```mermaid
 sequenceDiagram
@@ -314,19 +347,114 @@ Portal-->>WP : "200 OK / Error"
 - [settings-page.php:20-27](file://agent/epos-wp-agent/admin/settings-page.php#L20-L27)
 - [settings-page.php:30-45](file://agent/epos-wp-agent/admin/settings-page.php#L30-L45)
 
+## Bidirectional Plugin Synchronization
+
+### Enhanced Plugin Updates Flow
+The system now supports bidirectional plugin synchronization through a comprehensive updates endpoint that generates secure signed URLs for plugin downloads. This enables both directions of communication:
+
+1. **Portal-to-Agent Updates**: Portal checks installed plugins and sends update information
+2. **Agent-to-Portal State Reporting**: Agent reports plugin states back to Portal
+3. **Secure Download Process**: Signed URLs ensure secure plugin distribution
+
+```mermaid
+sequenceDiagram
+participant Portal as "Portal Backend"
+participant Agent as "WordPress Agent"
+participant SignedURL as "SignedUrlService"
+participant Download as "PluginDownloadController"
+Portal->>Agent : "POST /api/agent/plugin-updates"
+Agent->>Portal : "Send installed_plugins list"
+Portal->>SignedURL : "Generate signed download URL"
+SignedURL-->>Portal : "Return {url, token, expires_at}"
+Portal->>Agent : "Return updates with signed URL"
+Agent->>Download : "Download plugin via signed URL"
+Download->>SignedURL : "Validate token"
+SignedURL-->>Download : "Return file info"
+Download-->>Agent : "Serve plugin file"
+Agent->>Agent : "Verify file hash"
+Agent->>Agent : "Install/Update plugin"
+Agent->>Portal : "POST /api/agent/ping with plugin state"
+Portal->>Portal : "Sync plugin states to database"
+```
+
+**Diagram sources**
+- [AgentController.php:178-241](file://portal/app/Http/Controllers/Agent/AgentController.php#L178-L241)
+- [SignedUrlService.php:17-36](file://portal/app/Services/SignedUrlService.php#L17-L36)
+- [PluginDownloadController.php:16-43](file://portal/app/Http/Controllers/Portal/PluginDownloadController.php#L16-L43)
+- [class-plugin-updater.php:30-113](file://agent/epos-wp-agent/includes/class-plugin-updater.php#L30-L113)
+
+### Plugin State Synchronization
+The AgentController now includes comprehensive plugin state synchronization that:
+- Syncs company plugin installations to the site_plugins table
+- Calculates latest stable versions for each plugin
+- Handles plugin activation/deactivation states
+- Removes orphaned records when plugins are uninstalled
+
+**Section sources**
+- [AgentController.php:107-152](file://portal/app/Http/Controllers/Agent/AgentController.php#L107-L152)
+- [class-plugin-updater.php:30-113](file://agent/epos-wp-agent/includes/class-plugin-updater.php#L30-L113)
+
+## Enhanced Plugin Lifecycle Management
+
+### Secure Plugin Download System
+The system implements a secure plugin download process using signed URLs:
+
+1. **Token Generation**: Unique tokens with 10-minute expiration
+2. **Cache Storage**: Temporary storage of file metadata in cache
+3. **Single-Use Validation**: Token validation with automatic cleanup
+4. **Integrity Verification**: SHA-256 hash verification during installation
+
+```mermaid
+flowchart TD
+Start["Plugin Update Request"] --> Generate["Generate Random Token"]
+Generate --> Store["Store File Info in Cache<br/>Expires in 10 minutes"]
+Store --> CreateURL["Create Download URL<br/>/api/plugin-downloads/{token}"]
+CreateURL --> Send["Send URL to Agent"]
+Send --> Download["Agent Downloads via Signed URL"]
+Download --> Validate["Validate Token in Cache"]
+Validate --> Exists{"File Exists?"}
+Exists --> |No| Error["Return 404 Error"]
+Exists --> |Yes| Serve["Serve File with X-File-Hash Header"]
+Serve --> Verify["Agent Verifies SHA-256 Hash"]
+Verify --> Success["Installation Proceeds"]
+Error --> End["End Process"]
+Success --> End
+```
+
+**Diagram sources**
+- [SignedUrlService.php:17-36](file://portal/app/Services/SignedUrlService.php#L17-L36)
+- [PluginDownloadController.php:16-43](file://portal/app/Http/Controllers/Portal/PluginDownloadController.php#L16-L43)
+- [class-plugin-installer.php:47-57](file://agent/epos-wp-agent/includes/class-plugin-installer.php#L47-L57)
+
+### Improved Installer Logic
+The enhanced installer now includes:
+- Comprehensive parameter validation
+- Secure file hash verification
+- Overwrite handling for updates
+- Automatic activation logic
+- Detailed error reporting
+
+**Section sources**
+- [class-plugin-installer.php:19-110](file://agent/epos-wp-agent/includes/class-plugin-installer.php#L19-L110)
+- [SignedUrlService.php:17-36](file://portal/app/Services/SignedUrlService.php#L17-L36)
+- [PluginDownloadController.php:16-43](file://portal/app/Http/Controllers/Portal/PluginDownloadController.php#L16-L43)
+
 ## Dependency Analysis
-The agent plugin depends on WordPress core APIs for REST, cron, HTTP requests, and plugin management. The Portal validates requests and orchestrates actions based on the authenticated site context.
+The agent plugin depends on WordPress core APIs for REST, cron, HTTP requests, and plugin management. The Portal validates requests and orchestrates actions based on the authenticated site context, with enhanced plugin management capabilities.
 
 ```mermaid
 graph LR
 WP_Init["epos-wp-agent.php"] --> WP_API["class-api.php"]
 WP_Init --> WP_Ping["class-ping.php"]
 WP_Init --> WP_Plugins["class-plugin-installer.php"]
+WP_Init --> WP_Plugin_Updater["class-plugin-updater.php"]
 WP_Init --> WP_SMTP["class-smtp-config.php"]
 WP_Init --> WP_Order["class-order-sync.php"]
 WP_API --> Portal_Routes["routes/agent.php"]
 Portal_Routes --> Portal_MW["AgentAuthMiddleware.php"]
 Portal_Routes --> Portal_Ctrl["AgentController.php"]
+Portal_Ctrl --> Portal_SignedURL["SignedUrlService.php"]
+Portal_SignedURL --> Portal_Download["PluginDownloadController.php"]
 ```
 
 **Diagram sources**
@@ -335,6 +463,8 @@ Portal_Routes --> Portal_Ctrl["AgentController.php"]
 - [agent.php:16-19](file://portal/routes/agent.php#L16-L19)
 - [AgentAuthMiddleware.php:20-55](file://portal/app/Http/Middleware/AgentAuthMiddleware.php#L20-L55)
 - [AgentController.php:16-97](file://portal/app/Http/Controllers/Agent/AgentController.php#L16-L97)
+- [SignedUrlService.php:17-36](file://portal/app/Services/SignedUrlService.php#L17-L36)
+- [PluginDownloadController.php:16-43](file://portal/app/Http/Controllers/Portal/PluginDownloadController.php#L16-L43)
 
 **Section sources**
 - [epos-wp-agent.php:26-34](file://agent/epos-wp-agent/epos-wp-agent.php#L26-L34)
@@ -344,6 +474,8 @@ Portal_Routes --> Portal_Ctrl["AgentController.php"]
 - Heartbeat frequency: The 5-minute interval balances visibility and overhead. Adjustments should consider server load and network bandwidth.
 - Order sync limits: The recent order collection is capped to reduce payload size and processing time.
 - Plugin downloads: Large plugin archives increase memory and disk usage; ensure sufficient resources and timeouts.
+- Signed URL caching: Cache-based token storage minimizes database load while maintaining security.
+- Bidirectional sync: Plugin state synchronization reduces redundant data transfer and improves accuracy.
 - SMTP operations: Email sending adds latency; batch operations or async processing can help if needed.
 
 ## Security and Authentication
@@ -351,17 +483,23 @@ Portal_Routes --> Portal_Ctrl["AgentController.php"]
 - Headers: Both sides rely on X-Agent-Key and X-Site-Url for identification and authorization.
 - HTTPS: Outbound requests enable SSL verification to protect data in transit.
 - Integrity: Plugin installation validates file integrity via SHA-256 before upgrading.
+- Signed URL Security: Token-based download URLs with 10-minute expiration prevent unauthorized access.
+- Cache Security: Temporary cache storage with automatic cleanup prevents token reuse.
+- Bidirectional Authentication: Both directions require proper key validation and site authorization.
 
 Best practices:
 - Rotate API keys periodically and re-test connections after changes.
 - Restrict Portal URL and API key exposure; avoid logging sensitive values.
 - Monitor connection status and investigate persistent errors promptly.
+- Regularly review plugin update logs and security events.
+- Implement proper cache configuration for production environments.
 
 **Section sources**
 - [AgentAuthMiddleware.php:20-55](file://portal/app/Http/Middleware/AgentAuthMiddleware.php#L20-L55)
 - [class-api.php:50-71](file://agent/epos-wp-agent/includes/class-api.php#L50-L71)
 - [class-ping.php:50-62](file://agent/epos-wp-agent/includes/class-ping.php#L50-L62)
 - [class-plugin-installer.php:36-44](file://agent/epos-wp-agent/includes/class-plugin-installer.php#L36-L44)
+- [SignedUrlService.php:17-36](file://portal/app/Services/SignedUrlService.php#L17-L36)
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -386,6 +524,14 @@ Common issues and resolutions:
     - [class-plugin-installer.php:29-34](file://agent/epos-wp-agent/includes/class-plugin-installer.php#L29-L34)
     - [class-plugin-installer.php:68-80](file://agent/epos-wp-agent/includes/class-plugin-installer.php#L68-L80)
 
+- Plugin update failures
+  - Symptom: Updates not detected or download fails.
+  - Action: Verify signed URL generation, cache configuration, and file hash verification. Check plugin registry and version management.
+  - Section sources
+    - [class-plugin-updater.php:30-113](file://agent/epos-wp-agent/includes/class-plugin-updater.php#L30-L113)
+    - [AgentController.php:178-241](file://portal/app/Http/Controllers/Agent/AgentController.php#L178-L241)
+    - [SignedUrlService.php:17-36](file://portal/app/Services/SignedUrlService.php#L17-L36)
+
 - SMTP test failures
   - Symptom: Test email fails to send.
   - Action: Validate SMTP credentials and server settings; ensure the PHPMailer configuration is applied and the mailer is reachable.
@@ -400,5 +546,12 @@ Common issues and resolutions:
     - [class-ping.php:18-24](file://agent/epos-wp-agent/includes/class-ping.php#L18-L24)
     - [class-ping.php:72-81](file://agent/epos-wp-agent/includes/class-ping.php#L72-L81)
 
+- Bidirectional sync issues
+  - Symptom: Plugin states not updating or inconsistent data.
+  - Action: Verify plugin state reporting in heartbeat, check database synchronization, and confirm plugin registry updates.
+  - Section sources
+    - [AgentController.php:107-152](file://portal/app/Http/Controllers/Agent/AgentController.php#L107-L152)
+    - [class-activator.php:81-103](file://agent/epos-wp-agent/includes/class-activator.php#L81-L103)
+
 ## Conclusion
-The WordPress Agent plugin provides a robust foundation for connecting WordPress sites to the EPOS Portal. It establishes secure, authenticated communication, maintains health via periodic heartbeats, manages EPOS company plugins, configures SMTP remotely, and synchronizes WooCommerce orders. The Laravel backend enforces strict authentication and prepares the system for future enhancements in plugin and order synchronization.
+The WordPress Agent plugin provides a robust foundation for connecting WordPress sites to the EPOS Portal with enhanced bidirectional plugin synchronization capabilities. The system now features secure plugin lifecycle management with signed URL generation, comprehensive integrity verification, and real-time plugin state synchronization. It establishes secure, authenticated communication, maintains health via periodic heartbeats, manages EPOS company plugins with full lifecycle support, configures SMTP remotely, and synchronizes WooCommerce orders. The Laravel backend enforces strict authentication, manages plugin versions with secure downloads, and orchestrates bidirectional plugin synchronization for a complete integration solution.

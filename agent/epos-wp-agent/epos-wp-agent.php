@@ -32,6 +32,9 @@ require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-plugin-installer.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-plugin-updater.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-order-sync.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-smtp-config.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-autologin.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-health-check.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-rollback.php';
 
 // Activation / Deactivation hooks
 register_activation_hook(__FILE__, ['Epos_Agent_Activator', 'activate']);
@@ -49,6 +52,16 @@ function epos_agent_init() {
     
     // Register plugin updater for EPOS plugins
     Epos_Agent_Plugin_Updater::init();
+
+    // Register autologin handler
+    new EPOS_Agent_Autologin();
+
+    // Initialize admin account sync
+    require_once plugin_dir_path(__FILE__) . 'includes/class-admin-sync.php';
+    Epos_Agent_Admin_Sync::init();
+
+    // Initialize health check cron handler
+    Epos_Agent_Health_Check::init();
 }
 add_action('init', 'epos_agent_init');
 

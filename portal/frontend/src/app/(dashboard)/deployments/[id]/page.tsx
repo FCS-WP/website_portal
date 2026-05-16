@@ -17,7 +17,21 @@ import {
   Loader2,
   Clock,
   Wrench,
+  ShieldCheck,
+  Undo2,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { deploymentsService } from "@/lib/services/deployments";
 import { DeploymentJob, DeploymentJobSite, DeploymentProgress } from "@/types";
 import { toast } from "sonner";
@@ -56,6 +70,7 @@ export default function DeploymentDetailPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [tabFilter, setTabFilter] = useState<"all" | "success" | "failed">("all");
   const [selectedSites, setSelectedSites] = useState<Set<number>>(new Set());
+  const [rollbackingSiteId, setRollbackingSiteId] = useState<number | null>(null);
 
   const sites: DeploymentJobSite[] = deployment?.sites || [];
 
@@ -163,6 +178,8 @@ export default function DeploymentDetailPage() {
   const progressFailed = progress?.failed || deployment?.failed_count || 0;
   const progressPending = progress?.pending || 0;
   const progressRunning = progress?.running || 0;
+  const progressHealthy = progress?.healthy || sites.filter((s) => s.status === "healthy").length;
+  const progressRolledBack = progress?.rolled_back || sites.filter((s) => s.status === "rolled_back").length;
 
   const successPercent = progressTotal > 0 ? ((progressSuccess / progressTotal) * 100).toFixed(1) : "0";
   const failureRate = progressTotal > 0 ? ((progressFailed / progressTotal) * 100).toFixed(1) : "0";
@@ -277,6 +294,21 @@ export default function DeploymentDetailPage() {
   const successCount = sites.filter((s) => s.status === "success").length;
   const failedCount = sites.filter((s) => s.status === "failed").length;
 
+  const handleRollbackSite = async (siteJobId: number) => {
+    setRollbackingSiteId(siteJobId);
+    try {
+      const res = await deploymentsService.rollbackSite(siteJobId);
+      const version = res.data?.data?.rollback_version;
+      toast.success(version ? `Rollback initiated — restoring to ${version}` : "Rollback initiated");
+      fetchDeployment();
+      fetchProgress();
+    } catch {
+      toast.error("Failed to initiate rollback");
+    } finally {
+      setRollbackingSiteId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 p-6">
@@ -366,10 +398,12 @@ export default function DeploymentDetailPage() {
       </div>
 
       {/* === METRICS CARDS === */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-7 gap-4">
         <MetricCard label="TOTAL SITES" value={progressTotal} subtitle="All with plugin installed" color="text-foreground" />
         <MetricCard label="SUCCESS" value={progressSuccess} subtitle={`${successPercent}% complete`} color="text-emerald-400" />
+        <MetricCard label="HEALTHY" value={progressHealthy} subtitle="Passed health checks" color="text-green-400" />
         <MetricCard label="FAILED" value={progressFailed} subtitle={`${failureRate}% failure rate`} color="text-red-400" />
+        <MetricCard label="ROLLED BACK" value={progressRolledBack} subtitle="Reverted to stable" color="text-rose-600" />
         <MetricCard label="PENDING" value={progressPending} subtitle="In queue" color="text-gray-400" />
         <MetricCard label="RUNNING" value={progressRunning} subtitle="Concurrent slots: 10" color="text-blue-400" />
       </div>
@@ -404,10 +438,22 @@ export default function DeploymentDetailPage() {
                 style={{ width: `${(progressSuccess / progressTotal) * 100}%` }}
               />
             )}
+            {progressHealthy > 0 && (
+              <div
+                className="bg-green-400 h-full transition-all duration-500"
+                style={{ width: `${(progressHealthy / progressTotal) * 100}%` }}
+              />
+            )}
             {progressFailed > 0 && (
               <div
                 className="bg-red-500 h-full transition-all duration-500"
                 style={{ width: `${(progressFailed / progressTotal) * 100}%` }}
+              />
+            )}
+            {progressRolledBack > 0 && (
+              <div
+                className="bg-rose-800 h-full transition-all duration-500"
+                style={{ width: `${(progressRolledBack / progressTotal) * 100}%` }}
               />
             )}
             {progressRunning > 0 && (
@@ -434,9 +480,11 @@ export default function DeploymentDetailPage() {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-6 text-xs text-muted-foreground">
+        <div className="flex items-center gap-6 text-xs text-muted-foreground flex-wrap">
           <LegendDot color="bg-emerald-500" label="Success" count={progressSuccess} />
+          <LegendDot color="bg-green-400" label="Healthy" count={progressHealthy} />
           <LegendDot color="bg-red-500" label="Failed" count={progressFailed} />
+          <LegendDot color="bg-rose-800" label="Rolled Back" count={progressRolledBack} />
           <LegendDot color="bg-blue-500" label="Running" count={progressRunning} />
           <LegendDot color="bg-gray-500" label="Pending" count={progressPending} />
         </div>
@@ -474,13 +522,13 @@ export default function DeploymentDetailPage() {
             </div>
           </div>
 
-          {/* Table */}
           <div className="space-y-0 divide-y divide-border">
-            <div className="grid grid-cols-[auto_1fr_1fr_80px] gap-3 px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="grid grid-cols-[auto_1fr_1fr_80px_100px] gap-3 px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <div className="w-5" />
               <div>Site</div>
               <div>Status</div>
               <div>Duration</div>
+              <div>Actions</div>
             </div>
             {filteredSites.length > 0 ? (
               filteredSites.slice(0, 8).map((siteJob) => (
@@ -497,6 +545,9 @@ export default function DeploymentDetailPage() {
                     });
                   }}
                   startedAt={deployment.started_at}
+                  pluginName={pluginName}
+                  onRollback={handleRollbackSite}
+                  isRollbacking={rollbackingSiteId === siteJob.id}
                 />
               ))
             ) : (
@@ -687,11 +738,17 @@ function SiteRow({
   selected,
   onToggle,
   startedAt,
+  pluginName,
+  onRollback,
+  isRollbacking,
 }: {
   siteJob: DeploymentJobSite;
   selected: boolean;
   onToggle: () => void;
   startedAt: string | null;
+  pluginName: string;
+  onRollback: (id: number) => void;
+  isRollbacking: boolean;
 }) {
   const siteName = siteJob.site?.name || `Site #${siteJob.site_id}`;
   const hostingName = siteJob.site?.hosting?.name;
@@ -706,31 +763,107 @@ function SiteRow({
     duration = `${dur.toFixed(1)}s`;
   }
 
+  const canRollback = siteJob.status === "success" || siteJob.status === "healthy";
+
   return (
-    <div className="grid grid-cols-[auto_1fr_1fr_80px] gap-3 px-2 py-3 items-start">
-      <div className="pt-0.5">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggle}
-          className="h-3.5 w-3.5 rounded border-border"
-        />
+    <div className="px-2 py-3">
+      <div className="grid grid-cols-[auto_1fr_1fr_80px_100px] gap-3 items-start">
+        <div className="pt-0.5">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggle}
+            className="h-3.5 w-3.5 rounded border-border"
+          />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{siteName}</p>
+          {hostingName && (
+            <p className="text-xs text-muted-foreground">{hostingName}</p>
+          )}
+        </div>
+        <div>
+          <SiteStatusBadge status={siteJob.status} />
+          {siteJob.status === "failed" && siteJob.error_message && (
+            <p className="text-[11px] text-red-400/80 mt-1 leading-snug">
+              ⚠ {siteJob.error_message}
+            </p>
+          )}
+        </div>
+        <div className="text-sm text-muted-foreground">{duration}</div>
+        <div>
+          {canRollback && (
+            <AlertDialog>
+              <AlertDialogTrigger
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium border border-red-500/50 text-red-400 rounded-md hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                disabled={isRollbacking}
+              >
+                {isRollbacking ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Undo2 className="h-3 w-3" />
+                )}
+                Rollback
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Rollback {pluginName} on {siteName}?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will restore the previous stable version.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={() => onRollback(siteJob.id)}
+                  >
+                    Rollback
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
-      <div>
-        <p className="text-sm font-medium text-foreground">{siteName}</p>
-        {hostingName && (
-          <p className="text-xs text-muted-foreground">{hostingName}</p>
-        )}
-      </div>
-      <div>
-        <SiteStatusBadge status={siteJob.status} />
-        {siteJob.status === "failed" && siteJob.error_message && (
-          <p className="text-[11px] text-red-400/80 mt-1 leading-snug">
-            ⚠ {siteJob.error_message}
-          </p>
-        )}
-      </div>
-      <div className="text-sm text-muted-foreground">{duration}</div>
+
+      {/* Rolled-back site details */}
+      {siteJob.status === "rolled_back" && (
+        <div className="ml-8 mt-2 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 space-y-1.5">
+          {siteJob.rollback_reason && (
+            <p className="text-xs text-rose-400 flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              {siteJob.rollback_reason}
+            </p>
+          )}
+          {siteJob.rollback_version && (
+            <p className="text-xs text-muted-foreground">
+              Restored to <span className="font-medium text-foreground">v{siteJob.rollback_version}</span> successfully
+            </p>
+          )}
+          {siteJob.health_check_results && Object.keys(siteJob.health_check_results).length > 0 && (
+            <div className="text-xs space-y-0.5 pt-1 border-t border-rose-500/10">
+              <p className="text-muted-foreground font-medium">Health checks:</p>
+              {Object.entries(siteJob.health_check_results).map(([check, passed]) => (
+                <p key={check} className="flex items-center gap-1.5">
+                  {passed ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                  ) : passed === false ? (
+                    <XOctagon className="h-3 w-3 text-red-400" />
+                  ) : (
+                    <Clock className="h-3 w-3 text-gray-400" />
+                  )}
+                  <span className={passed === false ? "text-red-400" : "text-muted-foreground"}>
+                    {check}
+                  </span>
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -743,10 +876,22 @@ function SiteStatusBadge({ status }: { status: string }) {
           <CheckCircle2 className="h-3.5 w-3.5" /> Success
         </span>
       );
+    case "healthy":
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400">
+          <ShieldCheck className="h-3.5 w-3.5" /> Healthy
+        </span>
+      );
     case "failed":
       return (
         <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
           <XOctagon className="h-3.5 w-3.5" /> Failed
+        </span>
+      );
+    case "rolled_back":
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
+          <Undo2 className="h-3.5 w-3.5" /> Rolled Back
         </span>
       );
     case "running":

@@ -38,6 +38,9 @@ class SettingsController extends Controller
             'portal_base_url' => 'nullable|url',
             'agent_ping_interval_minutes' => 'nullable|integer|min:1|max:60',
             'max_deployment_retries' => 'nullable|integer|min:0|max:10',
+            'rollback_enabled' => 'nullable|boolean',
+            'rollback_check_delay_minutes' => 'nullable|integer|min:1|max:30',
+            'rollback_second_check_delay_minutes' => 'nullable|integer|min:1|max:60',
         ]);
 
         $allowedKeys = [
@@ -46,6 +49,9 @@ class SettingsController extends Controller
             'portal_base_url',
             'agent_ping_interval_minutes',
             'max_deployment_retries',
+            'rollback_enabled',
+            'rollback_check_delay_minutes',
+            'rollback_second_check_delay_minutes',
         ];
 
         foreach ($request->only($allowedKeys) as $key => $value) {

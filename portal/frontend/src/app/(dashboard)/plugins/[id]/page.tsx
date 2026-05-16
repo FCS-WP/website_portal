@@ -33,6 +33,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
@@ -43,9 +53,11 @@ import {
   Pencil,
   FileText,
   Rocket,
+  ArrowUpCircle,
+  FlaskConical,
 } from "lucide-react";
 import { pluginService } from "@/lib/services/plugins";
-import { Plugin, PluginVersion } from "@/types";
+import { Plugin, PluginVersion, BetaStatus } from "@/types";
 import { formatFileSize } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -82,6 +94,7 @@ export default function PluginDetailPage() {
   const [uploadVersion, setUploadVersion] = useState("");
   const [uploadChangelog, setUploadChangelog] = useState("");
   const [uploadType, setUploadType] = useState<string>("feature");
+  const [uploadTrack, setUploadTrack] = useState<'stable' | 'beta'>('stable');
   const [uploadIsStable, setUploadIsStable] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -89,6 +102,15 @@ export default function PluginDetailPage() {
   // Deploy dialog state
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [deployVersion, setDeployVersion] = useState<PluginVersion | null>(null);
+
+  // Promote dialog state
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
+  const [promoteVersion, setPromoteVersion] = useState<PluginVersion | null>(null);
+  const [promoting, setPromoting] = useState(false);
+
+  // Beta status state
+  const [betaStatusMap, setBetaStatusMap] = useState<Record<number, BetaStatus>>({});
+  const [expandedBetaVersion, setExpandedBetaVersion] = useState<number | null>(null);
 
   const fetchPlugin = useCallback(async () => {
     try {
@@ -150,7 +172,8 @@ export default function PluginDetailPage() {
       formData.append("version", uploadVersion);
       formData.append("changelog", uploadChangelog);
       formData.append("type", uploadType);
-      formData.append("is_stable", uploadIsStable ? "1" : "0");
+      formData.append("track", uploadTrack);
+      formData.append("is_stable", uploadTrack === 'stable' && uploadIsStable ? "1" : "0");
 
       await pluginService.uploadVersion(id, formData, (percent) => {
         setUploadProgress(percent);
@@ -161,6 +184,7 @@ export default function PluginDetailPage() {
       setUploadVersion("");
       setUploadChangelog("");
       setUploadType("feature");
+      setUploadTrack('stable');
       setUploadIsStable(true);
       setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -184,6 +208,31 @@ export default function PluginDetailPage() {
       }
     } catch {
       toast.error("Failed to get download URL");
+    }
+  };
+
+  const handlePromote = async () => {
+    if (!promoteVersion) return;
+    setPromoting(true);
+    try {
+      await pluginService.promoteVersion(promoteVersion.id);
+      toast.success(`Version ${promoteVersion.version} promoted to stable. Deployment to remaining sites will begin.`);
+      setPromoteDialogOpen(false);
+      setPromoteVersion(null);
+      fetchVersions();
+    } catch {
+      toast.error("Failed to promote version");
+    } finally {
+      setPromoting(false);
+    }
+  };
+
+  const fetchBetaStatus = async (versionId: number) => {
+    try {
+      const res = await pluginService.betaStatus(versionId);
+      setBetaStatusMap((prev) => ({ ...prev, [versionId]: res.data.data }));
+    } catch {
+      toast.error("Failed to load beta status");
     }
   };
 
@@ -311,6 +360,7 @@ export default function PluginDetailPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Version</TableHead>
+                        <TableHead>Track</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Stable</TableHead>
                         <TableHead>Released By</TableHead>
@@ -321,9 +371,17 @@ export default function PluginDetailPage() {
                     </TableHeader>
                     <TableBody>
                       {versions.map((version) => (
+                        <>
                         <TableRow key={version.id}>
                           <TableCell>
                             <Badge variant="outline">{version.version}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {version.track === 'beta' ? (
+                              <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-medium">BETA</span>
+                            ) : (
+                              <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full font-medium">STABLE</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             {version.changelog?.type ? (
@@ -391,9 +449,88 @@ export default function PluginDetailPage() {
                               >
                                 <Rocket className="h-4 w-4" />
                               </Button>
+                              {version.track === 'beta' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-1"
+                                  onClick={() => {
+                                    setPromoteVersion(version);
+                                    setPromoteDialogOpen(true);
+                                  }}
+                                  title="Promote to Stable"
+                                >
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                  Promote
+                                </Button>
+                              )}
+                              {version.track === 'beta' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="Beta Status"
+                                  onClick={() => {
+                                    if (expandedBetaVersion === version.id) {
+                                      setExpandedBetaVersion(null);
+                                    } else {
+                                      setExpandedBetaVersion(version.id);
+                                      if (!betaStatusMap[version.id]) {
+                                        fetchBetaStatus(version.id);
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <FlaskConical className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
+                        {expandedBetaVersion === version.id && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="bg-amber-50/50 border-amber-100">
+                              {betaStatusMap[version.id] ? (
+                                <div className="p-3 space-y-2">
+                                  <div className="flex items-center gap-2 text-sm font-medium">
+                                    <FlaskConical className="h-4 w-4 text-amber-600" />
+                                    Beta Status
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Total Sites:</span>{" "}
+                                      <span className="font-medium">{betaStatusMap[version.id].total_beta_sites}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Deployed:</span>{" "}
+                                      <span className="font-medium">{betaStatusMap[version.id].deployed}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Healthy:</span>{" "}
+                                      <span className="font-medium text-green-600">{betaStatusMap[version.id].healthy}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Failed:</span>{" "}
+                                      <span className="font-medium text-red-600">{betaStatusMap[version.id].failed}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Rolled Back:</span>{" "}
+                                      <span className="font-medium text-orange-600">{betaStatusMap[version.id].rolled_back}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-4 text-sm">
+                                    <span className="text-muted-foreground">Running for {betaStatusMap[version.id].days_running} day(s)</span>
+                                    <span className={betaStatusMap[version.id].failed > 0 || betaStatusMap[version.id].rolled_back > 0 ? "text-amber-600" : "text-green-600"}>
+                                      {betaStatusMap[version.id].status_message}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-3 text-sm text-muted-foreground">Loading beta status...</div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        </>
                       ))}
                     </TableBody>
                   </Table>
@@ -469,6 +606,40 @@ export default function PluginDetailPage() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label>Release Track</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="track"
+                      value="stable"
+                      checked={uploadTrack === 'stable'}
+                      onChange={() => setUploadTrack('stable')}
+                      className="h-4 w-4"
+                    />
+                    <span>Stable</span>
+                    <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">STABLE</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="track"
+                      value="beta"
+                      checked={uploadTrack === 'beta'}
+                      onChange={() => setUploadTrack('beta')}
+                      className="h-4 w-4"
+                    />
+                    <span>Beta</span>
+                    <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">BETA</span>
+                  </label>
+                </div>
+                {uploadTrack === 'beta' && (
+                  <p className="text-amber-600 text-sm mt-1">This version will only be pushed to beta tester sites.</p>
+                )}
+              </div>
+
+              {uploadTrack === 'stable' && (
               <div className="flex items-center gap-2">
                 <input
                   id="version-stable"
@@ -481,6 +652,7 @@ export default function PluginDetailPage() {
                   Mark as stable release
                 </Label>
               </div>
+              )}
 
               {uploading && (
                 <div className="space-y-1">
@@ -607,6 +779,36 @@ export default function PluginDetailPage() {
           onOpenChange={setDeployDialogOpen}
         />
       )}
+
+      {/* Promote to Stable Confirmation Dialog */}
+      <AlertDialog open={promoteDialogOpen} onOpenChange={setPromoteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Promote to Stable</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to promote <span className="font-semibold">v{promoteVersion?.version}</span> from beta to stable?
+              This will deploy the version to all remaining (non-beta) sites.
+              {betaStatusMap[promoteVersion?.id ?? 0] && (
+                <span className="block mt-2 text-sm">
+                  Beta status: {betaStatusMap[promoteVersion?.id ?? 0]?.healthy ?? 0} healthy,{" "}
+                  {betaStatusMap[promoteVersion?.id ?? 0]?.failed ?? 0} failed,{" "}
+                  {betaStatusMap[promoteVersion?.id ?? 0]?.rolled_back ?? 0} rolled back
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={promoting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePromote}
+              disabled={promoting}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {promoting ? "Promoting..." : "Promote to Stable"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

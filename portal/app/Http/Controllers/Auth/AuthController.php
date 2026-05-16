@@ -79,6 +79,7 @@ class AuthController extends Controller
             'role' => $user->role,
             'telegram_chat_id' => $user->telegram_chat_id,
             'is_active' => $user->is_active,
+            'has_vault_pin' => !is_null($user->vault_pin_hash),
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,
         ]);

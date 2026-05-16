@@ -34,3 +34,12 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// Public API instance — no auth header, no 401 redirect
+export const publicApi = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
+});

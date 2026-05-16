@@ -29,8 +29,31 @@ class AgentAuthMiddleware
             ], 401);
         }
 
-        // Look up site by URL
-        $site = Site::where('url', rtrim($siteUrl, '/'))->first();
+        // Look up site by URL — try exact match first, then Docker networking alternatives
+        $normalizedUrl = rtrim($siteUrl, '/');
+        $site = Site::where('url', $normalizedUrl)->first();
+
+        if (!$site) {
+            // Try Docker networking alternatives
+            $alternatives = [];
+
+            // localhost ↔ host.docker.internal
+            if (str_contains($normalizedUrl, 'localhost')) {
+                $alternatives[] = str_replace('localhost', 'host.docker.internal', $normalizedUrl);
+            } elseif (str_contains($normalizedUrl, 'host.docker.internal')) {
+                $alternatives[] = str_replace('host.docker.internal', 'localhost', $normalizedUrl);
+            }
+
+            // Also try 127.0.0.1
+            if (str_contains($normalizedUrl, '127.0.0.1')) {
+                $alternatives[] = str_replace('127.0.0.1', 'localhost', $normalizedUrl);
+                $alternatives[] = str_replace('127.0.0.1', 'host.docker.internal', $normalizedUrl);
+            }
+
+            if (!empty($alternatives)) {
+                $site = Site::whereIn('url', $alternatives)->first();
+            }
+        }
 
         if (!$site) {
             return response()->json([

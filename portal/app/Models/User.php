@@ -19,11 +19,13 @@ class User extends Authenticatable
         'role',
         'telegram_chat_id',
         'is_active',
+        'vault_pin_hash',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'vault_pin_hash',
     ];
 
     protected function casts(): array

@@ -5,6 +5,7 @@ export interface User {
   role: "admin" | "dev" | "mkt";
   telegram_chat_id: string | null;
   is_active: boolean;
+  has_vault_pin: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +30,7 @@ export interface Site {
   wp_version: string | null;
   php_version: string | null;
   woo_active: boolean;
+  is_beta_tester?: boolean;
   last_ping_at: string | null;
   tags: string[] | null;
   hosting?: Hosting;
@@ -78,6 +80,7 @@ export interface PluginVersion {
   file_size: number;
   file_hash: string;
   is_stable: boolean;
+  track?: 'beta' | 'stable';
   released_by: number;
   released_at: string;
   created_at: string;
@@ -98,11 +101,13 @@ export interface DeploymentJob {
   id: number;
   plugin_version_id: number;
   initiated_by: number;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'scheduled';
   total_sites: number;
   success_count: number;
   failed_count: number;
   note: string | null;
+  scheduled_at?: string | null;
+  job_type?: 'deploy' | 'rollback';
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -115,10 +120,14 @@ export interface DeploymentJobSite {
   id: number;
   deployment_job_id: number;
   site_id: number;
-  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped' | 'healthy' | 'rolled_back';
   error_message: string | null;
   attempt_count: number;
   deployed_at: string | null;
+  rollback_version?: string | null;
+  rollback_reason?: string | null;
+  health_check_results?: Record<string, boolean | null> | null;
+  rolled_back_at?: string | null;
   site?: { id: number; name: string; url: string; status: string; hosting_id?: number; hosting?: { id: number; name: string } };
 }
 
@@ -130,6 +139,18 @@ export interface DeploymentProgress {
   pending: number;
   running: number;
   skipped: number;
+  healthy: number;
+  rolled_back: number;
+}
+
+export interface BetaStatus {
+  total_beta_sites: number;
+  deployed: number;
+  healthy: number;
+  failed: number;
+  rolled_back: number;
+  days_running: number;
+  status_message: string;
 }
 
 export interface SitePlugin {
@@ -157,4 +178,36 @@ export interface ActivityLog {
   metadata: Record<string, unknown> | null;
   created_at: string;
   user?: { id: number; name: string };
+}
+
+export interface CredentialField {
+  id: number;
+  field_key: string;
+  field_label: string;
+  field_value: string | null;
+  is_sensitive: boolean;
+  sort_order: number;
+}
+
+export interface Credential {
+  id: number;
+  credential_type: {
+    id: number;
+    name: string;
+    slug: string;
+    icon: string;
+  };
+  label: string;
+  fields: CredentialField[];
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CredentialType {
+  id: number;
+  name: string;
+  slug: string;
+  icon: string;
+  sort_order: number;
 }

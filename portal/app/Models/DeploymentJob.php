@@ -10,9 +10,10 @@ class DeploymentJob extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['plugin_version_id', 'initiated_by', 'status', 'total_sites', 'success_count', 'failed_count', 'note', 'created_at', 'started_at', 'finished_at'];
+    protected $fillable = ['plugin_version_id', 'initiated_by', 'status', 'job_type', 'total_sites', 'success_count', 'failed_count', 'note', 'scheduled_at', 'created_at', 'started_at', 'finished_at'];
 
     protected $casts = [
+        'scheduled_at' => 'datetime',
         'created_at' => 'datetime',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',

@@ -182,6 +182,31 @@ class SiteController extends Controller
     }
 
     /**
+     * POST /api/sites/{id}/restore
+     * Restore a soft-deleted site (admin only).
+     */
+    public function restore(Request $request, $id)
+    {
+        if ($request->user()->role !== 'admin') {
+            return $this->errorResponse('Only admins can restore deleted sites.', 403);
+        }
+
+        $site = Site::withTrashed()->findOrFail($id);
+        $site->restore();
+
+        ActivityLogService::log(
+            'site.restored',
+            $site,
+            $request->user(),
+            $request->ip()
+        );
+
+        $site->load(['hosting', 'users']);
+
+        return $this->successResponse($site, 'Site restored successfully.');
+    }
+
+    /**
      * GET /api/sites/{site}/activity
      */
     public function activity(Request $request, Site $site)
@@ -199,5 +224,20 @@ class SiteController extends Controller
             ->paginate(20);
 
         return $this->paginatedResponse($logs);
+    }
+
+    /**
+     * POST /api/sites/{site}/toggle-beta
+     * Toggle beta tester status for a site.
+     */
+    public function toggleBetaTester(Site $site)
+    {
+        $site->update(['is_beta_tester' => !$site->is_beta_tester]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $site->is_beta_tester ? 'Site marked as beta tester' : 'Site removed from beta testers',
+            'data' => ['is_beta_tester' => $site->is_beta_tester],
+        ]);
     }
 }

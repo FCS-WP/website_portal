@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Traits\ApiResponse;
 use App\Services\ActivityLogService;
 use App\Jobs\DispatchBulkDeployment;
+use App\Jobs\PushPluginToSite;
 use Illuminate\Http\Request;
 
 class DeploymentController extends Controller
@@ -29,6 +30,7 @@ class DeploymentController extends Controller
             'site_ids.*' => 'exists:sites,id',
             'all_sites' => 'required_without:site_ids|boolean',
             'note' => 'nullable|string|max:500',
+            'scheduled_at' => 'nullable|date|after:now',
         ]);
 
         $pluginVersion = PluginVersion::with('plugin')->findOrFail($request->plugin_version_id);
@@ -40,17 +42,39 @@ class DeploymentController extends Controller
             $siteIds = $request->site_ids;
         }
 
+        // Beta track handling: filter sites based on version track
+        if ($pluginVersion->track === 'beta') {
+            if ($request->input('all_sites')) {
+                // Auto-filter to only beta tester sites
+                $siteIds = Site::where('status', 'connected')
+                    ->where('is_beta_tester', true)
+                    ->pluck('id')
+                    ->toArray();
+            } else {
+                // Validate that all selected sites are beta testers
+                $nonBetaSites = Site::whereIn('id', $siteIds)
+                    ->where('is_beta_tester', false)
+                    ->count();
+                if ($nonBetaSites > 0) {
+                    return $this->errorResponse('Beta versions can only be deployed to beta tester sites.', 422);
+                }
+            }
+        }
+
         if (empty($siteIds)) {
             return $this->errorResponse('No sites selected for deployment.', 422);
         }
+
+        $isScheduled = !empty($request->scheduled_at);
 
         // Create deployment job
         $job = DeploymentJob::create([
             'plugin_version_id' => $pluginVersion->id,
             'initiated_by' => $request->user()->id,
-            'status' => 'queued',
+            'status' => $isScheduled ? 'scheduled' : 'queued',
             'total_sites' => count($siteIds),
             'note' => $request->note,
+            'scheduled_at' => $isScheduled ? $request->scheduled_at : null,
             'created_at' => now(),
         ]);
 
@@ -63,20 +87,24 @@ class DeploymentController extends Controller
             ]);
         }
 
-        // Dispatch the bulk deployment job to the queue
-        DispatchBulkDeployment::dispatch($job);
+        // Only dispatch immediately if not scheduled
+        if (!$isScheduled) {
+            DispatchBulkDeployment::dispatch($job);
+        }
 
         ActivityLogService::log(
             'deployment.created',
             $job,
             $request->user(),
             $request->ip(),
-            ['plugin' => $pluginVersion->plugin->name, 'version' => $pluginVersion->version, 'sites' => count($siteIds)]
+            ['plugin' => $pluginVersion->plugin->name, 'version' => $pluginVersion->version, 'sites' => count($siteIds), 'scheduled' => $isScheduled]
         );
+
+        $message = $isScheduled ? 'Deployment scheduled.' : 'Deployment job created and queued.';
 
         return $this->successResponse(
             $job->load('pluginVersion.plugin'),
-            'Deployment job created and queued.',
+            $message,
             201
         );
     }
@@ -210,5 +238,148 @@ class DeploymentController extends Controller
         );
 
         return $this->successResponse(null, 'Deployment cancelled.');
+    }
+
+    /**
+     * GET /api/deployments/scheduled
+     * List scheduled deployment jobs.
+     */
+    public function scheduled()
+    {
+        $jobs = DeploymentJob::where('status', 'scheduled')
+            ->with(['pluginVersion.plugin', 'initiator'])
+            ->orderBy('scheduled_at')
+            ->paginate(20);
+
+        return response()->json(['data' => $jobs]);
+    }
+
+    /**
+     * PUT /api/deployments/{deploymentJob}/schedule
+     * Reschedule a scheduled deployment.
+     */
+    public function updateSchedule(Request $request, DeploymentJob $deploymentJob)
+    {
+        if ($deploymentJob->status !== 'scheduled') {
+            return response()->json(['success' => false, 'message' => 'Can only reschedule jobs in scheduled status'], 422);
+        }
+
+        $request->validate([
+            'scheduled_at' => 'required|date|after:now',
+        ]);
+
+        $deploymentJob->update(['scheduled_at' => $request->scheduled_at]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Schedule updated',
+            'data' => $deploymentJob->fresh()->load('pluginVersion.plugin'),
+        ]);
+    }
+
+    /**
+     * DELETE /api/deployments/{deploymentJob}/schedule
+     * Cancel a scheduled deployment.
+     */
+    public function cancelSchedule(DeploymentJob $deploymentJob)
+    {
+        if ($deploymentJob->status !== 'scheduled') {
+            return response()->json(['success' => false, 'message' => 'Can only cancel scheduled jobs'], 422);
+        }
+
+        $deploymentJob->update([
+            'status' => 'cancelled',
+            'finished_at' => now(),
+        ]);
+
+        // Also mark all pending sites as skipped
+        $deploymentJob->sites()->where('status', 'pending')->update(['status' => 'skipped']);
+
+        return response()->json(['success' => true, 'message' => 'Scheduled deployment cancelled']);
+    }
+
+    /**
+     * POST /api/deployment-job-sites/{deploymentJobSite}/rollback
+     * Trigger a manual rollback for a specific site deployment.
+     */
+    public function rollbackSite(DeploymentJobSite $deploymentJobSite)
+    {
+        $site = $deploymentJobSite->site;
+        $job = $deploymentJobSite->deploymentJob;
+        $pluginVersion = $job->pluginVersion;
+        $plugin = $pluginVersion->plugin;
+
+        // Find previous stable version
+        $previousVersion = PluginVersion::where('plugin_id', $plugin->id)
+            ->where('id', '<', $pluginVersion->id)
+            ->where('is_stable', true)
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$previousVersion) {
+            return response()->json(['success' => false, 'message' => 'No previous version available for rollback'], 422);
+        }
+
+        // Create rollback deployment job
+        $rollbackJob = DeploymentJob::create([
+            'plugin_version_id' => $previousVersion->id,
+            'initiated_by' => auth()->id(),
+            'status' => 'queued',
+            'job_type' => 'rollback',
+            'total_sites' => 1,
+            'success_count' => 0,
+            'failed_count' => 0,
+            'note' => "Manual rollback from v{$pluginVersion->version} to v{$previousVersion->version}",
+            'created_at' => now(),
+        ]);
+
+        $rollbackJobSite = $rollbackJob->sites()->create([
+            'site_id' => $site->id,
+            'status' => 'pending',
+            'attempt_count' => 0,
+        ]);
+
+        // Dispatch the rollback job
+        PushPluginToSite::dispatch($rollbackJobSite);
+
+        // Log activity
+        ActivityLogService::log(
+            'deployment.manual_rollback',
+            $site,
+            auth()->user(),
+            request()->ip(),
+            [
+                'plugin' => $plugin->name,
+                'from_version' => $pluginVersion->version,
+                'to_version' => $previousVersion->version,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Rollback initiated: {$plugin->name} v{$previousVersion->version}",
+            'data' => [
+                'deployment_job_id' => $rollbackJob->id,
+                'rollback_version' => $previousVersion->version,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/sites/{site}/rollback-history
+     * Get rollback history for a site.
+     */
+    public function rollbackHistory(Site $site)
+    {
+        $history = DeploymentJobSite::where('site_id', $site->id)
+            ->where(function ($q) use ($site) {
+                $q->where('status', 'rolled_back')
+                  ->orWhereHas('deploymentJob', fn($j) => $j->where('job_type', 'rollback'));
+            })
+            ->with(['deploymentJob.pluginVersion.plugin', 'site'])
+            ->orderByDesc('rolled_back_at')
+            ->paginate(20);
+
+        return response()->json(['data' => $history]);
     }
 }

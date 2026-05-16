@@ -27,8 +27,12 @@ import {
 } from "@/lib/services/dashboard";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useAuthStore } from "@/stores/auth-store";
+import { PinSetupBanner } from "@/components/vault/pin-setup-banner";
 
 export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+  const authLoading = useAuthStore((s) => s.isLoading);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -64,6 +68,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Vault PIN Setup Banner — only show after confirming PIN is NOT set */}
+      {!authLoading && user && user.has_vault_pin === false && <PinSetupBanner />}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Dashboard</h1>

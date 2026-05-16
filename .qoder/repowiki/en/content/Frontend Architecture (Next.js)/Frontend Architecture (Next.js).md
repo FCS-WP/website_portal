@@ -16,7 +16,28 @@
 - [input.tsx](file://portal/frontend/src/components/ui/input.tsx)
 - [card.tsx](file://portal/frontend/src/components/ui/card.tsx)
 - [app-layout.tsx](file://portal/frontend/src/components/layout/app-layout.tsx)
+- [plugins/[id]/page.tsx](file://portal/frontend/src/app/(dashboard)/plugins/[id]/page.tsx)
+- [deployments/[id]/page.tsx](file://portal/frontend/src/app/(dashboard)/deployments/[id]/page.tsx)
+- [sites/[id]/page.tsx](file://portal/frontend/src/app/(dashboard)/sites/[id]/page.tsx)
+- [deploy-dialog.tsx](file://portal/frontend/src/components/plugins/deploy-dialog.tsx)
+- [site-plugins-tab.tsx](file://portal/frontend/src/components/sites/site-plugins-tab.tsx)
+- [site-credentials-tab.tsx](file://portal/frontend/src/components/sites/site-credentials-tab.tsx)
+- [site-activity-tab.tsx](file://portal/frontend/src/components/sites/site-activity-tab.tsx)
+- [deployments.ts](file://portal/frontend/src/lib/services/deployments.ts)
+- [plugins.ts](file://portal/frontend/src/lib/services/plugins.ts)
+- [sites.ts](file://portal/frontend/src/lib/services/sites.ts)
+- [dashboard.ts](file://portal/frontend/src/lib/services/dashboard.ts)
+- [index.ts](file://portal/frontend/src/types/index.ts)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive plugin management interfaces with version upload, changelog support, and deployment capabilities
+- Implemented real-time deployment monitoring with progress tracking and live status updates
+- Enhanced site management with dedicated tabs for plugins, credentials, and activity logs
+- Expanded service layer with specialized APIs for deployments, plugins, and site operations
+- Added vault credential management with PIN protection and sharing capabilities
+- Integrated dashboard statistics and improved component architecture
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -24,14 +45,22 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+6. [Enhanced Service Layer](#enhanced-service-layer)
+7. [Plugin Management System](#plugin-management-system)
+8. [Deployment Monitoring](#deployment-monitoring)
+9. [Site Management Interfaces](#site-management-interfaces)
+10. [Vault Credential Management](#vault-credential-management)
+11. [Dashboard and Analytics](#dashboard-and-analytics)
+12. [Dependency Analysis](#dependency-analysis)
+13. [Performance Considerations](#performance-considerations)
+14. [Troubleshooting Guide](#troubleshooting-guide)
+15. [Conclusion](#conclusion)
+16. [Appendices](#appendices)
 
 ## Introduction
 This document describes the frontend architecture of the Next.js application located under portal/frontend. It covers the app directory structure, routing model, component hierarchy, TypeScript integration, state management via custom stores, API integration layer, UI component organization, styling with Tailwind CSS, build configuration, environment handling, deployment considerations, responsive design patterns, accessibility, and performance strategies.
+
+**Updated** Enhanced with comprehensive plugin management interfaces, deployment detail pages with real-time monitoring, settings management, and improved dashboard with plugin metrics. Added new services for API communication and enhanced component architecture.
 
 ## Project Structure
 The frontend is organized around Next.js App Router conventions with a clear separation of pages, components, stores, services, and shared utilities:
@@ -46,30 +75,41 @@ graph TB
 subgraph "App Router"
 PAGES["Pages under src/app"]
 LAYOUTS["Root and nested layouts"]
-end
+END
 subgraph "Components"
 UI["Reusable UI under src/components/ui"]
 LAYOUTCOMP["Layout components under src/components/layout"]
-end
+PLUGINCOMP["Plugin-specific components under src/components/plugins"]
+SITECOMP["Site-specific components under src/components/sites"]
+VAULTCOMP["Vault components under src/components/vault"]
+END
+subgraph "Services"
+APISERVICE["API client under src/lib/api.ts"]
+DEPLOYMENTS["Deployments service under src/lib/services/deployments.ts"]
+PLUGINS["Plugins service under src/lib/services/plugins.ts"]
+SITES["Sites service under src/lib/services/sites.ts"]
+DASHBOARD["Dashboard service under src/lib/services/dashboard.ts"]
+END
 subgraph "Stores"
 AUTHSTORE["Auth store under src/stores"]
-end
-subgraph "Services"
-API["API client under src/lib/api.ts"]
-UTILS["Utilities under src/lib/utils.ts"]
-HOOKS["Hooks under src/hooks"]
-end
-subgraph "Styles"
-GLOBALCSS["Global CSS and theme tokens under src/app/globals.css"]
-end
+END
+subgraph "Types"
+TYPES["Type definitions under src/types"]
+END
 PAGES --> LAYOUTS
 LAYOUTS --> UI
 LAYOUTS --> LAYOUTCOMP
 LAYOUTCOMP --> AUTHSTORE
-AUTHSTORE --> API
-API --> UTILS
-UI --> UTILS
-LAYOUTS --> GLOBALCSS
+AUTHSTORE --> APISERVICE
+APISERVICE --> DEPLOYMENTS
+APISERVICE --> PLUGINS
+APISERVICE --> SITES
+APISERVICE --> DASHBOARD
+UI --> TYPES
+LAYOUTCOMP --> TYPES
+PLUGINCOMP --> TYPES
+SITECOMP --> TYPES
+VAULTCOMP --> TYPES
 ```
 
 **Diagram sources**
@@ -77,11 +117,11 @@ LAYOUTS --> GLOBALCSS
 - [globals.css:1-130](file://portal/frontend/src/app/globals.css#L1-L130)
 - [auth-store.ts:1-64](file://portal/frontend/src/stores/auth-store.ts#L1-L64)
 - [api.ts:1-37](file://portal/frontend/src/lib/api.ts#L1-L37)
-- [utils.ts:1-7](file://portal/frontend/src/lib/utils.ts#L1-L7)
-- [button.tsx:1-59](file://portal/frontend/src/components/ui/button.tsx#L1-L59)
-- [input.tsx:1-21](file://portal/frontend/src/components/ui/input.tsx#L1-L21)
-- [card.tsx:1-104](file://portal/frontend/src/components/ui/card.tsx#L1-L104)
-- [app-layout.tsx:1-50](file://portal/frontend/src/components/layout/app-layout.tsx#L1-L50)
+- [deployments.ts:1-22](file://portal/frontend/src/lib/services/deployments.ts#L1-L22)
+- [plugins.ts:1-29](file://portal/frontend/src/lib/services/plugins.ts#L1-L29)
+- [sites.ts:1-17](file://portal/frontend/src/lib/services/sites.ts#L1-L17)
+- [dashboard.ts:1-37](file://portal/frontend/src/lib/services/dashboard.ts#L1-L37)
+- [index.ts:1-193](file://portal/frontend/src/types/index.ts#L1-L193)
 
 **Section sources**
 - [layout.tsx:1-38](file://portal/frontend/src/app/layout.tsx#L1-L38)
@@ -311,6 +351,278 @@ Implementation references:
 - [button.tsx:1-59](file://portal/frontend/src/components/ui/button.tsx#L1-L59)
 - [input.tsx:1-21](file://portal/frontend/src/components/ui/input.tsx#L1-L21)
 
+## Enhanced Service Layer
+
+### Plugin Management Service
+The plugin service provides comprehensive CRUD operations for plugin management with version control and file upload capabilities.
+
+```mermaid
+classDiagram
+class PluginService {
++list() ApiResponse~Plugin[]~
++create(data) ApiResponse~Plugin~
++show(id) ApiResponse~Plugin~
++update(id, data) ApiResponse~Plugin~
++versions(id) ApiResponse~PluginVersion[]~
++uploadVersion(pluginId, formData, onProgress) ApiResponse~void~
++getDownloadUrl(versionId) ApiResponse~string~
++deleteVersion(versionId) ApiResponse~void~
+}
+class Plugin {
++id : number
++name : string
++slug : string
++description : string
++author : string
++is_active : boolean
++latest_version : PluginVersion
++site_plugins_count : number
+}
+class PluginVersion {
++id : number
++plugin_id : number
++version : string
++file_path : string
++file_size : number
++file_hash : string
++is_stable : boolean
++changelog : PluginChangelog
+}
+```
+
+**Diagram sources**
+- [plugins.ts:1-29](file://portal/frontend/src/lib/services/plugins.ts#L1-L29)
+- [index.ts:60-96](file://portal/frontend/src/types/index.ts#L60-L96)
+
+### Deployment Management Service
+The deployment service handles job creation, progress tracking, and real-time monitoring with automatic polling.
+
+```mermaid
+classDiagram
+class DeploymentsService {
++create(data) ApiResponse~DeploymentJob~
++list(page, perPage) ApiResponse~DeploymentJob[]~
++show(id) ApiResponse~DeploymentJob~
++progress(id) ApiResponse~DeploymentProgress~
++retryFailed(id) ApiResponse~void~
++cancel(id) ApiResponse~void~
+}
+class DeploymentJob {
++id : number
++plugin_version_id : number
++status : string
++total_sites : number
++success_count : number
++failed_count : number
++sites : DeploymentJobSite[]
+}
+class DeploymentJobSite {
++id : number
++site_id : number
++status : string
++error_message : string
++attempt_count : number
++deployed_at : string
+}
+```
+
+**Diagram sources**
+- [deployments.ts:1-22](file://portal/frontend/src/lib/services/deployments.ts#L1-L22)
+- [index.ts:98-134](file://portal/frontend/src/types/index.ts#L98-L134)
+
+### Site Management Service
+The site service provides comprehensive site operations including plugin listing, activity logs, and auto-login functionality.
+
+```mermaid
+classDiagram
+class SitesService {
++list(params) ApiResponse~Site[]~
++create(data) ApiResponse~Site~
++show(id) ApiResponse~Site~
++update(id, data) ApiResponse~Site~
++delete(id) ApiResponse~void~
++regenerateKey(id) ApiResponse~string~
++activity(id, params) ApiResponse~ActivityLog[]~
++plugins(id) ApiResponse~SitePlugin[]~
++autologin(id) ApiResponse~string~
+}
+class Site {
++id : number
++name : string
++url : string
++status : string
++wp_version : string
++php_version : string
++woo_active : boolean
++last_ping_at : string
+}
+```
+
+**Diagram sources**
+- [sites.ts:1-17](file://portal/frontend/src/lib/services/sites.ts#L1-L17)
+- [index.ts:23-39](file://portal/frontend/src/types/index.ts#L23-L39)
+
+**Section sources**
+- [plugins.ts:1-29](file://portal/frontend/src/lib/services/plugins.ts#L1-L29)
+- [deployments.ts:1-22](file://portal/frontend/src/lib/services/deployments.ts#L1-L22)
+- [sites.ts:1-17](file://portal/frontend/src/lib/services/sites.ts#L1-L17)
+- [dashboard.ts:1-37](file://portal/frontend/src/lib/services/dashboard.ts#L1-L37)
+
+## Plugin Management System
+
+### Plugin Detail Page
+The plugin detail page provides comprehensive management capabilities including version history, upload functionality, and deployment options.
+
+**Key Features:**
+- Plugin information display with status indicators
+- Version history table with filtering and sorting
+- File upload with progress tracking
+- Changelog management with type categorization
+- Deployment dialog integration
+
+```mermaid
+stateDiagram-v2
+[*] --> Loading
+Loading --> PluginLoaded : Data Fetched
+PluginLoaded --> ViewingDetails : User Interacts
+ViewingDetails --> Editing : Edit Button Clicked
+Editing --> Updating : Save Changes
+Updating --> PluginLoaded : Update Complete
+ViewingDetails --> Uploading : Upload Button Clicked
+Uploading --> UploadComplete : File Uploaded
+UploadComplete --> PluginLoaded : Refresh Data
+ViewingDetails --> Deploying : Deploy Button Clicked
+Deploying --> DeploymentCreated : Job Created
+DeploymentCreated --> [*]
+```
+
+**Diagram sources**
+- [plugins/[id]/page.tsx:62-612](file://portal/frontend/src/app/(dashboard)/plugins/[id]/page.tsx#L62-L612)
+
+### Deploy Dialog Component
+The deploy dialog provides flexible deployment options with both bulk and selective targeting.
+
+**Features:**
+- Mode selection: All connected sites vs. selective targeting
+- Real-time site loading and filtering
+- Checkbox-based site selection with bulk operations
+- Deployment note support
+- Automatic navigation to deployment details
+
+**Section sources**
+- [plugins/[id]/page.tsx:1-613](file://portal/frontend/src/app/(dashboard)/plugins/[id]/page.tsx#L1-L613)
+- [deploy-dialog.tsx:1-280](file://portal/frontend/src/components/plugins/deploy-dialog.tsx#L1-L280)
+
+## Deployment Monitoring
+
+### Real-Time Deployment Tracking
+The deployment detail page implements sophisticated real-time monitoring with automatic polling and comprehensive status visualization.
+
+**Monitoring Features:**
+- Auto-polling for progress updates (3-second intervals)
+- Full data refresh (10-second intervals)
+- Live status badges with color coding
+- Progress bar with multi-color segments
+- Detailed metrics cards (success rate, failure rate, pending, running)
+- Per-site status table with filtering and search
+- Live log events with timestamped entries
+
+```mermaid
+flowchart TD
+Start(["Deployment Started"]) --> PollProgress["Poll Progress Every 3s"]
+PollProgress --> UpdateMetrics["Update Metrics & Progress"]
+UpdateMetrics --> CheckStatus{"Status == Running/Queued?"}
+CheckStatus --> |Yes| PollFull["Poll Full Data Every 10s"]
+CheckStatus --> |No| End(["Deployment Complete"])
+PollFull --> UpdateFullData["Update Full Deployment Data"]
+UpdateFullData --> PollProgress
+```
+
+**Diagram sources**
+- [deployments/[id]/page.tsx:89-109](file://portal/frontend/src/app/(dashboard)/deployments/[id]/page.tsx#L89-L109)
+
+**Section sources**
+- [deployments/[id]/page.tsx:1-794](file://portal/frontend/src/app/(dashboard)/deployments/[id]/page.tsx#L1-L794)
+
+## Site Management Interfaces
+
+### Comprehensive Site Detail Pages
+The site management system provides dedicated tabs for different aspects of site administration.
+
+**Available Tabs:**
+- Overview: Basic site information and status
+- Plugins: Plugin installation and update management
+- Orders: Order synchronization (future implementation)
+- SMTP: Email configuration (future implementation)
+- Credentials: Secure credential vault with PIN protection
+- Activity: Audit trail and user activity logs
+
+### Site Plugins Tab
+The plugins tab displays installed plugins with version comparison and update status.
+
+**Features:**
+- Plugin name, slug, and version information
+- Outdated status indicators
+- Active/inactive status display
+- Last synced timestamp
+- Direct navigation to plugin details
+
+### Site Credentials Tab
+The credentials tab provides secure credential management with PIN protection and sharing capabilities.
+
+**Security Features:**
+- PIN-protected credential reveal with timed visibility
+- Copy-to-clipboard functionality with visual feedback
+- Sensitive field masking with eye icon toggles
+- Admin-only credential deletion
+- Vault audit log integration
+
+**Section sources**
+- [sites/[id]/page.tsx:1-400](file://portal/frontend/src/app/(dashboard)/sites/[id]/page.tsx#L1-L400)
+- [site-plugins-tab.tsx:1-152](file://portal/frontend/src/components/sites/site-plugins-tab.tsx#L1-L152)
+- [site-credentials-tab.tsx:1-704](file://portal/frontend/src/components/sites/site-credentials-tab.tsx#L1-L704)
+- [site-activity-tab.tsx:1-174](file://portal/frontend/src/components/sites/site-activity-tab.tsx#L1-L174)
+
+## Vault Credential Management
+
+### PIN Protection System
+The vault credential management implements a robust PIN protection system for sensitive data access.
+
+**PIN Flow:**
+1. User initiates sensitive operation (reveal, copy, delete)
+2. PIN modal appears requesting verification
+3. Backend validates PIN and returns encrypted data
+4. Data displayed temporarily with countdown timer
+5. Automatic cleanup after expiration
+
+**Security Measures:**
+- PIN-protected API endpoints
+- Temporary data exposure with automatic cleanup
+- Visual feedback for copy operations
+- Admin-only deletion capabilities
+- Comprehensive audit logging
+
+**Section sources**
+- [site-credentials-tab.tsx:161-255](file://portal/frontend/src/components/sites/site-credentials-tab.tsx#L161-L255)
+
+## Dashboard and Analytics
+
+### Dashboard Statistics Service
+The dashboard service provides comprehensive analytics and overview data for system monitoring.
+
+**Available Metrics:**
+- Total sites count
+- Online/offline site distribution
+- New sites this month
+- Pending plugin updates
+- Sites requiring updates
+- Recent sites activity
+- Recent system activity
+
+**Section sources**
+- [dashboard.ts:1-37](file://portal/frontend/src/lib/services/dashboard.ts#L1-L37)
+- [index.ts:3-32](file://portal/frontend/src/types/index.ts#L3-L32)
+
 ## Dependency Analysis
 External dependencies and their roles:
 - Next.js runtime and App Router.
@@ -359,8 +671,11 @@ PKG --> TS
 - Client-side hydration and skeleton loading reduce perceived latency during auth initialization.
 - Local storage caching minimizes repeated network calls for token presence.
 - Request/response interceptors centralize auth and error handling to avoid duplication.
-- Tailwind v4’s tree-shaking and CSS-in-JS theme tokens help keep bundles lean.
+- Tailwind v4's tree-shaking and CSS-in-JS theme tokens help keep bundles lean.
 - Prefer server components for static content and leverage Next.js image optimization for assets.
+- **Updated** Implement efficient polling strategies with proper cleanup to prevent memory leaks.
+- **Updated** Use component-level memoization for expensive computations in deployment monitoring.
+- **Updated** Optimize API calls with pagination and selective data fetching.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -368,6 +683,9 @@ Common issues and resolutions:
 - Missing API URL: The client falls back to "/api"; configure NEXT_PUBLIC_API_URL for production.
 - Auth hydration loop: Ensure hydration runs once on mount and does not trigger unnecessary re-renders.
 - Responsive layout glitches: Verify useIsMobile hook matches Tailwind breakpoints and adjust layout logic accordingly.
+- **Updated** Deployment monitoring not updating: Check polling intervals and ensure proper cleanup of intervals.
+- **Updated** Plugin upload failures: Verify file size limits and supported formats in upload dialog.
+- **Updated** Credential PIN validation errors: Ensure proper PIN length and verify with backend authentication.
 
 **Section sources**
 - [api.ts:22-34](file://portal/frontend/src/lib/api.ts#L22-L34)
@@ -377,6 +695,8 @@ Common issues and resolutions:
 
 ## Conclusion
 The frontend employs a clean, modular architecture with strong separation of concerns. App Router pages and nested layouts provide a scalable routing model. Zustand simplifies state management for authentication, while a centralized API client ensures consistent request/response handling. The UI component library leverages Tailwind CSS v4 and shadcn primitives for maintainable, accessible components. With responsive hooks, theme tokens, and performance-conscious patterns, the application is well-positioned for growth and maintenance.
+
+**Updated** The enhanced architecture now supports comprehensive plugin management with real-time deployment monitoring, secure credential vault operations, and detailed site administration interfaces. The expanded service layer provides robust APIs for all major functional areas, while the component architecture ensures maintainable and scalable user interfaces.
 
 ## Appendices
 
@@ -401,6 +721,8 @@ The frontend employs a clean, modular architecture with strong separation of con
 - Build artifacts are produced by Next.js build; serve statically or via Next.js start in production.
 - Configure API rewrites appropriately for production backend endpoints.
 - Ensure environment variables are set for NEXT_PUBLIC_API_URL and any backend-dependent settings.
+- **Updated** Implement proper cleanup of polling intervals and WebSocket connections on component unmount.
+- **Updated** Consider implementing request deduplication to prevent multiple simultaneous API calls.
 
 **Section sources**
 - [next.config.ts:4-11](file://portal/frontend/next.config.ts#L4-L11)

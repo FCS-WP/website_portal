@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('sites:check-health')->everyFiveMinutes();
+Schedule::command('deployments:dispatch-scheduled')->everyMinute();

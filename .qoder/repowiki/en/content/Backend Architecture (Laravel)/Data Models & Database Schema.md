@@ -7,6 +7,12 @@
 - [Site.php](file://portal/app/Models/Site.php)
 - [ActivityLog.php](file://portal/app/Models/ActivityLog.php)
 - [PortalSetting.php](file://portal/app/Models/PortalSetting.php)
+- [Plugin.php](file://portal/app/Models/Plugin.php)
+- [PluginVersion.php](file://portal/app/Models/PluginVersion.php)
+- [PluginChangelog.php](file://portal/app/Models/PluginChangelog.php)
+- [SitePlugin.php](file://portal/app/Models/SitePlugin.php)
+- [DeploymentJob.php](file://portal/app/Models/DeploymentJob.php)
+- [DeploymentJobSite.php](file://portal/app/Models/DeploymentJobSite.php)
 - [create_users_table.php](file://portal/database/migrations/0001_01_01_000000_create_users_table.php)
 - [create_hostings_table.php](file://portal/database/migrations/2026_05_15_070001_create_hostings_table.php)
 - [create_sites_table.php](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php)
@@ -14,11 +20,22 @@
 - [create_activity_logs_table.php](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php)
 - [create_portal_settings_table.php](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php)
 - [create_plugins_table.php](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php)
+- [create_plugin_versions_table.php](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php)
+- [create_plugin_changelogs_table.php](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php)
+- [create_site_plugins_table.php](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php)
 - [create_deployment_jobs_table.php](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php)
 - [create_deployment_job_sites_table.php](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php)
 - [create_permission_tables.php](file://portal/database/migrations/2026_05_15_061634_create_permission_tables.php)
 - [permission.php](file://portal/config/permission.php)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive plugin ecosystem data model documentation covering six new migration files
+- Documented Plugin, PluginVersion, PluginChangelog, SitePlugin, DeploymentJob, and DeploymentJobSite models
+- Updated entity relationship diagrams to include plugin management infrastructure
+- Added detailed field definitions, relationships, and constraints for plugin deployment system
+- Enhanced dependency analysis with plugin-related foreign key relationships
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -26,38 +43,53 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+6. [Plugin Ecosystem Components](#plugin-ecosystem-components)
+7. [Dependency Analysis](#dependency-analysis)
+8. [Performance Considerations](#performance-considerations)
+9. [Troubleshooting Guide](#troubleshooting-guide)
+10. [Conclusion](#conclusion)
+11. [Appendices](#appendices)
 
 ## Introduction
 This document provides comprehensive data model documentation for the Eloquent models and database schema used in the application. It details entity relationships, field definitions, data types, primary and foreign keys, indexes, and constraints. It also explains model relationships such as hasMany, belongsToMany, and morphTo, documents migration patterns and schema evolution strategies, and outlines validation, accessors/mutators, and model events. Practical examples of complex queries, relationship loading, and data manipulation patterns are included, along with performance considerations and optimization techniques.
+
+**Updated** Added extensive documentation for the plugin ecosystem foundation including plugin management, version control, changelogs, deployment orchestration, and site plugin installations.
 
 ## Project Structure
 The data model layer consists of Eloquent models under the application namespace and a set of migrations under the database directory. Models define attributes, casts, hidden fields, and relationships. Migrations define the canonical schema, including primary keys, foreign keys, indexes, and constraints.
 
 ```mermaid
 graph TB
-subgraph "Models"
+subgraph "Core Models"
 U["User"]
 H["Hosting"]
 S["Site"]
 AL["ActivityLog"]
 PS["PortalSetting"]
 end
-subgraph "Migrations"
+subgraph "Plugin Ecosystem Models"
+P["Plugin"]
+PV["PluginVersion"]
+PC["PluginChangelog"]
+SP["SitePlugin"]
+DJ["DeploymentJob"]
+DJS["DeploymentJobSite"]
+end
+subgraph "Core Migrations"
 MU["create_users_table.php"]
 MH["create_hostings_table.php"]
 MS["create_sites_table.php"]
 MSU["create_site_users_table.php"]
 MAL["create_activity_logs_table.php"]
 MPS["create_portal_settings_table.php"]
+end
+subgraph "Plugin Migrations"
 MPL["create_plugins_table.php"]
+MPV["create_plugin_versions_table.php"]
+MPC["create_plugin_changelogs_table.php"]
+MSP["create_site_plugins_table.php"]
 MDJ["create_deployment_jobs_table.php"]
 MDJS["create_deployment_job_sites_table.php"]
-MP["create_permission_tables.php"]
 end
 U --- MU
 H --- MH
@@ -65,13 +97,19 @@ S --- MS
 S --- MSU
 AL --- MAL
 PS --- MPS
-U --- MP
-H --- MP
-S --- MP
-AL --- MP
-PS --- MP
-MPL --- MDJ
-MDJS --- MDJ
+P --- MPL
+PV --- MPV
+PC --- MPC
+SP --- MSP
+DJ --- MDJ
+DJS --- MDJS
+P --- PV
+PV --- PC
+S --- SP
+P --- SP
+DJ --- PV
+DJ --- DJS
+DJS --- S
 ```
 
 **Diagram sources**
@@ -80,6 +118,12 @@ MDJS --- MDJ
 - [Site.php:1-86](file://portal/app/Models/Site.php#L1-L86)
 - [ActivityLog.php:1-37](file://portal/app/Models/ActivityLog.php#L1-L37)
 - [PortalSetting.php:1-11](file://portal/app/Models/PortalSetting.php#L1-L11)
+- [Plugin.php:1-35](file://portal/app/Models/Plugin.php#L1-L35)
+- [PluginVersion.php:1-39](file://portal/app/Models/PluginVersion.php#L1-L39)
+- [PluginChangelog.php:1-21](file://portal/app/Models/PluginChangelog.php#L1-L21)
+- [SitePlugin.php:1-37](file://portal/app/Models/SitePlugin.php#L1-L37)
+- [DeploymentJob.php:1-36](file://portal/app/Models/DeploymentJob.php#L1-L36)
+- [DeploymentJobSite.php:1-26](file://portal/app/Models/DeploymentJobSite.php#L1-L26)
 - [create_users_table.php:1-53](file://portal/database/migrations/0001_01_01_000000_create_users_table.php#L1-L53)
 - [create_hostings_table.php:1-27](file://portal/database/migrations/2026_05_15_070001_create_hostings_table.php#L1-L27)
 - [create_sites_table.php:1-35](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php#L1-L35)
@@ -87,9 +131,11 @@ MDJS --- MDJ
 - [create_activity_logs_table.php:1-32](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L1-L32)
 - [create_portal_settings_table.php:1-24](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L1-L24)
 - [create_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L1-L28)
+- [create_plugin_versions_table.php:1-31](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L1-L31)
+- [create_plugin_changelogs_table.php:1-25](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L1-L25)
+- [create_site_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L1-L28)
 - [create_deployment_jobs_table.php:1-31](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L1-L31)
 - [create_deployment_job_sites_table.php:1-27](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L1-L27)
-- [create_permission_tables.php:53-134](file://portal/database/migrations/2026_05_15_061634_create_permission_tables.php#L53-L134)
 
 **Section sources**
 - [User.php:1-38](file://portal/app/Models/User.php#L1-L38)
@@ -97,6 +143,12 @@ MDJS --- MDJ
 - [Site.php:1-86](file://portal/app/Models/Site.php#L1-L86)
 - [ActivityLog.php:1-37](file://portal/app/Models/ActivityLog.php#L1-L37)
 - [PortalSetting.php:1-11](file://portal/app/Models/PortalSetting.php#L1-L11)
+- [Plugin.php:1-35](file://portal/app/Models/Plugin.php#L1-L35)
+- [PluginVersion.php:1-39](file://portal/app/Models/PluginVersion.php#L1-L39)
+- [PluginChangelog.php:1-21](file://portal/app/Models/PluginChangelog.php#L1-L21)
+- [SitePlugin.php:1-37](file://portal/app/Models/SitePlugin.php#L1-L37)
+- [DeploymentJob.php:1-36](file://portal/app/Models/DeploymentJob.php#L1-L36)
+- [DeploymentJobSite.php:1-26](file://portal/app/Models/DeploymentJobSite.php#L1-L26)
 - [create_users_table.php:1-53](file://portal/database/migrations/0001_01_01_000000_create_users_table.php#L1-L53)
 - [create_hostings_table.php:1-27](file://portal/database/migrations/2026_05_15_070001_create_hostings_table.php#L1-L27)
 - [create_sites_table.php:1-35](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php#L1-L35)
@@ -104,6 +156,9 @@ MDJS --- MDJ
 - [create_activity_logs_table.php:1-32](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L1-L32)
 - [create_portal_settings_table.php:1-24](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L1-L24)
 - [create_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L1-L28)
+- [create_plugin_versions_table.php:1-31](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L1-L31)
+- [create_plugin_changelogs_table.php:1-25](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L1-L25)
+- [create_site_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L1-L28)
 - [create_deployment_jobs_table.php:1-31](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L1-L31)
 - [create_deployment_job_sites_table.php:1-27](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L1-L27)
 - [create_permission_tables.php:53-134](file://portal/database/migrations/2026_05_15_061634_create_permission_tables.php#L53-L134)
@@ -152,7 +207,7 @@ This section summarizes the core models and their responsibilities, attributes, 
 - [PortalSetting.php:7-10](file://portal/app/Models/PortalSetting.php#L7-L10)
 
 ## Architecture Overview
-The data model architecture centers around Users, Hostings, Sites, and ActivityLogs. Users are linked to Hostings and Sites via created_by foreign keys. Sites maintain a many-to-many relationship with Users through a dedicated pivot table. ActivityLogs record user actions against polymorphic subjects, enabling auditability across entities.
+The data model architecture centers around Users, Hostings, Sites, and ActivityLogs. Users are linked to Hostings and Sites via created_by foreign keys. Sites maintain a many-to-many relationship with Users through a dedicated pivot table. ActivityLogs record user actions against polymorphic subjects, enabling auditability across entities. The plugin ecosystem adds a hierarchical structure with Plugins containing Versions, Changelogs, and SitePlugin installations, orchestrated by DeploymentJobs and DeploymentJobSites.
 
 ```mermaid
 classDiagram
@@ -212,12 +267,80 @@ class ActivityLog {
 +string ip_address
 +datetime created_at
 }
+class Plugin {
++int id
++string name
++string slug
++string description
++string author
++bool is_active
++int created_by
++datetime created_at
++datetime updated_at
+}
+class PluginVersion {
++int id
++int plugin_id
++string version
++string file_path
++int file_size
++string file_hash
++bool is_stable
++int released_by
++datetime released_at
++datetime created_at
++datetime updated_at
+}
+class PluginChangelog {
++int id
++int plugin_version_id
++text content
++string type
++datetime created_at
+}
+class SitePlugin {
++int id
++int site_id
++int plugin_id
++string installed_version
++string latest_version
++bool is_active
++datetime last_synced_at
+}
+class DeploymentJob {
++int id
++int plugin_version_id
++int initiated_by
++string status
++int total_sites
++int success_count
++int failed_count
++text note
++datetime created_at
++datetime started_at
++datetime finished_at
+}
+class DeploymentJobSite {
++int id
++int deployment_job_id
++int site_id
++string status
++text error_message
++int attempt_count
++datetime deployed_at
+}
 User "1" -- "many" Hosting : "created_by"
 User "1" -- "many" Site : "created_by"
 Site "1" -- "many" SiteUser : "site_id"
 User "many" -- "many" Site : "site_users"
 User "1" -- "many" ActivityLog : "user_id"
 Site "1" -- "many" ActivityLog : "subject_type=Site"
+Plugin "1" -- "many" PluginVersion : "plugin_id"
+PluginVersion "1" -- "one" PluginChangelog : "plugin_version_id"
+Site "1" -- "many" SitePlugin : "site_id"
+Plugin "1" -- "many" SitePlugin : "plugin_id"
+DeploymentJob "1" -- "many" DeploymentJobSite : "deployment_job_id"
+Site "1" -- "many" DeploymentJobSite : "site_id"
 ```
 
 **Diagram sources**
@@ -225,6 +348,12 @@ Site "1" -- "many" ActivityLog : "subject_type=Site"
 - [Hosting.php:10-30](file://portal/app/Models/Hosting.php#L10-L30)
 - [Site.php:12-85](file://portal/app/Models/Site.php#L12-L85)
 - [ActivityLog.php:9-36](file://portal/app/Models/ActivityLog.php#L9-L36)
+- [Plugin.php:15-33](file://portal/app/Models/Plugin.php#L15-L33)
+- [PluginVersion.php:19-37](file://portal/app/Models/PluginVersion.php#L19-L37)
+- [PluginChangelog.php:16-19](file://portal/app/Models/PluginChangelog.php#L16-L19)
+- [SitePlugin.php:19-27](file://portal/app/Models/SitePlugin.php#L19-L27)
+- [DeploymentJob.php:21-34](file://portal/app/Models/DeploymentJob.php#L21-L34)
+- [DeploymentJobSite.php:16-24](file://portal/app/Models/DeploymentJobSite.php#L16-L24)
 - [create_site_users_table.php:11-17](file://portal/database/migrations/2026_05_15_070003_create_site_users_table.php#L11-L17)
 - [create_users_table.php:14-25](file://portal/database/migrations/0001_01_01_000000_create_users_table.php#L14-L25)
 - [create_hostings_table.php:11-19](file://portal/database/migrations/2026_05_15_070001_create_hostings_table.php#L11-L19)
@@ -367,26 +496,83 @@ DB-->>C : "filtered Site collection"
 - [PortalSetting.php:9-10](file://portal/app/Models/PortalSetting.php#L9-L10)
 - [create_portal_settings_table.php:11-16](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L11-L16)
 
-### Additional Entities (Plugins and Deployment)
-These entities support plugin management and deployment orchestration.
+## Plugin Ecosystem Components
 
-- Plugins
-  - Fields: name, slug (unique), description, author, is_active, created_by
-  - created_by references users
-- DeploymentJobs
-  - Fields: plugin_version_id, initiated_by, status, total_sites, success_count, failed_count, note, timestamps
-  - Status enum supports queued, running, completed, failed, cancelled
-- DeploymentJobSites
-  - Fields: deployment_job_id, site_id, status, error_message, attempt_count, deployed_at
-  - Status enum supports pending, running, success, failed, skipped
+### Plugin Model
+- Purpose: Represents individual plugins available in the system.
+- Fillable fields: name, slug, description, author, is_active, created_by.
+- Casts: is_active to boolean.
+- Relationships: hasMany versions; hasMany sitePlugins; belongsTo user (creator).
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
 
 **Section sources**
-- [create_plugins_table.php:11-20](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L11-L20)
-- [create_deployment_jobs_table.php:11-23](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L11-L23)
-- [create_deployment_job_sites_table.php:11-19](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L11-L19)
+- [Plugin.php:11-33](file://portal/app/Models/Plugin.php#L11-L33)
+- [create_plugins_table.php:11-18](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L11-L18)
+
+### PluginVersion Model
+- Purpose: Manages different versions of plugins with file metadata and release information.
+- Fillable fields: plugin_id, version, file_path, file_size, file_hash, is_stable, released_by, released_at.
+- Casts: is_stable to boolean, file_size to integer, released_at to datetime.
+- Relationships: belongsTo plugin; hasOne changelog; belongsTo user (released_by); hasMany deploymentJobs.
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+
+**Section sources**
+- [PluginVersion.php:11-37](file://portal/app/Models/PluginVersion.php#L11-L37)
+- [create_plugin_versions_table.php:11-22](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L11-L22)
+
+### PluginChangelog Model
+- Purpose: Stores changelog entries for plugin versions with type categorization.
+- Fillable fields: plugin_version_id, content, type.
+- Casts: created_at to datetime.
+- Relationships: belongsTo pluginVersion.
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+
+**Section sources**
+- [PluginChangelog.php:12-19](file://portal/app/Models/PluginChangelog.php#L12-L19)
+- [create_plugin_changelogs_table.php:11-16](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L11-L16)
+
+### SitePlugin Model
+- Purpose: Tracks plugin installation state per site with version management.
+- Fillable fields: site_id, plugin_id, installed_version, latest_version, is_active, last_synced_at.
+- Casts: is_active to boolean, last_synced_at to datetime.
+- Relationships: belongsTo site; belongsTo plugin.
+- Methods: isOutdated() compares installed vs latest versions using semantic versioning.
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+
+**Section sources**
+- [SitePlugin.php:12-35](file://portal/app/Models/SitePlugin.php#L12-L35)
+- [create_site_plugins_table.php:11-19](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L11-L19)
+
+### DeploymentJob Model
+- Purpose: Orchestrates plugin deployment across multiple sites with status tracking.
+- Fillable fields: plugin_version_id, initiated_by, status, total_sites, success_count, failed_count, note, created_at, started_at, finished_at.
+- Casts: created_at, started_at, finished_at to datetime.
+- Relationships: belongsTo pluginVersion; belongsTo user (initiated_by); hasMany deploymentJobSites.
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+
+**Section sources**
+- [DeploymentJob.php:13-34](file://portal/app/Models/DeploymentJob.php#L13-L34)
+- [create_deployment_jobs_table.php:11-22](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L11-L22)
+
+### DeploymentJobSite Model
+- Purpose: Tracks individual site deployment status within a deployment job.
+- Fillable fields: deployment_job_id, site_id, status, error_message, attempt_count, deployed_at.
+- Casts: deployed_at to datetime.
+- Relationships: belongsTo deploymentJob; belongsTo site.
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+
+**Section sources**
+- [DeploymentJobSite.php:12-24](file://portal/app/Models/DeploymentJobSite.php#L12-L24)
+- [create_deployment_job_sites_table.php:11-18](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L11-L18)
 
 ## Dependency Analysis
-This section maps model dependencies and foreign key relationships derived from migrations.
+This section maps model dependencies and foreign key relationships derived from migrations, including the new plugin ecosystem components.
 
 ```mermaid
 erDiagram
@@ -461,6 +647,37 @@ text description
 string author
 bool is_active
 int created_by FK
+timestamp created_at
+timestamp updated_at
+}
+PLUGIN_VERSIONS {
+int id PK
+int plugin_id FK
+string version
+string file_path
+int file_size
+string file_hash
+bool is_stable
+int released_by FK
+timestamp released_at
+timestamp created_at
+timestamp updated_at
+}
+PLUGIN_CHANGELOGS {
+int id PK
+int plugin_version_id FK
+text content
+enum type
+timestamp created_at
+}
+SITE_PLUGINS {
+int id PK
+int site_id FK
+int plugin_id FK
+string installed_version
+string latest_version
+bool is_active
+timestamp last_synced_at
 }
 DEPLOYMENT_JOBS {
 int id PK
@@ -490,7 +707,11 @@ SITES ||--o{ SITE_USERS : "site_id"
 USERS ||--o{ SITE_USERS : "user_id"
 USERS ||--o{ ACTIVITY_LOGS : "user_id"
 SITES ||--o{ ACTIVITY_LOGS : "subject_type=Site"
-PLUGINS ||--|| DEPLOYMENT_JOBS : "plugin_version_id"
+PLUGINS ||--o{ PLUGIN_VERSIONS : "plugin_id"
+PLUGIN_VERSIONS ||--|| PLUGIN_CHANGELOGS : "plugin_version_id"
+SITES ||--o{ SITE_PLUGINS : "site_id"
+PLUGINS ||--o{ SITE_PLUGINS : "plugin_id"
+PLUGIN_VERSIONS ||--o{ DEPLOYMENT_JOBS : "plugin_version_id"
 USERS ||--|| DEPLOYMENT_JOBS : "initiated_by"
 DEPLOYMENT_JOBS ||--o{ DEPLOYMENT_JOB_SITES : "deployment_job_id"
 SITES ||--|| DEPLOYMENT_JOB_SITES : "site_id"
@@ -503,9 +724,12 @@ SITES ||--|| DEPLOYMENT_JOB_SITES : "site_id"
 - [create_site_users_table.php:11-17](file://portal/database/migrations/2026_05_15_070003_create_site_users_table.php#L11-L17)
 - [create_activity_logs_table.php:11-24](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L11-L24)
 - [create_portal_settings_table.php:11-16](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L11-L16)
-- [create_plugins_table.php:11-20](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L11-L20)
-- [create_deployment_jobs_table.php:11-23](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L11-L23)
-- [create_deployment_job_sites_table.php:11-19](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L11-L19)
+- [create_plugins_table.php:11-18](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L11-L18)
+- [create_plugin_versions_table.php:11-22](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L11-L22)
+- [create_plugin_changelogs_table.php:11-16](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L11-L16)
+- [create_site_plugins_table.php:11-19](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L11-L19)
+- [create_deployment_jobs_table.php:11-22](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L11-L22)
+- [create_deployment_job_sites_table.php:11-18](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L11-L18)
 
 ## Performance Considerations
 - Indexing strategies
@@ -513,40 +737,49 @@ SITES ||--|| DEPLOYMENT_JOB_SITES : "site_id"
   - Separate indexes on action and user_id improve filtering and auditing performance.
   - Unique indexes on url and api_secret_key in sites prevent duplicates and speed up lookups.
   - Unique composite index on (site_id, user_id) in site_users ensures efficient membership checks.
+  - **Updated** Plugin ecosystem indexing: Unique composite index on (plugin_id, version) in plugin_versions; unique composite index on (site_id, plugin_id) in site_plugins; indexes on plugin_version_id, plugin_id, site_id for fast lookups.
 - Query optimization techniques
-  - Use eager loading for relationships to avoid N+1 queries (e.g., with users, hosting, activityLogs).
+  - Use eager loading for relationships to avoid N+1 queries (e.g., with users, hosting, activityLogs, plugin versions).
   - Apply scopes like accessibleBy to limit dataset size early.
   - Prefer JSON fields for tags and metadata to reduce joins; ensure appropriate queries on JSON columns.
+  - **Updated** Optimize plugin queries using where clauses on is_stable and released_at for latest version retrieval.
 - Soft deletes
   - Soft deletes on hostings and sites require careful querying; ensure queries account for deleted_at when necessary.
 - Casts and serialization
   - Array and datetime casts minimize manual conversion overhead and improve consistency.
-
-[No sources needed since this section provides general guidance]
+- **Updated** Plugin performance considerations
+  - Use hasOne/hasMany relationships judiciously; consider lazy loading for plugin versions and changelogs.
+  - Implement pagination for deployment job lists and site plugin installations.
+  - Cache frequently accessed plugin metadata and version information.
 
 ## Troubleshooting Guide
 - Common issues
   - Unique constraint violations on url or api_secret_key in sites.
   - Foreign key constraint failures when deleting users or sites without proper cascade/null behavior.
   - Missing indexes causing slow audits or polymorphic lookups.
+  - **Updated** Plugin-related issues: Duplicate plugin versions, missing plugin version associations, deployment job failures, site plugin sync errors.
 - Diagnostics
   - Verify indexes exist on subject_type/subject_id, action, and user_id in activity_logs.
   - Confirm unique constraints on key fields in portal_settings and site_users.
   - Check soft delete behavior and nullOnDelete configurations for dependent records.
+  - **Updated** Verify unique constraints on plugin slug, (plugin_id, version), and (site_id, plugin_id) combinations.
+  - Check foreign key relationships between plugins, versions, and deployment jobs.
 - Remediation
   - Add missing indexes via new migrations.
   - Adjust foreign key constraints or cascades to match intended behavior.
   - Use scopes and eager loading to avoid accidental heavy queries.
+  - **Updated** Implement proper error handling for plugin deployment failures and version conflicts.
 
 **Section sources**
 - [create_sites_table.php:15-17](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php#L15-L17)
 - [create_site_users_table.php:16-16](file://portal/database/migrations/2026_05_15_070003_create_site_users_table.php#L16-L16)
 - [create_activity_logs_table.php:21-23](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L21-L23)
+- [create_plugins_table.php:14-14](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L14-L14)
+- [create_plugin_versions_table.php:22-22](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L22-L22)
+- [create_site_plugins_table.php:19-19](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L19-L19)
 
 ## Conclusion
-The data model layer is designed around clear entity boundaries with explicit relationships and constraints. Users drive creation of Hostings and Sites, Sites maintain many-to-many relationships with Users, and ActivityLogs capture auditable events against polymorphic subjects. Migrations encode primary keys, foreign keys, indexes, and constraints, while model scopes and casts streamline common operations. Following the recommended indexing and query strategies will help maintain performance as the system scales.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The data model layer is designed around clear entity boundaries with explicit relationships and constraints. Users drive creation of Hostings and Sites, Sites maintain many-to-many relationships with Users, and ActivityLogs capture auditable events against polymorphic subjects. The newly added plugin ecosystem provides comprehensive plugin management capabilities with version control, changelogs, site installations, and deployment orchestration. Migrations encode primary keys, foreign keys, indexes, and constraints, while model scopes and casts streamline common operations. Following the recommended indexing and query strategies will help maintain performance as the system scales with both core functionality and plugin management capabilities.
 
 ## Appendices
 
@@ -557,6 +790,7 @@ The data model layer is designed around clear entity boundaries with explicit re
 - Pattern: Use unique constraints for fields requiring uniqueness (e.g., email, url, api_secret_key, slug, key).
 - Pattern: Employ soft deletes for entities requiring historical tracking (hostings, sites).
 - Pattern: Use JSON columns for flexible metadata (tags, metadata) and ensure appropriate queries.
+- **Updated** Plugin ecosystem patterns: Cascade deletes for dependent records, unique composite indexes for version and installation tracking, enum constraints for status fields.
 
 **Section sources**
 - [create_users_table.php:14-25](file://portal/database/migrations/0001_01_01_000000_create_users_table.php#L14-L25)
@@ -564,6 +798,8 @@ The data model layer is designed around clear entity boundaries with explicit re
 - [create_activity_logs_table.php:21-23](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L21-L23)
 - [create_portal_settings_table.php:13-13](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L13-L13)
 - [create_plugins_table.php:14-14](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L14-L14)
+- [create_plugin_versions_table.php:22-22](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L22-L22)
+- [create_site_plugins_table.php:19-19](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L19-L19)
 
 ### Examples of Complex Queries and Relationship Loading
 - Filter sites accessible by a user (role-aware):
@@ -574,10 +810,18 @@ The data model layer is designed around clear entity boundaries with explicit re
   - Filter by subject_type and subject_id to retrieve logs for a specific Site.
 - JSON column queries:
   - Query tags using JSON operators to filter by tag presence or values.
+- **Updated** Plugin ecosystem queries:
+  - Get latest stable plugin version: Use Plugin->latestVersion relationship with where clause on is_stable.
+  - List site plugin installations: Use Site->sitePlugins relationship with eager loading of plugin details.
+  - Query deployment job status: Use DeploymentJob->sites relationship with status filtering.
+  - Check plugin updates: Use SitePlugin->isOutdated method for semantic version comparison.
 
 **Section sources**
 - [Site.php:75-84](file://portal/app/Models/Site.php#L75-L84)
 - [ActivityLog.php:56-60](file://portal/app/Models/ActivityLog.php#L56-L60)
+- [Plugin.php:20-23](file://portal/app/Models/Plugin.php#L20-L23)
+- [SitePlugin.php:29-35](file://portal/app/Models/SitePlugin.php#L29-L35)
+- [DeploymentJob.php:31-34](file://portal/app/Models/DeploymentJob.php#L31-L34)
 
 ### Data Validation Rules, Accessors, Mutators, and Model Events
 - Validation rules
@@ -586,10 +830,15 @@ The data model layer is designed around clear entity boundaries with explicit re
   - No custom accessors/mutators are defined; password hashing and date casting are handled via model casts.
 - Model events
   - Sanctum and Spatie Permission traits manage API token lifecycle and role/permission synchronization.
+- **Updated** Plugin-specific behaviors
+  - Version comparison using semantic versioning in SitePlugin->isOutdated method.
+  - Automatic latest version retrieval through Plugin->latestVersion relationship.
 
 **Section sources**
 - [User.php:29-36](file://portal/app/Models/User.php#L29-L36)
 - [Site.php:31-39](file://portal/app/Models/Site.php#L31-L39)
+- [SitePlugin.php:29-35](file://portal/app/Models/SitePlugin.php#L29-L35)
+- [Plugin.php:20-23](file://portal/app/Models/Plugin.php#L20-L23)
 
 ### Authorization and Permission Tables
 - The permission tables are generated by the Spatie Permission package and include:
@@ -601,3 +850,24 @@ The data model layer is designed around clear entity boundaries with explicit re
 **Section sources**
 - [create_permission_tables.php:53-134](file://portal/database/migrations/2026_05_15_061634_create_permission_tables.php#L53-L134)
 - [permission.php:43-76](file://portal/config/permission.php#L43-L76)
+
+### Plugin Ecosystem Implementation Details
+- **Plugin Management**
+  - Plugins are uniquely identified by slug and can be activated/deactivated.
+  - Each plugin maintains a version history with file metadata (path, size, hash).
+  - Changelogs categorize updates by type (feature, bugfix, security, etc.).
+- **Installation Tracking**
+  - SitePlugin tracks which plugins are installed on which sites with version information.
+  - Supports active/inactive states and last sync timestamps.
+- **Deployment Orchestration**
+  - DeploymentJobs coordinate plugin updates across multiple sites.
+  - DeploymentJobSites track individual site deployment progress and errors.
+  - Status tracking includes pending, running, success, failed, and skipped states.
+
+**Section sources**
+- [Plugin.php:15-28](file://portal/app/Models/Plugin.php#L15-L28)
+- [PluginVersion.php:19-37](file://portal/app/Models/PluginVersion.php#L19-L37)
+- [PluginChangelog.php:16-19](file://portal/app/Models/PluginChangelog.php#L16-L19)
+- [SitePlugin.php:19-35](file://portal/app/Models/SitePlugin.php#L19-L35)
+- [DeploymentJob.php:21-34](file://portal/app/Models/DeploymentJob.php#L21-L34)
+- [DeploymentJobSite.php:16-24](file://portal/app/Models/DeploymentJobSite.php#L16-L24)

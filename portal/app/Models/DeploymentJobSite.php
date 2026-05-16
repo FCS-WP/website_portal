@@ -9,9 +9,13 @@ class DeploymentJobSite extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['deployment_job_id', 'site_id', 'status', 'error_message', 'attempt_count', 'deployed_at'];
+    protected $fillable = ['deployment_job_id', 'site_id', 'status', 'error_message', 'attempt_count', 'deployed_at', 'rollback_version', 'rollback_reason', 'health_check_results', 'rolled_back_at'];
 
-    protected $casts = ['deployed_at' => 'datetime'];
+    protected $casts = [
+        'deployed_at' => 'datetime',
+        'health_check_results' => 'array',
+        'rolled_back_at' => 'datetime',
+    ];
 
     public function deploymentJob(): BelongsTo
     {

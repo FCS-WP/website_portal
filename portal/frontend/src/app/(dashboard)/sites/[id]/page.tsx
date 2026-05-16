@@ -1,25 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { siteService } from "@/lib/services/sites";
 import { Site } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Globe, Server, Calendar, Code, Plug } from "lucide-react";
+import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical } from "lucide-react";
 import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
 import { SiteActivityTab } from "@/components/sites/site-activity-tab";
+import { SiteCredentialsTab } from "@/components/sites/site-credentials-tab";
+import { ApiKeyDialog } from "@/components/sites/api-key-dialog";
 
 export default function SiteDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params.id);
   const [site, setSite] = useState<Site | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [autologinLoading, setAutologinLoading] = useState(false);
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
+  const [newApiKey, setNewApiKey] = useState("");
+  const [togglingBeta, setTogglingBeta] = useState(false);
 
   useEffect(() => {
     async function fetchSite() {
@@ -34,6 +56,78 @@ export default function SiteDetailPage() {
     }
     if (id) fetchSite();
   }, [id]);
+
+  const handleRegenerateKey = async () => {
+    if (!site) return;
+    setRegenerating(true);
+    try {
+      const res = await siteService.regenerateKey(site.id);
+      const apiKey = res.data.data?.api_key;
+      if (apiKey) {
+        setNewApiKey(apiKey);
+        setRegenerateDialogOpen(false);
+        setApiKeyDialogOpen(true);
+        // Update local site status to pending
+        setSite({ ...site, status: "pending" });
+        toast.success("API key regenerated successfully");
+      }
+    } catch {
+      toast.error("Failed to regenerate API key");
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handleAutologin = async () => {
+    if (!site) return;
+    setAutologinLoading(true);
+    try {
+      const res = await siteService.autologin(site.id);
+      const redirectUrl = res.data.data.redirect_url;
+      if (redirectUrl) {
+        window.open(redirectUrl, "_blank");
+      } else {
+        toast.error("No redirect URL returned");
+      }
+    } catch {
+      toast.error("Failed to open WP Admin");
+    } finally {
+      setAutologinLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!site) return;
+    setDeleting(true);
+    try {
+      await siteService.delete(site.id);
+      toast.success(`Site "${site.name}" deleted successfully`);
+      router.push("/sites");
+    } catch {
+      toast.error("Failed to delete site");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleToggleBeta = async () => {
+    if (!site) return;
+    setTogglingBeta(true);
+    try {
+      const res = await siteService.toggleBetaTester(site.id);
+      const updatedSite = res.data.data;
+      setSite({ ...site, is_beta_tester: updatedSite.is_beta_tester });
+      toast.success(
+        updatedSite.is_beta_tester
+          ? "Site enrolled as beta tester"
+          : "Site removed from beta testing"
+      );
+    } catch {
+      toast.error("Failed to toggle beta tester status");
+    } finally {
+      setTogglingBeta(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -57,7 +151,100 @@ export default function SiteDetailPage() {
       <div className="flex items-center gap-4">
         <h1 className="text-3xl font-bold">{site.name}</h1>
         <StatusBadge status={site.status} />
+        {site.is_beta_tester && (
+          <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">BETA</span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant={site.is_beta_tester ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleBeta}
+            disabled={togglingBeta}
+            className={site.is_beta_tester ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
+          >
+            <FlaskConical className="mr-2 h-4 w-4" />
+            {togglingBeta ? "Updating..." : site.is_beta_tester ? "Beta Tester ✓" : "Enable Beta"}
+          </Button>
+          {["connected", "online"].includes(site.status) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAutologin}
+              disabled={autologinLoading}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              {autologinLoading ? "Opening..." : "Open WP Admin"}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRegenerateDialogOpen(true)}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Regenerate API Key
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Site
+          </Button>
+        </div>
       </div>
+
+      {/* Regenerate Key Confirmation Dialog */}
+      <AlertDialog open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate API Key</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will invalidate the current API key. The site agent will need
+              to be reconfigured with the new key. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={regenerating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRegenerateKey}
+              disabled={regenerating}
+            >
+              {regenerating ? "Regenerating..." : "Regenerate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* API Key Dialog */}
+      <ApiKeyDialog
+        open={apiKeyDialogOpen}
+        onOpenChange={setApiKeyDialogOpen}
+        apiKey={newApiKey}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Site</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{site.name}&rdquo;? This action can be undone by an admin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Tabs defaultValue="overview">
         <TabsList>
@@ -65,6 +252,10 @@ export default function SiteDetailPage() {
           <TabsTrigger value="plugins">Plugins</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="smtp">SMTP</TabsTrigger>
+          <TabsTrigger value="credentials" className="gap-1">
+            <KeyRound className="h-3.5 w-3.5" />
+            Credentials
+          </TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -222,6 +413,14 @@ export default function SiteDetailPage() {
               </p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="credentials" className="mt-6">
+          <SiteCredentialsTab
+            siteId={site.id}
+            siteName={site.name}
+            siteUrl={site.url}
+          />
         </TabsContent>
 
         <TabsContent value="activity" className="mt-6">

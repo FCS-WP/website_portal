@@ -24,6 +24,14 @@ function epos_agent_register_settings() {
     register_setting('epos_agent_settings', 'epos_agent_api_key', [
         'sanitize_callback' => 'sanitize_text_field',
     ]);
+    register_setting('epos_agent_settings', 'epos_agent_admin_sync_enabled', [
+        'sanitize_callback' => 'epos_agent_sanitize_checkbox',
+        'default' => true,
+    ]);
+}
+
+function epos_agent_sanitize_checkbox($value) {
+    return (bool) $value;
 }
 
 function epos_agent_settings_page() {
@@ -64,7 +72,7 @@ function epos_agent_settings_page() {
             <h2>Connection Status: <?php echo $status_labels[$status] ?? $status; ?></h2>
         </div>
 
-        <form method="post" action="options.php">
+        <form method="post" action="options.php" id="epos-agent-settings-form">
             <?php settings_fields('epos_agent_settings'); ?>
             
             <table class="form-table">
@@ -109,8 +117,122 @@ function epos_agent_settings_page() {
             <tr><td><strong>PHP Version</strong></td><td><?php echo phpversion(); ?></td></tr>
             <tr><td><strong>WooCommerce</strong></td><td><?php echo class_exists('WooCommerce') ? 'Active' : 'Not Active'; ?></td></tr>
         </table>
+
+        <hr>
+        <h3>Admin Account Sync</h3>
+
+        <?php
+        $sync_enabled = get_option('epos_agent_admin_sync_enabled', true);
+        $last_sync = get_option('epos_agent_last_admin_sync', '');
+        $admin_users = get_users(['role' => 'administrator']);
+        ?>
+
+        <table class="form-table">
+            <tr>
+                <th scope="row">Automatic Sync</th>
+                <td>
+                    <label>
+                        <input type="checkbox" name="epos_agent_admin_sync_enabled" value="1"
+                               <?php checked($sync_enabled); ?>
+                               form="epos-agent-settings-form">
+                        Automatically sync administrator accounts to Portal
+                    </label>
+                </td>
+            </tr>
+        </table>
+
+        <h4>Current Administrators</h4>
+        <table class="widefat striped" style="max-width: 600px;">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($admin_users as $admin) : ?>
+                <tr>
+                    <td><?php echo esc_html($admin->user_login); ?></td>
+                    <td><?php echo esc_html($admin->user_email); ?></td>
+                    <td><span class="dashicons dashicons-shield" style="color: #d63638;"></span> Administrator</td>
+                    <td><span style="color: #46b450;">&#x2705; Active</span></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <p style="margin-top: 15px;">
+            <button type="button" id="epos-agent-sync-now" class="button button-primary">
+                Sync Now
+            </button>
+            <span id="epos-agent-sync-status" style="margin-left: 10px;"></span>
+        </p>
+
+        <p class="description">
+            <?php if ($last_sync) : ?>
+                Last synced: <strong><?php echo esc_html($last_sync); ?></strong>
+            <?php else : ?>
+                Never synced
+            <?php endif; ?>
+        </p>
+
+        <script type="text/javascript">
+        (function($) {
+            $('#epos-agent-sync-now').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#epos-agent-sync-status');
+
+                $btn.prop('disabled', true).text('Syncing...');
+                $status.html('');
+
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'epos_agent_manual_sync',
+                        nonce: '<?php echo wp_create_nonce('epos_agent_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $status.html('<span style="color: #46b450;">&#x2705; ' + response.data.message + '</span>');
+                        } else {
+                            $status.html('<span style="color: #dc3232;">&#x274C; ' + (response.data.message || 'Sync failed') + '</span>');
+                        }
+                    },
+                    error: function() {
+                        $status.html('<span style="color: #dc3232;">&#x274C; Request failed</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('Sync Now');
+                    }
+                });
+            });
+        })(jQuery);
+        </script>
     </div>
     <?php
+}
+
+// AJAX handler for manual admin sync
+add_action('wp_ajax_epos_agent_manual_sync', 'epos_agent_handle_manual_sync');
+
+function epos_agent_handle_manual_sync() {
+    check_ajax_referer('epos_agent_nonce', 'nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'Unauthorized']);
+    }
+
+    require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-admin-sync.php';
+    $result = Epos_Agent_Admin_Sync::manual_sync();
+
+    if ($result['success']) {
+        wp_send_json_success($result);
+    } else {
+        wp_send_json_error($result);
+    }
 }
 
 // Also hook SMTP configuration into phpmailer for all outgoing emails

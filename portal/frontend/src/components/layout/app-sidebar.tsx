@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   Mail,
   FileText,
+  CalendarClock,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,7 @@ export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }
       items: [
         { name: "Repository", href: "/plugins", icon: Puzzle },
         { name: "Deployments", href: "/deployments", icon: Rocket },
+        { name: "Scheduled", href: "/deployments/scheduled", icon: CalendarClock },
       ],
     },
     {
@@ -104,7 +106,9 @@ export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }
             </div>
             <div className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const isActive = pathname === item.href || 
+                  (pathname.startsWith(item.href + "/") && 
+                   !group.items.some((other) => other.href !== item.href && pathname.startsWith(other.href)));
                 return (
                   <Link
                     key={item.name}

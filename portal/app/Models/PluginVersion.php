@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PluginVersion extends Model
 {
-    protected $fillable = ['plugin_id', 'version', 'file_path', 'file_size', 'file_hash', 'is_stable', 'released_by', 'released_at'];
+    protected $fillable = ['plugin_id', 'version', 'file_path', 'file_size', 'file_hash', 'is_stable', 'track', 'released_by', 'released_at'];
 
     protected $casts = [
         'is_stable' => 'boolean',

@@ -42,6 +42,13 @@ class Epos_Agent_Api {
             'callback'            => [self::class, 'handle_status'],
             'permission_callback' => [self::class, 'verify_agent_key'],
         ]);
+
+        // Rollback endpoint (Portal-initiated manual rollback)
+        register_rest_route($namespace, '/rollback', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_rollback'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
     }
 
     /**
@@ -105,5 +112,49 @@ class Epos_Agent_Api {
             'woo_active'     => class_exists('WooCommerce'),
             'active_plugins' => Epos_Agent_Activator::get_epos_plugins(),
         ]);
+    }
+
+    /**
+     * Handle Portal-initiated manual rollback
+     */
+    public static function handle_rollback($request) {
+        $plugin_slug  = $request->get_param('plugin_slug');
+        $download_url = $request->get_param('download_url');
+        $version      = $request->get_param('version');
+        $file_hash    = $request->get_param('file_hash');
+
+        if (empty($plugin_slug) || empty($download_url)) {
+            return new \WP_REST_Response([
+                'success' => false,
+                'message' => 'Missing required parameters: plugin_slug, download_url',
+            ], 400);
+        }
+
+        $rollback = new Epos_Agent_Rollback();
+
+        // First try local backup
+        $backup_path = get_option('epos_rollback_' . $plugin_slug);
+        if ($backup_path && is_dir($backup_path)) {
+            $success = $rollback->rollback($plugin_slug);
+        } else {
+            // Download from Portal
+            $success = $rollback->rollback_from_portal($plugin_slug, $download_url, $file_hash);
+        }
+
+        if ($success) {
+            return new \WP_REST_Response([
+                'success' => true,
+                'message' => "Rolled back {$plugin_slug} to v{$version}",
+                'data'    => [
+                    'plugin_slug'    => $plugin_slug,
+                    'rolled_back_to' => $version,
+                ],
+            ], 200);
+        }
+
+        return new \WP_REST_Response([
+            'success' => false,
+            'message' => "Failed to rollback {$plugin_slug}",
+        ], 500);
     }
 }

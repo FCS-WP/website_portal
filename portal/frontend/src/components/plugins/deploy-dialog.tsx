@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Rocket } from "lucide-react";
+import { Rocket, Clock } from "lucide-react";
 import { deploymentsService } from "@/lib/services/deployments";
 import { siteService } from "@/lib/services/sites";
 import { toast } from "sonner";
@@ -47,6 +47,14 @@ export function DeployDialog({
   const [note, setNote] = useState("");
   const [loadingSites, setLoadingSites] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
+
+  // Minimum datetime for scheduling (now + 5 min)
+  const minDatetime = useMemo(() => {
+    const d = new Date(Date.now() + 5 * 60 * 1000);
+    return d.toISOString().slice(0, 16);
+  }, []);
 
   useEffect(() => {
     if (open && mode === "select" && sites.length === 0) {
@@ -111,9 +119,13 @@ export function DeployDialog({
         payload.note = note.trim();
       }
 
+      if (scheduleEnabled && scheduledAt) {
+        (payload as Record<string, unknown>).scheduled_at = new Date(scheduledAt).toISOString();
+      }
+
       const res = await deploymentsService.create(payload);
       const deploymentId = res.data.data?.id;
-      toast.success("Deployment created!");
+      toast.success(scheduleEnabled ? "Deployment scheduled!" : "Deployment created!");
       onOpenChange(false);
       resetForm();
       if (deploymentId) {
@@ -132,6 +144,8 @@ export function DeployDialog({
     setMode("all");
     setSelectedSiteIds([]);
     setNote("");
+    setScheduleEnabled(false);
+    setScheduledAt("");
   };
 
   return (
@@ -250,6 +264,32 @@ export function DeployDialog({
             />
           </div>
 
+          {/* Schedule for later */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={scheduleEnabled}
+                onChange={(e) => setScheduleEnabled(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Schedule for later</span>
+            </label>
+            {scheduleEnabled && (
+              <div className="flex items-center gap-3 pl-6">
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  min={minDatetime}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+                <span className="text-xs text-muted-foreground">Asia/Ho_Chi_Minh</span>
+              </div>
+            )}
+          </div>
+
           {/* Confirmation */}
           <div className="rounded-md bg-muted p-3">
             <p className="text-sm">
@@ -267,10 +307,13 @@ export function DeployDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || (mode === "select" && selectedSiteIds.length === 0)}
+            disabled={submitting || (mode === "select" && selectedSiteIds.length === 0) || (scheduleEnabled && !scheduledAt)}
           >
-            <Rocket className="mr-2 h-4 w-4" />
-            {submitting ? "Deploying..." : "Deploy"}
+            {scheduleEnabled ? (
+              <><Clock className="mr-2 h-4 w-4" />{submitting ? "Scheduling..." : "Schedule"}</>
+            ) : (
+              <><Rocket className="mr-2 h-4 w-4" />{submitting ? "Deploying..." : "Deploy"}</>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

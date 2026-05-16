@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Agent\AgentController;
+use App\Http\Controllers\Portal\AutologinController;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,4 +18,7 @@ Route::middleware(\App\Http\Middleware\AgentAuthMiddleware::class)->group(functi
     Route::post('/handshake', [AgentController::class, 'handshake']);
     Route::post('/ping', [AgentController::class, 'ping']);
     Route::post('/plugin-updates', [AgentController::class, 'pluginUpdates']);
+    Route::post('/verify-login-token', [AutologinController::class, 'verifyToken']);
+    Route::post('/sync-credentials', [AgentController::class, 'syncCredentials']);
+    Route::post('/deployment/health-report', [AgentController::class, 'healthReport']);
 });
