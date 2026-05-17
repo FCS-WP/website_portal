@@ -122,7 +122,7 @@ export default function OrdersPage() {
           {mostActive.map((m, i) => (
             <span key={m.site_id}>
               {i > 0 && <span className="mx-2 text-muted-foreground">·</span>}
-              <Link href={`/sites/${m.site_id}`} className="font-medium hover:underline">
+              <Link href={`/sites/${m.site_id}`} className="font-medium text-primary hover:text-primary/80 transition-colors">
                 {m.site_name ?? `Site #${m.site_id}`}
               </Link>{" "}
               <span className="text-muted-foreground">{m.order_count_today}</span>

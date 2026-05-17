@@ -18,11 +18,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { siteService } from "@/lib/services/sites";
+import { ordersService } from "@/lib/services/orders";
+import { useAuthStore } from "@/stores/auth-store";
 import { Site } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical, Shield, LayoutDashboard, Puzzle, ShoppingCart, Mail, Activity } from "lucide-react";
+import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical, Shield, LayoutDashboard, Puzzle, ShoppingCart, Mail, Activity, MoreVertical, Loader2 } from "lucide-react";
 import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
 import { SiteActivityTab } from "@/components/sites/site-activity-tab";
 import { SiteCredentialsTab } from "@/components/sites/site-credentials-tab";
@@ -34,6 +43,13 @@ export default function SiteDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = Number(params.id);
+  // Role-derived capability flags. Centralised so each tab/button gates from
+  // the same source — easier to audit and to extend later (e.g. limiting
+  // certain plugin actions to admin only).
+  const role = useAuthStore((s) => s.user?.role);
+  const isMkt = role === "mkt";
+  const isAdmin = role === "admin";
+
   const [site, setSite] = useState<Site | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -43,6 +59,7 @@ export default function SiteDetailPage() {
   const [autologinLoading, setAutologinLoading] = useState(false);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [newApiKey, setNewApiKey] = useState("");
+  const [syncing, setSyncing] = useState(false);
   const [togglingBeta, setTogglingBeta] = useState(false);
 
   useEffect(() => {
@@ -95,6 +112,28 @@ export default function SiteDetailPage() {
       toast.error("Failed to open WP Admin");
     } finally {
       setAutologinLoading(false);
+    }
+  };
+
+  /**
+   * Trigger the agent's full ping inline (orders + plugins + connection).
+   * After it returns we refresh the site row so the header reflects the new
+   * last_ping_at / status.
+   */
+  const handleSyncNow = async () => {
+    if (!site) return;
+    setSyncing(true);
+    try {
+      await ordersService.syncSite(site.id);
+      toast.success("Sync complete.");
+      // Refresh the displayed site so badges/timestamps update.
+      const res = await siteService.show(site.id);
+      setSite(res.data.data);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e.response?.data?.message ?? "Sync failed.");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -156,11 +195,11 @@ export default function SiteDetailPage() {
           <h1 className="text-2xl font-bold">{site.name}</h1>
           <StatusBadge status={site.status} />
           {site.is_beta_tester && (
-            <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-medium">BETA</span>
+            <span className="bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full font-medium">BETA</span>
           )}
         </div>
 
-        {/* Actions row */}
+        {/* Actions row — primary actions inline, rare/risky ones in a kebab menu */}
         <div className="flex items-center gap-2 flex-wrap">
           {["connected", "online"].includes(site.status) && (
             <Button
@@ -169,38 +208,77 @@ export default function SiteDetailPage() {
               onClick={handleAutologin}
               disabled={autologinLoading}
             >
-              <ExternalLink className="mr-1.5 h-4 w-4" />
-              {autologinLoading ? "Opening..." : "Open WP Admin"}
+              {autologinLoading ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <ExternalLink className="mr-1.5 h-4 w-4" />
+              )}
+              {autologinLoading ? "Opening…" : "Open WP Admin"}
             </Button>
           )}
-          <Button
-            variant={site.is_beta_tester ? "default" : "outline"}
-            size="sm"
-            onClick={handleToggleBeta}
-            disabled={togglingBeta}
-            className={site.is_beta_tester ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
-          >
-            <FlaskConical className="mr-1.5 h-4 w-4" />
-            {togglingBeta ? "Updating..." : site.is_beta_tester ? "Beta Tester ✓" : "Enable Beta"}
-          </Button>
+
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setRegenerateDialogOpen(true)}
+            onClick={handleSyncNow}
+            disabled={syncing}
+            title="Force the WP agent to push fresh orders, plugins, and status"
           >
-            <RefreshCw className="mr-1.5 h-4 w-4" />
-            Regenerate API Key
+            {syncing ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+            )}
+            {syncing ? "Syncing…" : "Sync now"}
           </Button>
-          <div className="ml-auto">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              <Trash2 className="mr-1.5 h-4 w-4" />
-              Delete Site
-            </Button>
-          </div>
+
+          {/* Less-frequent / destructive actions live in this menu. Keeping them
+              out of the main row prevents accidental clicks on Delete and reduces
+              visual weight in a page that's mostly informational.
+
+              The menu is hidden entirely for MKT (every item is admin/dev-only,
+              so showing an empty kebab would just confuse them). */}
+          {!isMkt && (
+            <div className="ml-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                  aria-label="More site actions"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    onClick={handleToggleBeta}
+                    disabled={togglingBeta}
+                  >
+                    <FlaskConical className="mr-2 h-4 w-4" />
+                    {togglingBeta
+                      ? "Updating…"
+                      : site.is_beta_tester
+                        ? "Disable beta testing"
+                        : "Enable beta testing"}
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setRegenerateDialogOpen(true)}>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Regenerate API key
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && <DropdownMenuSeparator />}
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete site
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </div>
 
@@ -269,22 +347,28 @@ export default function SiteDetailPage() {
             <ShoppingCart className="h-3.5 w-3.5" />
             Orders
           </TabsTrigger>
-          <TabsTrigger value="smtp" className="gap-1">
-            <Mail className="h-3.5 w-3.5" />
-            SMTP
-          </TabsTrigger>
+          {!isMkt && (
+            <TabsTrigger value="smtp" className="gap-1">
+              <Mail className="h-3.5 w-3.5" />
+              SMTP
+            </TabsTrigger>
+          )}
           <TabsTrigger value="credentials" className="gap-1">
             <KeyRound className="h-3.5 w-3.5" />
             Credentials
           </TabsTrigger>
-          <TabsTrigger value="activity" className="gap-1">
-            <Activity className="h-3.5 w-3.5" />
-            Activity
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-1">
-            <Shield className="h-3.5 w-3.5" />
-            Security
-          </TabsTrigger>
+          {!isMkt && (
+            <TabsTrigger value="activity" className="gap-1">
+              <Activity className="h-3.5 w-3.5" />
+              Activity
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="security" className="gap-1">
+              <Shield className="h-3.5 w-3.5" />
+              Security
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -305,7 +389,7 @@ export default function SiteDetailPage() {
                       href={site.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-primary hover:text-primary/80 transition-colors"
                     >
                       {site.url}
                     </a>
@@ -420,38 +504,45 @@ export default function SiteDetailPage() {
         </TabsContent>
 
         <TabsContent value="plugins" className="mt-6">
-          <SitePluginsTab siteId={site.id} />
+          <SitePluginsTab siteId={site.id} readOnly={isMkt} />
         </TabsContent>
 
         <TabsContent value="orders" className="mt-6">
           <SiteOrdersTab siteId={site.id} siteUrl={site.url} />
         </TabsContent>
 
-        <TabsContent value="smtp" className="mt-6">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">
-                SMTP configuration coming in Phase 2.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {!isMkt && (
+          <TabsContent value="smtp" className="mt-6">
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">
+                  SMTP configuration coming in Phase 2.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="credentials" className="mt-6">
           <SiteCredentialsTab
             siteId={site.id}
             siteName={site.name}
             siteUrl={site.url}
+            readOnly={isMkt}
           />
         </TabsContent>
 
-        <TabsContent value="activity" className="mt-6">
-          <SiteActivityTab siteId={site.id} />
-        </TabsContent>
+        {!isMkt && (
+          <TabsContent value="activity" className="mt-6">
+            <SiteActivityTab siteId={site.id} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="security" className="mt-6">
-          <SiteSecurityTab siteId={site.id} />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="security" className="mt-6">
+            <SiteSecurityTab siteId={site.id} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

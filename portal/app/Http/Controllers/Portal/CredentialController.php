@@ -41,10 +41,9 @@ class CredentialController extends Controller
     {
         $user = $request->user();
 
-        // MKT: no vault access
-        if ($user->role === 'mkt') {
-            return $this->errorResponse('You do not have access to the vault.', 403);
-        }
+        // MKT has read access (incl. reveal/copy for client handoff) but no
+        // write — destroy/store/update still block them below. Audit-logging
+        // captures every reveal/copy so the trail is preserved.
 
         // Check site accessibility for non-admin users
         if (!$this->canAccessSite($user, $site)) {
@@ -159,9 +158,8 @@ class CredentialController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role === 'mkt') {
-            return $this->errorResponse('You do not have access to the vault.', 403);
-        }
+        // MKT can read individual credential records (no MKT block here);
+        // they need this to look up usernames before pulling a reveal.
 
         if (!$this->canAccessSite($user, $site)) {
             return $this->errorResponse('You do not have access to this site.', 403);
@@ -324,9 +322,8 @@ class CredentialController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role === 'mkt') {
-            return $this->errorResponse('You do not have access to the vault.', 403);
-        }
+        // MKT may reveal credentials to share with clients. Every reveal is
+        // PIN-protected and audit-logged via VaultAuditService below.
 
         if (!$this->canAccessSite($user, $site)) {
             return $this->errorResponse('You do not have access to this site.', 403);
@@ -395,9 +392,8 @@ class CredentialController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role === 'mkt') {
-            return $this->errorResponse('You do not have access to the vault.', 403);
-        }
+        // MKT may copy credentials (same workflow as reveal — PIN-gated and
+        // audit-logged). Writes remain admin/dev-only.
 
         if (!$this->canAccessSite($user, $site)) {
             return $this->errorResponse('You do not have access to this site.', 403);

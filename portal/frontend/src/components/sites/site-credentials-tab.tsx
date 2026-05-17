@@ -45,6 +45,13 @@ interface SiteCredentialsTabProps {
   siteId: number | string;
   siteName: string;
   siteUrl: string;
+  /**
+   * Read-only mode: hides Add / Edit / Delete buttons but keeps reveal +
+   * copy actions. MKT users need to read credentials to share with clients
+   * but mustn't modify them. The backend already rejects MKT writes — this
+   * flag just hides the dead UI controls.
+   */
+  readOnly?: boolean;
 }
 
 type PendingAction =
@@ -94,9 +101,14 @@ export function SiteCredentialsTab({
   siteId,
   siteName,
   siteUrl,
+  readOnly = false,
 }: SiteCredentialsTabProps) {
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "admin";
+  // Combined gate for write-style buttons. readOnly is the explicit caller
+  // signal (MKT); the existing isAdmin check is preserved so dev-only logic
+  // upstream still applies. canMutate => can Add/Edit/Delete.
+  const canMutate = !readOnly;
 
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
@@ -353,10 +365,12 @@ export function SiteCredentialsTab({
             <p className="text-muted-foreground mb-4">
               No credentials stored for this site.
             </p>
-            <Button onClick={handleAddClick}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Credentials
-            </Button>
+            {canMutate && (
+              <Button onClick={handleAddClick}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Credentials
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -389,10 +403,12 @@ export function SiteCredentialsTab({
             Share with client
           </Button>
         )}
-        <Button size="sm" onClick={handleAddClick}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Add Credentials
-        </Button>
+        {canMutate && (
+          <Button size="sm" onClick={handleAddClick}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Add Credentials
+          </Button>
+        )}
       </div>
 
       {/* Type filter tabs */}
@@ -469,14 +485,16 @@ export function SiteCredentialsTab({
                           WP Admin
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleEditClick(credential)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      {isAdmin && (
+                      {canMutate && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleEditClick(credential)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {canMutate && isAdmin && (
                         <Button
                           variant="ghost"
                           size="icon-sm"

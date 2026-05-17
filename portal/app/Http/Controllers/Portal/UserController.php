@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Models\Site;
 use App\Models\User;
 use App\Traits\ApiResponse;
 use App\Http\Requests\User\StoreUserRequest;
@@ -44,6 +45,11 @@ class UserController extends Controller
         // Assign Spatie role
         $user->assignRole($request->role);
 
+        // Open-by-default policy: dev/mkt members see every site. Attach
+        // the new user to every existing site so they don't miss content
+        // that was created before their account existed.
+        self::attachUserToAllSitesIfApplicable($user);
+
         ActivityLogService::log(
             'user.created',
             $user,
@@ -70,6 +76,7 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request, User $user)
     {
         $oldRole = $user->role;
+        $wasInactive = !$user->is_active;
 
         $data = $request->only(['name', 'email', 'role', 'is_active', 'telegram_chat_id']);
 
@@ -90,6 +97,20 @@ class UserController extends Controller
                 $request->ip(),
                 ['old_role' => $oldRole, 'new_role' => $request->role]
             );
+        }
+
+        // Re-apply the open-by-default policy if either:
+        //   - the user just transitioned to dev/mkt from another role, or
+        //   - the user was reactivated after being disabled.
+        // Both events can leave the user missing from sites created during
+        // the gap. attachUserToAllSitesIfApplicable() is idempotent.
+        $roleChangedToDevOrMkt = $request->has('role')
+            && $request->role !== $oldRole
+            && in_array($request->role, ['dev', 'mkt'], true);
+        $justReactivated = $wasInactive && $user->fresh()->is_active;
+
+        if ($roleChangedToDevOrMkt || $justReactivated) {
+            self::attachUserToAllSitesIfApplicable($user->fresh());
         }
 
         ActivityLogService::log(
@@ -132,5 +153,34 @@ class UserController extends Controller
         $user->delete();
 
         return $this->successResponse(null, 'User deleted successfully.');
+    }
+
+    /**
+     * Open-by-default site visibility for the dev/mkt teams.
+     *
+     * Attaches the given user to every site that exists, but only when the
+     * user is an active dev/mkt member. Idempotent — uses
+     * syncWithoutDetaching so previously-assigned sites aren't disturbed
+     * and we don't fight an admin who explicitly curated assignments.
+     * Admins are skipped (they already see everything via the
+     * Site::accessibleBy scope).
+     */
+    private static function attachUserToAllSitesIfApplicable(User $user): void
+    {
+        if (!$user->is_active || !in_array($user->role, ['dev', 'mkt'], true)) {
+            return;
+        }
+
+        $siteIds = Site::query()->pluck('id')->all();
+        if (empty($siteIds)) {
+            return;
+        }
+
+        // Reach back through Site::users() since User doesn't expose the
+        // inverse relation in this codebase. Group into one attach per site
+        // for transactional cleanliness on Postgres.
+        Site::whereIn('id', $siteIds)
+            ->get()
+            ->each(fn (Site $s) => $s->users()->syncWithoutDetaching([$user->id]));
     }
 }

@@ -68,7 +68,13 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                // Stronger row hover than the primitive default (muted/50).
+                // The left-border accent gives a clear "this row is interactive"
+                // cue without needing per-page customization.
+                <TableRow
+                  key={row.id}
+                  className="group border-l-2 border-l-transparent transition-colors hover:bg-muted hover:border-l-primary"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(

@@ -46,9 +46,17 @@ type PluginTypeFilter = "all" | "internal" | "wporg" | "premium";
 
 interface SitePluginsTabProps {
   siteId: number;
+  /**
+   * Read-only mode: hides the Install / Update-all toolbar buttons AND the
+   * per-row action buttons (Activate / Deactivate / Update / Uninstall).
+   * View-only consumers (e.g. MKT support staff) get this; the underlying
+   * Portal API would 403 their write attempts anyway, but hiding the UI
+   * avoids confusing dead clicks.
+   */
+  readOnly?: boolean;
 }
 
-export function SitePluginsTab({ siteId }: SitePluginsTabProps) {
+export function SitePluginsTab({ siteId, readOnly = false }: SitePluginsTabProps) {
   const [plugins, setPlugins] = useState<SitePluginAll[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<PluginTypeFilter>("all");
@@ -235,21 +243,23 @@ export function SitePluginsTab({ siteId }: SitePluginsTabProps) {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-base font-medium">Plugins</h3>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" render={<Link href="/plugins/install" />}>
-                <Download className="h-3.5 w-3.5" />
-                Install plugin
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={outdatedWporgCount === 0}
-                onClick={() => setUpdateAllConfirmOpen(true)}
-              >
-                <Package className="h-3.5 w-3.5" />
-                Update all outdated ({outdatedWporgCount})
-              </Button>
-            </div>
+            {!readOnly && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" render={<Link href="/plugins/install" />}>
+                  <Download className="h-3.5 w-3.5" />
+                  Install plugin
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={outdatedWporgCount === 0}
+                  onClick={() => setUpdateAllConfirmOpen(true)}
+                >
+                  <Package className="h-3.5 w-3.5" />
+                  Update all outdated ({outdatedWporgCount})
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Type Filter Tabs */}
@@ -362,14 +372,20 @@ export function SitePluginsTab({ siteId }: SitePluginsTabProps) {
 
                   {/* Actions */}
                   <TableCell className="text-right">
-                    <PluginActions
-                      plugin={plugin}
-                      actionLoading={actionLoading}
-                      onActivate={handleActivate}
-                      onDeactivate={setDeactivateTarget}
-                      onUpdate={setUpdateTarget}
-                      onUninstall={setUninstallTarget}
-                    />
+                    {readOnly ? (
+                      <span className="text-xs text-muted-foreground italic">
+                        View only
+                      </span>
+                    ) : (
+                      <PluginActions
+                        plugin={plugin}
+                        actionLoading={actionLoading}
+                        onActivate={handleActivate}
+                        onDeactivate={setDeactivateTarget}
+                        onUpdate={setUpdateTarget}
+                        onUninstall={setUninstallTarget}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

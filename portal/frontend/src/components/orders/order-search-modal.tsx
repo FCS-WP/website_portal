@@ -127,7 +127,7 @@ export function OrderSearchModal({ open, onOpenChange, defaultSiteId = null }: P
         {/* Result panes */}
         {state.status === "found" && state.orders && (
           <div className="space-y-2">
-            <div className="text-sm font-semibold text-green-700">
+            <div className="text-sm font-semibold text-green-700 dark:text-green-400">
               Found {state.orders.length} match{state.orders.length === 1 ? "" : "es"}
             </div>
             <ul className="divide-y rounded border">
@@ -161,18 +161,18 @@ export function OrderSearchModal({ open, onOpenChange, defaultSiteId = null }: P
         )}
 
         {state.status === "not_found" && (
-          <div className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm">
-            <div className="flex items-center gap-2 font-medium text-amber-900">
+          <div className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-500/40 dark:bg-amber-500/10">
+            <div className="flex items-center gap-2 font-medium text-amber-900 dark:text-amber-300">
               <AlertCircle className="h-4 w-4" /> {state.errorMessage}
             </div>
-            <p className="text-xs text-amber-800">
+            <p className="text-xs text-amber-800 dark:text-amber-300/90">
               Orders are cached up to 200 most recent per site. Search directly in wp-admin:
             </p>
             <ul className="space-y-1">
               {state.fallbackUrls?.map((s) => (
                 <li key={s.site_id}>
                   <a
-                    className="text-amber-900 underline underline-offset-2"
+                    className="text-amber-900 underline underline-offset-2 dark:text-amber-300"
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -186,7 +186,7 @@ export function OrderSearchModal({ open, onOpenChange, defaultSiteId = null }: P
         )}
 
         {state.status === "error" && (
-          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
             {state.errorMessage}
           </div>
         )}

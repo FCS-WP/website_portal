@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { AppSidebar } from "./app-sidebar";
 import { AppHeader } from "./app-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { canAccessPath, fallbackPathFor, type Role } from "@/lib/access-control";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, hydrate } = useAuthStore();
+  const { isAuthenticated, isLoading, hydrate, user } = useAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     hydrate();
@@ -20,6 +23,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       router.push("/login");
     }
   }, [isLoading, isAuthenticated, router]);
+
+  // Route guard: once we know who the user is, redirect them off pages they
+  // can't see. Runs after the auth check so we don't ping /login → / loop.
+  // Uses the same rule table as the sidebar so the two can't disagree.
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !user) return;
+    const role = user.role as Role;
+    if (!canAccessPath(role, pathname)) {
+      toast.error("You don't have access to that page.");
+      router.replace(fallbackPathFor(role));
+    }
+  }, [isLoading, isAuthenticated, user, pathname, router]);
 
   if (isLoading) {
     return (

@@ -43,12 +43,33 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Plus, MoreHorizontal, Trash2, ExternalLink } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ApiKeyDialog } from "@/components/sites/api-key-dialog";
 import { siteService } from "@/lib/services/sites";
 import { hostingService } from "@/lib/services/hostings";
+import { useAuthStore } from "@/stores/auth-store";
 import { Site, Hosting } from "@/types";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
+
+// Color-code Last Ping by recency. Anything older than 2h likely needs
+// attention — the cron pings every 5 min so a healthy site shows <15 min.
+// Dot stays saturated in both modes; text gets a lighter step in dark mode
+// so it pops against the dark background.
+function lastPingTone(iso: string | null): { dotClass: string; textClass: string; label: string } {
+  if (!iso) return { dotClass: "bg-gray-400", textClass: "text-muted-foreground", label: "Never" };
+  const ageMs = Date.now() - new Date(iso).getTime();
+  const mins = ageMs / 60_000;
+  if (mins < 15)  return { dotClass: "bg-green-500", textClass: "text-green-700 dark:text-green-400", label: formatDistanceToNow(new Date(iso), { addSuffix: true }) };
+  if (mins < 120) return { dotClass: "bg-amber-500", textClass: "text-amber-700 dark:text-amber-400", label: formatDistanceToNow(new Date(iso), { addSuffix: true }) };
+  return            { dotClass: "bg-red-500",   textClass: "text-red-700 dark:text-red-400",     label: formatDistanceToNow(new Date(iso), { addSuffix: true }) };
+}
 
 export default function SitesPage() {
   const router = useRouter();
@@ -76,20 +97,36 @@ export default function SitesPage() {
     user_ids: [] as number[],
   });
 
+  // Only admins can read /api/hostings (it's a CRUD endpoint, not a dropdown
+  // source). For non-admin roles we skip the call entirely — the hosting
+  // filter is hidden for them too, so an empty array is fine. We also fetch
+  // sites + hostings independently so a single failed call doesn't blank
+  // the whole page (previously Promise.all + 403 wiped the sites list).
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canFetchHostings = userRole === "admin";
+  // Site creation is admin+dev per route middleware; MKT can't create sites,
+  // so hide the Add button for them.
+  const canCreateSite = userRole === "admin" || userRole === "dev";
+
   const fetchData = useCallback(async () => {
-    try {
-      const [sitesRes, hostingsRes] = await Promise.all([
-        siteService.list(),
-        hostingService.list(),
-      ]);
-      setSites(sitesRes.data.data || []);
-      setHostings(hostingsRes.data.data || []);
-    } catch {
-      toast.error("Failed to load data");
-    } finally {
-      setLoading(false);
+    setLoading(true);
+
+    siteService.list()
+      .then((res) => setSites(res.data.data || []))
+      .catch(() => toast.error("Failed to load sites"));
+
+    if (canFetchHostings) {
+      hostingService.list()
+        .then((res) => setHostings(res.data.data || []))
+        .catch(() => {
+          // Hosting filter just won't have entries — non-blocking.
+        });
+    } else {
+      setHostings([]);
     }
-  }, []);
+
+    setLoading(false);
+  }, [canFetchHostings]);
 
   useEffect(() => {
     fetchData();
@@ -161,27 +198,25 @@ export default function SitesPage() {
 
   const columns: ColumnDef<Site>[] = [
     {
+      // Merged Name + URL. The name is the click target; the URL is muted
+      // metadata directly below for context.
       accessorKey: "name",
-      header: "Name",
+      header: "Site",
       cell: ({ row }) => (
-        <div className="flex items-center">
-          <button
-            className="font-medium text-primary hover:underline"
-            onClick={() => router.push(`/sites/${row.original.id}`)}
-          >
-            {row.getValue("name")}
-          </button>
-          {row.original.is_beta_tester && (
-            <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full ml-2">BETA</span>
-          )}
+        <div className="min-w-0 max-w-[360px]">
+          <div className="flex items-center gap-2">
+            <button
+              className="font-medium text-primary hover:text-primary/80 truncate text-left transition-colors"
+              onClick={() => router.push(`/sites/${row.original.id}`)}
+            >
+              {row.getValue("name")}
+            </button>
+            {row.original.is_beta_tester && (
+              <span className="bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full shrink-0">BETA</span>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">{row.original.url}</div>
         </div>
-      ),
-    },
-    {
-      accessorKey: "url",
-      header: "URL",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{row.getValue("url")}</span>
       ),
     },
     {
@@ -197,18 +232,43 @@ export default function SitesPage() {
     {
       accessorKey: "woo_active",
       header: "WooCommerce",
-      cell: ({ row }) => (
-        <Badge variant={row.getValue("woo_active") ? "default" : "secondary"}>
-          {row.getValue("woo_active") ? "Yes" : "No"}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const active = !!row.getValue("woo_active");
+        if (!active) {
+          return <Badge variant="outline" className="text-muted-foreground">Not active</Badge>;
+        }
+        // WooCommerce brand purple (#7f54b3) for active state.
+        return (
+          <Badge
+            className="border-transparent text-white hover:opacity-90"
+            style={{ backgroundColor: "#7f54b3" }}
+          >
+            <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white/90" />
+            WooCommerce
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "last_ping_at",
       header: "Last Ping",
       cell: ({ row }) => {
         const val = row.getValue("last_ping_at") as string | null;
-        return val ? format(new Date(val), "MMM d, HH:mm") : "Never";
+        const tone = lastPingTone(val);
+        const exact = val ? format(new Date(val), "MMM d, yyyy · HH:mm") : "Never pinged";
+        return (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className={cn("inline-flex items-center gap-1.5 text-sm cursor-default", tone.textClass)}>
+                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", tone.dotClass)} />
+                  {tone.label}
+                </span>
+              }
+            />
+            <TooltipContent>{exact}</TooltipContent>
+          </Tooltip>
+        );
       },
     },
     {
@@ -241,28 +301,34 @@ export default function SitesPage() {
         return (
           <div className="flex items-center justify-end gap-1">
             {isOnline && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                    const res = await siteService.autologin(row.original.id);
-                    const redirectUrl = res.data.data.redirect_url;
-                    if (redirectUrl) {
-                      window.open(redirectUrl, "_blank");
-                    } else {
-                      toast.error("No redirect URL returned");
-                    }
-                  } catch {
-                    toast.error("Failed to open WP Admin");
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Open in WP Admin"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const res = await siteService.autologin(row.original.id);
+                          const redirectUrl = res.data.data.redirect_url;
+                          if (redirectUrl) {
+                            window.open(redirectUrl, "_blank");
+                          } else {
+                            toast.error("No redirect URL returned");
+                          }
+                        } catch {
+                          toast.error("Failed to open WP Admin");
+                        }
+                      }}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
                   }
-                }}
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                WP Admin
-              </Button>
+                />
+                <TooltipContent>Open in WP Admin</TooltipContent>
+              </Tooltip>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -299,19 +365,22 @@ export default function SitesPage() {
   }
 
   return (
+    <TooltipProvider delay={120}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Sites</h1>
           <p className="text-muted-foreground">Manage your WordPress sites</p>
         </div>
-        <Button onClick={() => {
-          setFormData({ name: "", url: "", hosting_id: "", description: "", tags: "", user_ids: [] });
-          setDialogOpen(true);
-        }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Site
-        </Button>
+        {canCreateSite && (
+          <Button onClick={() => {
+            setFormData({ name: "", url: "", hosting_id: "", description: "", tags: "", user_ids: [] });
+            setDialogOpen(true);
+          }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Site
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -333,19 +402,21 @@ export default function SitesPage() {
             <SelectItem value="disconnected">Disconnected</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filterHosting} onValueChange={(val) => setFilterHosting(val ?? "all")}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Hosting" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Hostings</SelectItem>
-            {hostings.map((h) => (
-              <SelectItem key={h.id} value={String(h.id)}>
-                {h.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {hostings.length > 0 && (
+          <Select value={filterHosting} onValueChange={(val) => setFilterHosting(val ?? "all")}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Hosting" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Hostings</SelectItem>
+              {hostings.map((h) => (
+                <SelectItem key={h.id} value={String(h.id)}>
+                  {h.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <DataTable columns={columns} data={filteredSites} pageSize={20} />
@@ -455,5 +526,6 @@ export default function SitesPage() {
         apiKey={newApiKey}
       />
     </div>
+    </TooltipProvider>
   );
 }

@@ -81,7 +81,7 @@ export function OrdersTable({ orders, loading, hideSite = false, initiallyExpand
                       {o.site_id ? (
                         <Link
                           href={`/sites/${o.site_id}`}
-                          className="text-primary hover:underline"
+                          className="text-primary hover:text-primary/80 transition-colors"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {o.site_name ?? `Site #${o.site_id}`}

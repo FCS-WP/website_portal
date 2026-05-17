@@ -5,13 +5,18 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Traits\ApiResponse;
+use App\Traits\AuthorizesSiteAccess;
+use Illuminate\Http\Request;
 
 class SitePluginController extends Controller
 {
     use ApiResponse;
+    use AuthorizesSiteAccess;
 
-    public function index(Site $site)
+    public function index(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $plugins = $site->sitePlugins()->with('plugin:id,name,slug,author')->get();
 
         $data = $plugins->map(function ($sp) {

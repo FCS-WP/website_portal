@@ -25,6 +25,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
 import { sidebarService, SidebarCounts } from "@/lib/services/sidebar";
 
+type Role = "admin" | "dev" | "mkt";
+
 interface NavItem {
   name: string;
   href: string;
@@ -32,18 +34,24 @@ interface NavItem {
   badge?: number;
   badgeVariant?: "info" | "warning";
   placeholder?: boolean;
+  /** If set, only these roles see this item. Omit to allow everyone. */
+  roles?: Role[];
 }
 
 interface NavGroup {
   label: string;
+  /** Legacy flag — equivalent to roles=["admin"]. Kept so other groups don't break. */
   adminOnly?: boolean;
+  /** If set, only these roles see this whole group. Falls back to per-item filtering. */
+  roles?: Role[];
   items: NavItem[];
 }
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
-  const isAdmin = user?.role === "admin";
+  const role = (user?.role ?? "mkt") as Role;
+  const isAdmin = role === "admin";
   const [counts, setCounts] = useState<SidebarCounts | null>(null);
 
   useEffect(() => {
@@ -61,6 +69,13 @@ export function AppSidebar() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
+  // Role-based sidebar shape. Per our scope audit:
+  //   admin → sees everything
+  //   dev   → sees MAIN (no Hostings), PLUGINS, OPERATIONS, no SECURITY/ADMIN
+  //   mkt   → sees Dashboard + Sites (MAIN) and Orders (OPERATIONS) only
+  //
+  // `roles` on a group hides the whole group. `roles` on an item hides
+  // individual rows so we don't end up with an empty group header.
   const navGroups: NavGroup[] = [
     {
       label: "MAIN",
@@ -79,11 +94,13 @@ export function AppSidebar() {
           icon: Server,
           badge: counts?.hostings || undefined,
           badgeVariant: "info",
+          roles: ["admin"],
         },
       ],
     },
     {
       label: "PLUGINS",
+      roles: ["admin", "dev"],
       items: [
         {
           name: "Updates",
@@ -112,6 +129,7 @@ export function AppSidebar() {
     },
     {
       label: "SECURITY",
+      roles: ["admin"],
       items: [
         { name: "Overview", href: "/security", icon: Shield },
         {
@@ -128,8 +146,8 @@ export function AppSidebar() {
       label: "OPERATIONS",
       items: [
         { name: "Orders", href: "/orders", icon: ShoppingCart },
-        { name: "SMTP", href: "/smtp", icon: Mail, placeholder: true },
-        { name: "Activity Logs", href: "/activity-logs", icon: FileText },
+        { name: "SMTP", href: "/smtp", icon: Mail, placeholder: true, roles: ["admin", "dev"] },
+        { name: "Activity Logs", href: "/activity-logs", icon: FileText, roles: ["admin", "dev"] },
       ],
     },
     {
@@ -142,9 +160,23 @@ export function AppSidebar() {
     },
   ];
 
-  const filteredGroups = navGroups.filter(
-    (group) => !group.adminOnly || isAdmin
-  );
+  const canSeeGroup = (group: NavGroup): boolean => {
+    if (group.adminOnly && !isAdmin) return false;
+    if (group.roles && !group.roles.includes(role)) return false;
+    return true;
+  };
+
+  const canSeeItem = (item: NavItem): boolean => {
+    if (item.roles && !item.roles.includes(role)) return false;
+    return true;
+  };
+
+  // First filter items inside each group, then drop any group that
+  // ended up with zero visible items (so we don't render an empty header).
+  const filteredGroups = navGroups
+    .filter(canSeeGroup)
+    .map((g) => ({ ...g, items: g.items.filter(canSeeItem) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r bg-sidebar">
@@ -178,30 +210,33 @@ export function AppSidebar() {
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      // Base: row layout + a transparent left border that the
+                      // active state lights up. Using a border slot avoids
+                      // layout shift between active/inactive states.
+                      "flex items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        ? // Active: primary-tinted background, primary text,
+                          // and a primary left accent. Icon picks up the
+                          // primary color through `[&_svg]:text-primary` so
+                          // the whole row reads as the selected nav item.
+                          "border-primary bg-primary/10 text-primary [&_svg]:text-primary"
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
                   >
-                    <item.icon className="h-4 w-4" />
-                    <span className="flex-1 inline-flex items-center">
-                      <span className="relative">
-                        {item.name}
-                        {item.badge !== undefined && item.badge > 0 && (
-                          <span
-                            className={cn(
-                              "absolute -top-0.5 -right-4 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none",
-                              item.badgeVariant === "warning"
-                                ? "bg-amber-500 text-white dark:bg-amber-600"
-                                : "bg-muted-foreground/20 text-muted-foreground"
-                            )}
-                          >
-                            {item.badge}
-                          </span>
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1 truncate">{item.name}</span>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span
+                        className={cn(
+                          "ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-none tabular-nums",
+                          item.badgeVariant === "warning"
+                            ? "bg-amber-500 text-white dark:bg-amber-600"
+                            : "bg-muted-foreground/20 text-muted-foreground"
                         )}
+                      >
+                        {item.badge > 99 ? "99+" : item.badge}
                       </span>
-                    </span>
+                    )}
                   </Link>
                 );
               })}

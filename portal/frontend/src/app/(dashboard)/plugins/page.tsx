@@ -88,7 +88,7 @@ export default function PluginsPage() {
       header: "Name",
       cell: ({ row }) => (
         <button
-          className="font-medium text-primary hover:underline"
+          className="font-medium text-primary hover:text-primary/80 transition-colors"
           onClick={() => router.push(`/plugins/${row.original.id}`)}
         >
           {row.getValue("name")}

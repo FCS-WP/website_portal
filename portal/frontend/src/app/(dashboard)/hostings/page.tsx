@@ -521,7 +521,7 @@ function CredentialRow({
         <div className="flex-1 rounded-md border bg-muted/50 px-3 py-2 text-sm font-mono truncate">
           {value ? (
             isUrl ? (
-              <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
                 {value}
               </a>
             ) : (

@@ -11,6 +11,7 @@ use App\Models\PluginOperationLog;
 use App\Models\Site;
 use App\Models\SitePlugin;
 use App\Traits\ApiResponse;
+use App\Traits\AuthorizesSiteAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 class ExternalPluginController extends Controller
 {
     use ApiResponse;
+    use AuthorizesSiteAccess;
 
     /**
      * GET /plugins/external/updates
@@ -483,8 +485,10 @@ class ExternalPluginController extends Controller
      * GET /sites/{site}/plugins/all
      * Return ALL plugins for this site (internal + wporg + premium).
      */
-    public function sitePlugins(Site $site)
+    public function sitePlugins(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $plugins = SitePlugin::where('site_id', $site->id)
             ->with('externalPlugin:slug,name,rating,active_installs,is_abandoned,last_updated_wporg')
             ->orderBy('plugin_name')
@@ -499,6 +503,8 @@ class ExternalPluginController extends Controller
      */
     public function activate(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $request->validate([
             'slug' => 'required|string',
             'plugin_file' => 'required|string',
@@ -557,6 +563,8 @@ class ExternalPluginController extends Controller
      */
     public function deactivate(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $request->validate([
             'slug' => 'required|string',
             'plugin_file' => 'required|string',
@@ -615,6 +623,8 @@ class ExternalPluginController extends Controller
      */
     public function uninstall(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $request->validate([
             'slug' => 'required|string',
             'plugin_file' => 'required|string',
@@ -661,6 +671,8 @@ class ExternalPluginController extends Controller
      */
     public function updateAllOnSite(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $outdated = SitePlugin::where('site_id', $site->id)
             ->where('plugin_type', 'wporg')
             ->where('update_available', true)

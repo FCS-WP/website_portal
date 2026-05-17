@@ -345,7 +345,7 @@ export default function TwoFaManagementPage() {
                   <TableCell className="font-medium">
                     <Link
                       href={`/sites/${site.id}`}
-                      className="hover:underline"
+                      className="text-primary hover:text-primary/80 transition-colors"
                     >
                       {site.name}
                     </Link>

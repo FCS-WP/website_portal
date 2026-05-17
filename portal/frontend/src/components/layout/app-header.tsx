@@ -13,6 +13,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AppHeader() {
   const { user, logout } = useAuthStore();
@@ -31,13 +32,14 @@ export function AppHeader() {
     .slice(0, 2) || "U";
 
   const roleBadgeColor: Record<string, string> = {
-    admin: "bg-purple-100 text-purple-800",
-    dev: "bg-blue-100 text-blue-800",
-    mkt: "bg-green-100 text-green-800",
+    admin: "bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300",
+    dev:   "bg-blue-100   text-blue-800   dark:bg-blue-500/15   dark:text-blue-300",
+    mkt:   "bg-green-100  text-green-800  dark:bg-green-500/15  dark:text-green-300",
   };
 
   return (
     <header className="h-16 border-b bg-background flex items-center justify-end px-6 gap-4">
+      <ThemeToggle />
       {user && (
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium">{user.name}</span>

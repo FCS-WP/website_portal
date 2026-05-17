@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Site;
+use App\Models\User;
 use App\Traits\ApiResponse;
+use App\Traits\AuthorizesSiteAccess;
 use App\Http\Requests\Site\StoreSiteRequest;
 use App\Http\Requests\Site\UpdateSiteRequest;
 use App\Services\ActivityLogService;
@@ -15,6 +17,7 @@ use Illuminate\Support\Str;
 class SiteController extends Controller
 {
     use ApiResponse;
+    use AuthorizesSiteAccess;
 
     /**
      * GET /api/sites
@@ -74,9 +77,25 @@ class SiteController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
-        // Assign users if provided
-        if ($request->has('user_ids')) {
-            $site->users()->sync($request->user_ids);
+        // User assignment policy:
+        //  - If the admin passed a non-empty `user_ids` list, honor it
+        //    exactly (the admin made an explicit choice).
+        //  - Otherwise auto-assign all active dev + mkt users so the new
+        //    site is visible to those teams immediately. Without this,
+        //    support staff (mkt) and developers wouldn't know the site
+        //    exists until an admin manually added them.
+        $explicitIds = (array) $request->input('user_ids', []);
+        if (!empty($explicitIds)) {
+            $site->users()->sync($explicitIds);
+        } else {
+            $defaultIds = User::query()
+                ->whereIn('role', ['dev', 'mkt'])
+                ->where('is_active', true)
+                ->pluck('id')
+                ->all();
+            if (!empty($defaultIds)) {
+                $site->users()->sync($defaultIds);
+            }
         }
 
         ActivityLogService::log(
@@ -98,12 +117,7 @@ class SiteController extends Controller
      */
     public function show(Request $request, Site $site)
     {
-        // Check access for non-admin users
-        if ($request->user()->role !== 'admin') {
-            if (!$site->users()->where('users.id', $request->user()->id)->exists()) {
-                return $this->errorResponse('You do not have access to this site.', 403);
-            }
-        }
+        $this->assertSiteAccess($request, $site);
 
         $site->load(['hosting', 'users']);
 
@@ -115,6 +129,8 @@ class SiteController extends Controller
      */
     public function update(UpdateSiteRequest $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $site->update($request->validated());
 
         // Update user assignments if provided
@@ -139,6 +155,8 @@ class SiteController extends Controller
      */
     public function destroy(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $site->delete();
 
         ActivityLogService::log(
@@ -157,10 +175,14 @@ class SiteController extends Controller
      */
     public function regenerateKey(Request $request, Site $site)
     {
-        // Only admin can regenerate
+        // Only admin can regenerate, and only on sites they can see.
+        // assertSiteAccess covers the latter (admin is always allowed by
+        // Site::accessibleBy); the explicit role check stays so dev users
+        // get a clear "admin only" message rather than a generic 403.
         if ($request->user()->role !== 'admin') {
             return $this->errorResponse('Only admins can regenerate API keys.', 403);
         }
+        $this->assertSiteAccess($request, $site);
 
         $plainKey = Str::random(64);
         $hashedKey = hash('sha256', $plainKey);
@@ -214,12 +236,7 @@ class SiteController extends Controller
      */
     public function activity(Request $request, Site $site)
     {
-        // Check access for non-admin users
-        if ($request->user()->role !== 'admin') {
-            if (!$site->users()->where('users.id', $request->user()->id)->exists()) {
-                return $this->errorResponse('You do not have access to this site.', 403);
-            }
-        }
+        $this->assertSiteAccess($request, $site);
 
         $logs = $site->activityLogs()
             ->with('user')
@@ -233,8 +250,10 @@ class SiteController extends Controller
      * POST /api/sites/{site}/toggle-beta
      * Toggle beta tester status for a site.
      */
-    public function toggleBetaTester(Site $site)
+    public function toggleBetaTester(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $site->update(['is_beta_tester' => !$site->is_beta_tester]);
 
         return response()->json([
@@ -258,11 +277,7 @@ class SiteController extends Controller
      */
     public function syncNow(Request $request, Site $site)
     {
-        // Defense: enforce the same scoping the rest of the controller uses.
-        $hasAccess = Site::accessibleBy($request->user())->whereKey($site->id)->exists();
-        if (!$hasAccess) {
-            return $this->errorResponse('Site not accessible.', 403);
-        }
+        $this->assertSiteAccess($request, $site);
 
         if (empty($site->api_key_encrypted)) {
             return $this->errorResponse('Site is missing its agent API key. Re-register the site to provision one.', 422);

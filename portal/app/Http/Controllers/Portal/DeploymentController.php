@@ -8,6 +8,7 @@ use App\Models\DeploymentJobSite;
 use App\Models\PluginVersion;
 use App\Models\Site;
 use App\Traits\ApiResponse;
+use App\Traits\AuthorizesSiteAccess;
 use App\Services\ActivityLogService;
 use App\Jobs\DispatchBulkDeployment;
 use App\Jobs\PushPluginToSite;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 class DeploymentController extends Controller
 {
     use ApiResponse;
+    use AuthorizesSiteAccess;
 
     /**
      * POST /api/deployments
@@ -369,8 +371,10 @@ class DeploymentController extends Controller
      * GET /api/sites/{site}/rollback-history
      * Get rollback history for a site.
      */
-    public function rollbackHistory(Site $site)
+    public function rollbackHistory(Request $request, Site $site)
     {
+        $this->assertSiteAccess($request, $site);
+
         $history = DeploymentJobSite::where('site_id', $site->id)
             ->where(function ($q) use ($site) {
                 $q->where('status', 'rolled_back')
