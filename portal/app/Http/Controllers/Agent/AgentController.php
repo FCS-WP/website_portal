@@ -62,6 +62,18 @@ class AgentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Handshake successful. Site is now connected.',
+            'site' => [
+                'id'                => $site->id,
+                'name'              => $site->name,
+                'url'               => $site->url,
+                'status'            => $site->status,
+                'wp_version'        => $site->wp_version,
+                'php_version'       => $site->php_version,
+                'woo_active'        => (bool) $site->woo_active,
+                'last_ping_at'      => optional($site->last_ping_at)->toIso8601String(),
+                'tags'              => $site->tags,
+                'portal_time'       => now()->toIso8601String(),
+            ],
         ]);
     }
 

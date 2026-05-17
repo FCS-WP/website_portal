@@ -16,12 +16,21 @@ class DatabaseSeeder extends Seeder
         Role::firstOrCreate(['name' => 'dev']);
         Role::firstOrCreate(['name' => 'mkt']);
 
-        // Create default admin user
+        // Create default admin user (credentials sourced from env, never committed)
+        $adminEmail = env('SEED_ADMIN_EMAIL');
+        $adminPassword = env('SEED_ADMIN_PASSWORD');
+
+        if (empty($adminEmail) || empty($adminPassword)) {
+            throw new \RuntimeException(
+                'SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set in .env before seeding.'
+            );
+        }
+
         $admin = User::firstOrCreate(
-            ['email' => 'admin@epos.com'],
+            ['email' => $adminEmail],
             [
-                'name' => 'Admin',
-                'password' => Hash::make('password'),
+                'name' => env('SEED_ADMIN_NAME', 'Admin'),
+                'password' => Hash::make($adminPassword),
                 'role' => 'admin',
                 'is_active' => true,
                 'email_verified_at' => now(),
@@ -29,13 +38,15 @@ class DatabaseSeeder extends Seeder
         );
         $admin->assignRole('admin');
 
-        // Create default portal settings
+        // Create default portal settings. portal_base_url is the address WP
+        // sites use to call the backend, so it must be reachable from THEIR
+        // network — keep it in env, not hardcoded.
         $settings = [
-            'telegram_bot_token' => '',
-            'telegram_default_chat_id' => '',
-            'portal_base_url' => 'http://localhost:8081',
-            'agent_ping_interval_minutes' => '5',
-            'max_deployment_retries' => '3',
+            'telegram_bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
+            'telegram_default_chat_id' => env('TELEGRAM_CHAT_ID', ''),
+            'portal_base_url' => env('PORTAL_BASE_URL', env('APP_URL', 'http://localhost:8000')),
+            'agent_ping_interval_minutes' => env('AGENT_PING_INTERVAL_MINUTES', '5'),
+            'max_deployment_retries' => env('MAX_DEPLOYMENT_RETRIES', '3'),
         ];
 
         foreach ($settings as $key => $value) {

@@ -41,6 +41,7 @@ require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-user-monitor.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-2fa-manager.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-api.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-external-plugin-manager.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-deactivation-guard.php';
 
 // Activation / Deactivation hooks
 register_activation_hook(__FILE__, ['Epos_Agent_Activator', 'activate']);
@@ -84,4 +85,5 @@ add_action('init', 'epos_agent_init');
  */
 if (is_admin()) {
     require_once EPOS_AGENT_PLUGIN_DIR . 'admin/settings-page.php';
+    Epos_Agent_Deactivation_Guard::init();
 }

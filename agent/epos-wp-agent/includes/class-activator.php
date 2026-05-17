@@ -30,12 +30,19 @@ class Epos_Agent_Activator {
     }
 
     /**
-     * Perform handshake with the Portal
+     * Perform handshake with the Portal.
+     *
+     * @param string $portal_url
+     * @param string $api_key
+     * @param bool   $return_details  When true, returns an associative array
+     *                                with full response details instead of a bool.
+     *                                Existing callers using `if ($result)` still work
+     *                                because the array is truthy on success.
+     * @return bool|array
      */
-    public static function perform_handshake($portal_url, $api_key) {
+    public static function perform_handshake($portal_url, $api_key, $return_details = false) {
         $site_url = get_site_url();
-        
-        // Gather site information
+
         $body = [
             'wp_version'      => get_bloginfo('version'),
             'php_version'     => phpversion(),
@@ -59,20 +66,53 @@ class Epos_Agent_Activator {
 
         if (is_wp_error($response)) {
             update_option('epos_agent_connection_status', 'error');
+            update_option('epos_agent_last_test_at', time());
+            update_option('epos_agent_last_error', $response->get_error_message());
+
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('[EPOS Agent] Handshake failed: ' . $response->get_error_message());
             }
-            return false;
+
+            return $return_details ? [
+                'success' => false,
+                'code'    => 0,
+                'message' => $response->get_error_message(),
+                'site_url_sent' => $site_url,
+            ] : false;
         }
 
         $code = wp_remote_retrieve_response_code($response);
+        $raw  = wp_remote_retrieve_body($response);
+        $data = json_decode($raw, true);
+
+        update_option('epos_agent_last_test_at', time());
+
         if ($code === 200) {
             update_option('epos_agent_connection_status', 'connected');
+            update_option('epos_agent_last_error', '');
+
+            if ($return_details) {
+                return [
+                    'success' => true,
+                    'code'    => 200,
+                    'message' => $data['message'] ?? 'Connected.',
+                    'site'    => $data['site'] ?? null,
+                    'site_url_sent' => $site_url,
+                ];
+            }
             return true;
         }
 
         update_option('epos_agent_connection_status', 'error');
-        return false;
+        $errMsg = $data['message'] ?? ('HTTP ' . $code);
+        update_option('epos_agent_last_error', $errMsg);
+
+        return $return_details ? [
+            'success' => false,
+            'code'    => $code,
+            'message' => $errMsg,
+            'site_url_sent' => $site_url,
+        ] : false;
     }
 
     /**

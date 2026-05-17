@@ -1,4 +1,6 @@
 .PHONY: help up down restart rebuild logs ps \
+       up-prod down-prod restart-prod rebuild-prod logs-prod ps-prod \
+       prod-setup use-prod-env use-dev-env \
        migrate migrate-fresh seed tinker artisan composer clear \
        dev build lint typecheck fe-install \
        db-shell \
@@ -10,6 +12,7 @@
 
 # Variables
 DC = docker-compose
+DC_PROD = docker-compose -f docker-compose.yml -f docker-compose.prod.yml
 EXEC = $(DC) exec -T -w /var/www/portal app
 EXEC_IT = $(DC) exec -w /var/www/portal app
 FRONTEND_DIR = portal/frontend
@@ -44,6 +47,47 @@ logs: ## Tail all container logs
 
 ps: ## Show running containers
 	$(DC) ps
+
+# ─── Production ──────────────────────────────────────────────────────────────
+
+up-prod: ## Start prod stack (uses docker-compose.prod.yml overlay)
+	$(DC_PROD) up -d
+
+down-prod: ## Stop prod stack
+	$(DC_PROD) down
+
+restart-prod: ## Restart prod stack
+	$(DC_PROD) restart
+
+rebuild-prod: ## Rebuild and restart prod stack
+	$(DC_PROD) up -d --build
+
+logs-prod: ## Tail prod logs
+	$(DC_PROD) logs -f
+
+ps-prod: ## Show prod containers
+	$(DC_PROD) ps
+
+use-prod-env: ## Swap portal/.env -> portal/.env.production (backup current as .env.dev.bak)
+	@cp -n portal/.env portal/.env.dev.bak 2>/dev/null || true
+	cp portal/.env.production portal/.env
+	@echo "✔ portal/.env now points at production. Backup at portal/.env.dev.bak"
+	@echo "  Run: make up-prod && make artisan cmd=\"config:cache\""
+
+use-dev-env: ## Restore portal/.env from portal/.env.dev.bak
+	@test -f portal/.env.dev.bak || (echo "No portal/.env.dev.bak found"; exit 1)
+	cp portal/.env.dev.bak portal/.env
+	@echo "✔ portal/.env restored from dev backup."
+
+prod-setup: ## First-time prod setup on this host: swap env, build, migrate, cache
+	$(MAKE) use-prod-env
+	$(DC_PROD) up -d --build
+	$(DC_PROD) exec -T app chmod -R 777 /var/www/portal/storage /var/www/portal/bootstrap/cache
+	$(DC_PROD) exec -T -w /var/www/portal app php artisan migrate --force
+	$(DC_PROD) exec -T -w /var/www/portal app php artisan config:cache
+	$(DC_PROD) exec -T -w /var/www/portal app php artisan route:cache
+	@echo ""
+	@echo "✔ Prod up. Tunnel should route portal.theshin.info -> :3000 and web-backend.theshin.info -> :8000"
 
 # ─── Backend (Laravel) ───────────────────────────────────────────────────────
 

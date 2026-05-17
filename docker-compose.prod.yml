@@ -1,0 +1,52 @@
+# Production overlay. Use with:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# or via the Makefile shortcut:
+#   make up-prod
+#
+# Tunnel mapping (already set up in Cloudflare dashboard):
+#   portal.theshin.info       -> host.docker.internal:3000  (frontend)
+#   web-backend.theshin.info  -> host.docker.internal:8000  (nginx -> app)
+#
+# Switching modes:
+#   make up        # dev:  next dev (HMR) on :3000
+#   make up-prod   # prod: next build && next start on :3000
+# Only one mode at a time. The frontend bind-mount means side-by-side would
+# cause `.next/` conflicts; switch instead.
+
+services:
+  app:
+    command: php-fpm
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+
+  nginx:
+    restart: unless-stopped
+
+  # Prod frontend: built once on `up`, served by `next start`. No HMR, no WS error.
+  # NEXT_PUBLIC_* must be available at BUILD time (Next inlines them into the bundle).
+  frontend:
+    command: sh -c "npm ci && npm run build && npm run start -- -H 0.0.0.0 -p 3000"
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://web-backend.theshin.info/api
+
+  postgres:
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-8081}:5432"
+
+  redis:
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+
+  # In prod, queue + scheduler are always-on (override the dev `profiles:` gate).
+  queue:
+    profiles: []
+    restart: unless-stopped
+
+  scheduler:
+    profiles: []
+    restart: unless-stopped
