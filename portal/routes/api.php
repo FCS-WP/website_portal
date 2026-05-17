@@ -78,6 +78,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/sites/{site}/regenerate-key', [\App\Http\Controllers\Portal\SiteController::class, 'regenerateKey']);
         Route::post('/sites/{id}/restore', [\App\Http\Controllers\Portal\SiteController::class, 'restore']);
         Route::post('/sites/{site}/toggle-beta', [\App\Http\Controllers\Portal\SiteController::class, 'toggleBetaTester']);
+        Route::post('/sites/{site}/sync-now', [\App\Http\Controllers\Portal\SiteController::class, 'syncNow']);
 
         // Plugin management (Phase 2)
         Route::apiResource('plugins', \App\Http\Controllers\Portal\PluginController::class)->except(['destroy']);
@@ -141,6 +142,15 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/sites', [\App\Http\Controllers\Portal\SiteController::class, 'index']);
     Route::get('/sites/{site}', [\App\Http\Controllers\Portal\SiteController::class, 'show']);
     Route::get('/sites/{site}/activity', [\App\Http\Controllers\Portal\SiteController::class, 'activity']);
+
+    // Orders (Phase 7). All roles can read; controller scopes by Site::accessibleBy.
+    Route::get('/orders/filter-options', [\App\Http\Controllers\Portal\OrderController::class, 'filterOptions']);
+    Route::get('/orders/most-active',    [\App\Http\Controllers\Portal\OrderController::class, 'mostActive']);
+    Route::get('/orders/search',         [\App\Http\Controllers\Portal\OrderController::class, 'search']);
+    Route::get('/orders',                [\App\Http\Controllers\Portal\OrderController::class, 'index']);
+    Route::get('/orders/{order}',        [\App\Http\Controllers\Portal\OrderController::class, 'show']);
+    Route::get('/sites/{site}/orders/stats', [\App\Http\Controllers\Portal\OrderController::class, 'siteStats']);
+    Route::get('/sites/{site}/orders',       [\App\Http\Controllers\Portal\OrderController::class, 'siteIndex']);
 
     // Credential types (all authenticated users)
     Route::get('/credential-types', function () {

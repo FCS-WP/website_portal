@@ -30,7 +30,23 @@ import { Hosting, HostingCredentials } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-const providers = ["RunCloud", "GridPane", "SpinupWP", "Cloudways", "Forge", "Ploi", "Other"];
+// Provider dropdown: display nicely, send lowercase enum to the API.
+// Keep this list in sync with the backend whitelist in
+// portal/app/Http/Requests/Hosting/StoreHostingRequest.php
+const providers: { value: string; label: string }[] = [
+  { value: "cloudways",    label: "Cloudways" },
+  { value: "runcloud",     label: "RunCloud" },
+  { value: "gridpane",     label: "GridPane" },
+  { value: "spinupwp",     label: "SpinupWP" },
+  { value: "forge",        label: "Forge" },
+  { value: "ploi",         label: "Ploi" },
+  { value: "cpanel",       label: "cPanel" },
+  { value: "vultr",        label: "Vultr" },
+  { value: "digitalocean", label: "DigitalOcean" },
+  { value: "other",        label: "Other" },
+];
+const providerLabel = (v: string) =>
+  providers.find((p) => p.value === v)?.label ?? v;
 
 export default function HostingsPage() {
   const [hostings, setHostings] = useState<Hosting[]>([]);
@@ -172,7 +188,7 @@ export default function HostingsPage() {
       accessorKey: "provider",
       header: "Provider",
       cell: ({ row }) => (
-        <Badge variant="secondary">{row.getValue("provider")}</Badge>
+        <Badge variant="secondary">{providerLabel(row.getValue("provider"))}</Badge>
       ),
     },
     {
@@ -297,8 +313,8 @@ export default function HostingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {providers.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

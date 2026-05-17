@@ -27,6 +27,7 @@ import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
 import { SiteActivityTab } from "@/components/sites/site-activity-tab";
 import { SiteCredentialsTab } from "@/components/sites/site-credentials-tab";
 import { SiteSecurityTab } from "@/components/sites/site-security-tab";
+import { SiteOrdersTab } from "@/components/orders/site-orders-tab";
 import { ApiKeyDialog } from "@/components/sites/api-key-dialog";
 
 export default function SiteDetailPage() {
@@ -423,13 +424,7 @@ export default function SiteDetailPage() {
         </TabsContent>
 
         <TabsContent value="orders" className="mt-6">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">
-                Order syncing coming in Phase 3.
-              </p>
-            </CardContent>
-          </Card>
+          <SiteOrdersTab siteId={site.id} siteUrl={site.url} />
         </TabsContent>
 
         <TabsContent value="smtp" className="mt-6">

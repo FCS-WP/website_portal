@@ -225,3 +225,80 @@ export interface CredentialType {
   icon: string;
   sort_order: number;
 }
+
+// ─── Phase 7 — Orders ──────────────────────────────────────────────
+export type OrderStatus =
+  | "pending"
+  | "processing"
+  | "on-hold"
+  | "completed"
+  | "cancelled"
+  | "refunded"
+  | "failed"
+  | string;
+
+export interface OrderLineItem {
+  name: string;
+  qty: number;
+  total: string;
+}
+
+export interface OrderSummary {
+  id: number;
+  site_id: number;
+  site_name: string | null;
+  site_url: string | null;
+  woo_order_id: number;
+  order_number: string | null;
+  status: OrderStatus;
+  total: string;
+  currency: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  payment_method: string | null;
+  payment_method_title: string | null;
+  items_count: number;
+  order_date: string | null;
+  synced_at: string | null;
+  wp_admin_edit_url: string | null;
+}
+
+export interface Order extends OrderSummary {
+  customer_phone: string | null;
+  billing_address: string | null;
+  line_items: OrderLineItem[] | null;
+  latest_note: string | null;
+}
+
+export interface OrderListMeta {
+  total: number;
+  page: number;
+  per_page: number;
+  last_page: number;
+  last_synced_at: string | null;
+}
+
+export interface MostActiveSite {
+  site_id: number;
+  site_name: string | null;
+  site_url: string | null;
+  order_count_today: number;
+}
+
+export interface OrderFilterOptions {
+  sites: { id: number; name: string }[];
+  statuses: string[];
+  payment_methods: { slug: string; title: string }[];
+}
+
+export interface OrderSiteStats {
+  orders_today: number;
+  processing_now: number;
+  last_order_at: string | null;
+}
+
+export interface OrderSearchFallback {
+  site_id: number;
+  site_name: string;
+  url: string;
+}

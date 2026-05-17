@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -12,9 +13,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, EyeOff, Send, Save, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Send, Save, Loader2, Plus, X } from "lucide-react";
 import { settingsService } from "@/lib/services/settings";
 import { toast } from "sonner";
+
+// Normalize what the admin types into a valid prefix.
+// - lowercase, trim
+// - keep only [a-z0-9-]
+// - ensure trailing hyphen
+const PREFIX_REGEX = /^[a-z0-9][a-z0-9-]*-$/;
+function normalizePrefix(raw: string): string {
+  let v = raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (!v) return "";
+  if (!v.endsWith("-")) v = v + "-";
+  return v;
+}
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -28,6 +41,8 @@ export default function SettingsPage() {
   const [portalBaseUrl, setPortalBaseUrl] = useState("");
   const [agentPingInterval, setAgentPingInterval] = useState("");
   const [maxDeploymentRetries, setMaxDeploymentRetries] = useState("");
+  const [companyPrefixes, setCompanyPrefixes] = useState<string[]>([]);
+  const [newPrefix, setNewPrefix] = useState("");
 
   // Track the original masked token to detect user changes
   const [originalMaskedToken, setOriginalMaskedToken] = useState("");
@@ -47,6 +62,9 @@ export default function SettingsPage() {
       setPortalBaseUrl(data.portal_base_url || "");
       setAgentPingInterval(data.agent_ping_interval_minutes || "");
       setMaxDeploymentRetries(data.max_deployment_retries || "");
+      setCompanyPrefixes(
+        Array.isArray(data.company_plugin_prefixes) ? data.company_plugin_prefixes : []
+      );
     } catch {
       toast.error("Failed to load settings");
     } finally {
@@ -57,12 +75,15 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const payload: Record<string, string | number | null> = {
+      // Settings update accepts mixed scalar + array payloads. The shape here
+      // matches the SettingsController validator.
+      const payload: Record<string, string | number | string[] | null> = {
         telegram_default_chat_id: telegramChatId,
         telegram_topic_id: telegramTopicId || null,
         portal_base_url: portalBaseUrl,
         agent_ping_interval_minutes: agentPingInterval,
         max_deployment_retries: maxDeploymentRetries,
+        company_plugin_prefixes: companyPrefixes,
       };
 
       // Only include bot token if user changed it from the masked value
@@ -79,6 +100,26 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const addPrefix = () => {
+    const normalized = normalizePrefix(newPrefix);
+    if (!normalized) return;
+    if (!PREFIX_REGEX.test(normalized)) {
+      toast.error("Invalid prefix. Use lowercase letters/digits and end with '-' (e.g. zippy-).");
+      return;
+    }
+    if (companyPrefixes.includes(normalized)) {
+      toast.info(`"${normalized}" is already in the list.`);
+      setNewPrefix("");
+      return;
+    }
+    setCompanyPrefixes([...companyPrefixes, normalized]);
+    setNewPrefix("");
+  };
+
+  const removePrefix = (prefix: string) => {
+    setCompanyPrefixes(companyPrefixes.filter((p) => p !== prefix));
   };
 
   const handleTestTelegram = async () => {
@@ -265,6 +306,78 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Company Plugin Prefixes (Phase 6) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Company Plugin Prefixes</CardTitle>
+          <CardDescription>
+            Slug prefixes that identify your company&rsquo;s internal plugins. Any
+            agent-reported plugin matching one of these AND registered under{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">Plugins → Repository</code>{" "}
+            is classified as <strong>internal</strong>. Use lowercase, end with{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">-</code> (for example{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">zippy-</code>).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {companyPrefixes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No prefixes configured — every plugin will be classified as
+                WP.org or premium.
+              </p>
+            ) : (
+              companyPrefixes.map((prefix) => (
+                <Badge
+                  key={prefix}
+                  variant="secondary"
+                  className="gap-1.5 pl-2.5 pr-1.5 py-1 text-sm font-mono"
+                >
+                  {prefix}
+                  <button
+                    type="button"
+                    onClick={() => removePrefix(prefix)}
+                    className="rounded-sm p-0.5 hover:bg-muted-foreground/20"
+                    aria-label={`Remove ${prefix}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Input
+              value={newPrefix}
+              onChange={(e) => setNewPrefix(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addPrefix();
+                }
+              }}
+              placeholder="e.g. zippy-"
+              className="max-w-[240px] font-mono"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addPrefix}
+              disabled={!newPrefix.trim()}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add prefix
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Tip: changes take effect on the next agent ping. Trigger an immediate
+            re-classification with the <em>Sync now</em> button on any site.
+          </p>
         </CardContent>
       </Card>
 

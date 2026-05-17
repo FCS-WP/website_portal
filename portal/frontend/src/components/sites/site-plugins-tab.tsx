@@ -567,16 +567,51 @@ function PluginActions({
 }) {
   const isLoading = (action: string) => actionLoading === `${action}-${plugin.id}`;
 
-  // Company (internal) plugins
+  // Company (internal) plugins — Activate/Deactivate allowed for quick ops,
+  // but Update/Uninstall stay behind the Deployments flow so company code
+  // can't be removed from a single site by accident.
   if (plugin.plugin_type === "internal") {
     return (
-      <Link
-        href={`/plugins/${plugin.plugin_id}`}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors"
-      >
-        <ExternalLink className="h-3.5 w-3.5" />
-        View in repo
-      </Link>
+      <div className="flex items-center justify-end gap-1">
+        {plugin.is_active ? (
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => onDeactivate(plugin)}
+            disabled={isLoading("deactivate")}
+          >
+            {isLoading("deactivate") ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Power className="h-3 w-3" />
+            )}
+            Deactivate
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => onActivate(plugin)}
+            disabled={isLoading("activate")}
+          >
+            {isLoading("activate") ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Power className="h-3 w-3" />
+            )}
+            Activate
+          </Button>
+        )}
+        {plugin.plugin_id && (
+          <Link
+            href={`/plugins/${plugin.plugin_id}`}
+            className="inline-flex items-center gap-1 px-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+            title="Open in plugin repository"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        )}
+      </div>
     );
   }
 

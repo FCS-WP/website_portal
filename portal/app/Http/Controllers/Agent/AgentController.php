@@ -12,7 +12,9 @@ use App\Models\SiteCredential;
 use App\Models\SitePlugin;
 use App\Services\ActivityLogService;
 use App\Services\CredentialEncryptionService;
+use App\Services\OrderIngestService;
 use App\Services\SignedUrlService;
+use App\Services\SitePluginIngestService;
 use App\Services\TelegramNotificationService;
 use App\Services\VaultAuditService;
 use Illuminate\Http\Request;
@@ -90,7 +92,20 @@ class AgentController extends Controller
             'company_plugins.*.slug' => 'string',
             'company_plugins.*.version' => 'string',
             'company_plugins.*.active' => 'boolean',
+            // Phase 6: full installed-plugin list (internal + wporg + premium).
+            'all_plugins' => 'nullable|array',
+            'all_plugins.*.slug' => 'string',
+            'all_plugins.*.name' => 'nullable|string',
+            'all_plugins.*.version' => 'nullable|string',
+            'all_plugins.*.file' => 'nullable|string',
+            'all_plugins.*.is_active' => 'nullable|boolean',
+            'all_plugins.*.is_network_active' => 'nullable|boolean',
+            // Phase 7: accept both the new wrapped envelope from
+            // class-order-sync.php and the legacy flat list. The service
+            // normalizes both shapes.
             'orders' => 'nullable|array',
+            'orders.last_sync_timestamp' => 'nullable|integer',
+            'orders.orders' => 'nullable|array',
         ]);
 
         // Update last ping time
@@ -110,16 +125,40 @@ class AgentController extends Controller
 
         $site->update($updateData);
 
-        // Sync company_plugins data to site_plugins table
-        if ($request->has('company_plugins')) {
-            $this->syncCompanyPlugins($site, $request->input('company_plugins', []));
+        // Phase 6 — ingest the full plugin list with classification. When the
+        // agent only sends `company_plugins` (older versions), we fall back to
+        // that array so internal plugins still sync.
+        $pluginsAccepted = 0;
+        $allPlugins = $request->input('all_plugins');
+        if (empty($allPlugins) && $request->has('company_plugins')) {
+            // Adapt company_plugins shape (slug/version/active) → all_plugins shape.
+            $allPlugins = collect($request->input('company_plugins', []))
+                ->map(fn ($p) => [
+                    'slug'      => $p['slug'] ?? null,
+                    'name'      => $p['name'] ?? ($p['slug'] ?? null),
+                    'version'   => $p['version'] ?? null,
+                    'file'      => $p['file'] ?? null,
+                    'is_active' => $p['active'] ?? false,
+                ])
+                ->all();
+        }
+        if (!empty($allPlugins)) {
+            $pluginsAccepted = app(SitePluginIngestService::class)
+                ->ingest($site, (array) $allPlugins);
         }
 
-        // TODO: In Phase 3, sync orders data to orders table
+        // Phase 7 — ingest orders + spike detection.
+        $ordersAccepted = 0;
+        if ($request->has('orders')) {
+            $ordersAccepted = app(OrderIngestService::class)
+                ->ingest($site, (array) $request->input('orders', []));
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Ping received.',
+            'plugins_received_count' => $pluginsAccepted,
+            'orders_received_count' => $ordersAccepted,
         ]);
     }
 

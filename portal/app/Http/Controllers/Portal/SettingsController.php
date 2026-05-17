@@ -17,14 +17,28 @@ class SettingsController extends Controller
      */
     public function index()
     {
-        $settings = PortalSetting::all()->pluck('value', 'key');
+        $settings = PortalSetting::all()->pluck('value', 'key')->toArray();
 
         // Mask sensitive values
-        if (isset($settings['telegram_bot_token']) && $settings['telegram_bot_token']) {
+        if (!empty($settings['telegram_bot_token'])) {
             $settings['telegram_bot_token'] = '••••••••' . substr($settings['telegram_bot_token'], -4);
         }
 
+        // Decode JSON-stored array settings so the frontend sees a real array
+        // instead of a JSON string. Falls back to the same default the
+        // classifier uses when the row is missing.
+        $settings['company_plugin_prefixes'] = $this->decodePrefixes($settings['company_plugin_prefixes'] ?? null);
+
         return $this->successResponse($settings);
+    }
+
+    private function decodePrefixes($raw): array
+    {
+        if (empty($raw)) {
+            return ['epos-'];
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? array_values($decoded) : ['epos-'];
     }
 
     /**
@@ -42,6 +56,11 @@ class SettingsController extends Controller
             'rollback_enabled' => 'nullable|boolean',
             'rollback_check_delay_minutes' => 'nullable|integer|min:1|max:30',
             'rollback_second_check_delay_minutes' => 'nullable|integer|min:1|max:60',
+            // Phase 6 — list of slug prefixes (e.g. "epos-", "zippy-").
+            // Stored JSON-encoded on the same `value` column so no schema change.
+            // Pattern requires lowercase, ends with hyphen, only [a-z0-9-].
+            'company_plugin_prefixes' => 'nullable|array|max:20',
+            'company_plugin_prefixes.*' => 'string|max:50|regex:/^[a-z0-9][a-z0-9-]*-$/',
         ]);
 
         $allowedKeys = [
@@ -63,6 +82,23 @@ class SettingsController extends Controller
                     ['value' => $value]
                 );
             }
+        }
+
+        // Prefixes are stored JSON-encoded after normalization (lowercase, dedupe).
+        // We persist on every update call, including an empty list — that lets
+        // the admin reset to the empty state from the UI.
+        if ($request->has('company_plugin_prefixes')) {
+            $prefixes = collect((array) $request->input('company_plugin_prefixes', []))
+                ->map(fn ($p) => strtolower(trim((string) $p)))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            PortalSetting::updateOrCreate(
+                ['key' => 'company_plugin_prefixes'],
+                ['value' => json_encode($prefixes)]
+            );
         }
 
         // Clear Telegram cache when settings change

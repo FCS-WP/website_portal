@@ -69,6 +69,11 @@ class Site extends Model
         return $this->hasMany(SitePlugin::class);
     }
 
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
     public function wporgPlugins(): HasMany
     {
         return $this->hasMany(SitePlugin::class)->where('plugin_type', 'wporg');

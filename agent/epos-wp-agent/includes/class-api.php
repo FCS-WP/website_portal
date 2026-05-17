@@ -86,6 +86,15 @@ class Epos_Agent_Api {
             'callback'            => [self::class, 'handle_external_uninstall'],
             'permission_callback' => [self::class, 'verify_agent_key'],
         ]);
+
+        // Portal-initiated manual sync. Runs the same ping that WP-cron runs
+        // on the every-5-min schedule, but synchronously so the Portal sees
+        // the new orders/plugins immediately on the response.
+        register_rest_route($namespace, '/sync-now', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_sync_now'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
     }
 
     /**
@@ -224,6 +233,31 @@ class Epos_Agent_Api {
             $params['file'] ?? ''
         );
         return new \WP_REST_Response($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Handle Portal-initiated "Sync now" — runs the regular ping inline.
+     * The ping itself POSTs back to the Portal, so by the time we return
+     * the Portal DB already has any fresh orders/plugins/security data.
+     */
+    public static function handle_sync_now($request) {
+        // Don't echo upstream timeouts — wrap so a slow WP.org/HTTP call in
+        // the ping still surfaces as a clean JSON error.
+        try {
+            Epos_Agent_Ping::run();
+        } catch (\Throwable $e) {
+            return new \WP_REST_Response([
+                'success' => false,
+                'message' => 'Sync failed: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return new \WP_REST_Response([
+            'success' => true,
+            'message' => 'Sync triggered.',
+            'connection_status' => get_option('epos_agent_connection_status', 'unknown'),
+            'orders_last_sync_at' => (int) get_option('epos_agent_orders_last_sync', 0),
+        ], 200);
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Traits\ApiResponse;
 use App\Http\Requests\Site\StoreSiteRequest;
 use App\Http\Requests\Site\UpdateSiteRequest;
 use App\Services\ActivityLogService;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -241,5 +242,59 @@ class SiteController extends Controller
             'message' => $site->is_beta_tester ? 'Site marked as beta tester' : 'Site removed from beta testers',
             'data' => ['is_beta_tester' => $site->is_beta_tester],
         ]);
+    }
+
+    /**
+     * POST /api/sites/{site}/sync-now
+     *
+     * Tells the WP agent to immediately fire the regular ping (orders +
+     * plugins + security). The agent's ping handler calls back into the
+     * Portal's /api/agent/ping endpoint, so by the time we get the agent's
+     * response the DB is already updated.
+     *
+     * Authenticated as a normal Portal user; site access is scoped through
+     * Site::accessibleBy(). We re-decrypt the site's API key to authenticate
+     * the outbound request to the WP agent.
+     */
+    public function syncNow(Request $request, Site $site)
+    {
+        // Defense: enforce the same scoping the rest of the controller uses.
+        $hasAccess = Site::accessibleBy($request->user())->whereKey($site->id)->exists();
+        if (!$hasAccess) {
+            return $this->errorResponse('Site not accessible.', 403);
+        }
+
+        if (empty($site->api_key_encrypted)) {
+            return $this->errorResponse('Site is missing its agent API key. Re-register the site to provision one.', 422);
+        }
+
+        try {
+            // The ping runs synchronously inside the agent, and it itself calls
+            // back to the Portal — give it generous headroom.
+            $response = Http::timeout(60)
+                ->withHeaders(['X-Agent-Key' => decrypt($site->api_key_encrypted)])
+                ->acceptJson()
+                ->post(rtrim($site->url, '/') . '/wp-json/epos-agent/v1/sync-now', []);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Could not reach the site agent: ' . $e->getMessage(), 502);
+        }
+
+        if (!$response->successful()) {
+            return $this->errorResponse(
+                'Agent rejected sync (HTTP ' . $response->status() . '). Check that the agent plugin is active and the API key matches.',
+                502,
+                ['agent_body' => $response->body()]
+            );
+        }
+
+        ActivityLogService::log('site.sync_now', $site, $request->user(), $request->ip());
+
+        // Refresh the site row so the response includes the new last_ping_at.
+        $site->refresh();
+
+        return $this->successResponse([
+            'agent'         => $response->json(),
+            'last_ping_at'  => optional($site->last_ping_at)->toIso8601String(),
+        ], 'Sync triggered. Orders refreshed from the site.');
     }
 }

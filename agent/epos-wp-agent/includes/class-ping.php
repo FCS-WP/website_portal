@@ -99,10 +99,16 @@ class Epos_Agent_Ping {
             'all_plugins'     => self::get_all_installed_plugins(),
         ];
 
-        // Include order data if WooCommerce is active
-        if (class_exists('WooCommerce')) {
-            $order_sync = new Epos_Agent_Order_Sync();
-            $body['orders'] = $order_sync->get_recent_orders();
+        // Include order data if WooCommerce is active. PRD §7.2 wraps the
+        // payload as { last_sync_timestamp, orders: [...] } so the Portal
+        // can negotiate delta sync. We mark_synced() only after the ping
+        // returns 200, so a failed ping retries the same delta.
+        $order_sync = class_exists('WooCommerce') ? new Epos_Agent_Order_Sync() : null;
+        if ($order_sync) {
+            $payload = $order_sync->get_sync_payload();
+            if ($payload !== null) {
+                $body['orders'] = $payload;
+            }
         }
 
         // Include security data
@@ -140,6 +146,11 @@ class Epos_Agent_Ping {
         $code = wp_remote_retrieve_response_code($response);
         if ($code === 200) {
             update_option('epos_agent_connection_status', 'connected');
+            // Advance the order-sync watermark only on a successful ping so a
+            // failed ping retries the same delta next round.
+            if ($order_sync) {
+                $order_sync->mark_synced();
+            }
         } else {
             update_option('epos_agent_connection_status', 'error');
             if (defined('WP_DEBUG') && WP_DEBUG) {
