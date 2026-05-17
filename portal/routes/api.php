@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Portal\CredentialShareController;
+use App\Http\Controllers\Portal\ExternalPluginController;
 
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -106,6 +107,25 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         // Rollback
         Route::post('/deployment-job-sites/{deploymentJobSite}/rollback', [\App\Http\Controllers\Portal\DeploymentController::class, 'rollbackSite']);
         Route::get('/sites/{site}/rollback-history', [\App\Http\Controllers\Portal\DeploymentController::class, 'rollbackHistory']);
+
+        // External Plugin Management
+        Route::prefix('plugins/external')->group(function () {
+            Route::get('/updates', [ExternalPluginController::class, 'updates']);
+            Route::get('/updates/{slug}/sites', [ExternalPluginController::class, 'updateSites']);
+            Route::get('/search', [ExternalPluginController::class, 'search']);
+            Route::get('/{slug}/info', [ExternalPluginController::class, 'info']);
+            Route::post('/install', [ExternalPluginController::class, 'install']);
+            Route::post('/update', [ExternalPluginController::class, 'update']);
+            Route::post('/refresh-cache', [ExternalPluginController::class, 'refreshCache']);
+            Route::get('/cache-status', [ExternalPluginController::class, 'cacheStatus']);
+        });
+
+        // Per-site external plugin management
+        Route::get('/sites/{site}/plugins/all', [ExternalPluginController::class, 'sitePlugins']);
+        Route::post('/sites/{site}/plugins/external/activate', [ExternalPluginController::class, 'activate']);
+        Route::post('/sites/{site}/plugins/external/deactivate', [ExternalPluginController::class, 'deactivate']);
+        Route::post('/sites/{site}/plugins/external/uninstall', [ExternalPluginController::class, 'uninstall']);
+        Route::post('/sites/{site}/plugins/external/update-all', [ExternalPluginController::class, 'updateAllOnSite']);
     });
 
     // All authenticated users (admin, dev, mkt)

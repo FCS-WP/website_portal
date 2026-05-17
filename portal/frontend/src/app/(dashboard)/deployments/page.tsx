@@ -6,10 +6,12 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { deploymentsService } from "@/lib/services/deployments";
 import { DeploymentJob } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Eye } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   queued: "bg-gray-100 text-gray-800 hover:bg-gray-100",
@@ -18,6 +20,14 @@ const statusColors: Record<string, string> = {
   failed: "bg-red-100 text-red-800 hover:bg-red-100",
   cancelled: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
   scheduled: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+};
+
+const jobTypeConfig: Record<string, { label: string; className: string }> = {
+  deploy: { label: "Deploy", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
+  wporg_install: { label: "Install", className: "bg-green-100 text-green-800 hover:bg-green-100" },
+  wporg_update: { label: "Update", className: "bg-amber-100 text-amber-800 hover:bg-amber-100" },
+  wporg_uninstall: { label: "Uninstall", className: "bg-red-100 text-red-800 hover:bg-red-100" },
+  rollback: { label: "Rollback", className: "bg-purple-100 text-purple-800 hover:bg-purple-100" },
 };
 
 export default function DeploymentsPage() {
@@ -52,10 +62,24 @@ export default function DeploymentsPage() {
       header: "Plugin",
       cell: ({ row }) => {
         const pv = row.original.plugin_version;
+        const name = pv?.plugin?.name || row.original.plugin_name;
         return (
           <span className="font-medium">
-            {pv?.plugin?.name || "—"}
+            {name || "—"}
           </span>
+        );
+      },
+    },
+    {
+      accessorKey: "job_type",
+      header: "Type",
+      cell: ({ row }) => {
+        const type = row.original.job_type || "deploy";
+        const config = jobTypeConfig[type] || jobTypeConfig.deploy;
+        return (
+          <Badge variant="secondary" className={config.className}>
+            {config.label}
+          </Badge>
         );
       },
     },
@@ -64,8 +88,9 @@ export default function DeploymentsPage() {
       header: "Version",
       cell: ({ row }) => {
         const pv = row.original.plugin_version;
-        return pv ? (
-          <Badge variant="outline">{pv.version}</Badge>
+        const version = pv?.version || row.original.target_version;
+        return version ? (
+          <Badge variant="outline">{version}</Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
@@ -128,12 +153,15 @@ export default function DeploymentsPage() {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => (
-        <button
-          className="text-sm text-primary hover:underline"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0"
           onClick={() => router.push(`/deployments/${row.original.id}`)}
+          title="View details"
         >
-          View
-        </button>
+          <Eye className="h-4 w-4" />
+        </Button>
       ),
     },
   ];

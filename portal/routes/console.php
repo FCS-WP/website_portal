@@ -16,3 +16,4 @@ Schedule::command('security:scan-file-integrity')->dailyAt('03:00');
 Schedule::command('security:scan-vulnerabilities')->dailyAt('04:00');
 Schedule::command('security:calculate-scores')->everySixHours();
 Schedule::command('security:prune-login-events')->weekly();
+Schedule::command('plugins:sync-wporg-cache')->dailyAt('01:00');

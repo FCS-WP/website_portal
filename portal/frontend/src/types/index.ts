@@ -110,15 +110,18 @@ export interface PluginChangelog {
 
 export interface DeploymentJob {
   id: number;
-  plugin_version_id: number;
+  plugin_version_id: number | null;
   initiated_by: number;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'scheduled';
+  job_type?: 'deploy' | 'rollback' | 'wporg_install' | 'wporg_update' | 'wporg_uninstall';
+  plugin_slug?: string | null;
+  plugin_name?: string | null;
+  target_version?: string | null;
   total_sites: number;
   success_count: number;
   failed_count: number;
   note: string | null;
   scheduled_at?: string | null;
-  job_type?: 'deploy' | 'rollback';
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

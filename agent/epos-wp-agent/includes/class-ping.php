@@ -56,6 +56,31 @@ class Epos_Agent_Ping {
     }
 
     /**
+     * Get all installed plugins with metadata
+     */
+    public static function get_all_installed_plugins() {
+        if (!function_exists('get_plugins')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $all_plugins = get_plugins();
+        $active = get_option('active_plugins', []);
+        $result = [];
+
+        foreach ($all_plugins as $file => $data) {
+            $slug = explode('/', $file)[0];
+            $result[] = [
+                'slug'              => $slug,
+                'name'              => $data['Name'],
+                'version'           => $data['Version'],
+                'file'              => $file,
+                'is_active'         => in_array($file, $active),
+                'is_network_active' => function_exists('is_plugin_active_for_network') ? is_plugin_active_for_network($file) : false,
+            ];
+        }
+        return $result;
+    }
+
+    /**
      * Execute the ping to Portal
      */
     public static function run() {
@@ -71,6 +96,7 @@ class Epos_Agent_Ping {
         // Gather data to send
         $body = [
             'company_plugins' => Epos_Agent_Activator::get_epos_plugins(),
+            'all_plugins'     => self::get_all_installed_plugins(),
         ];
 
         // Include order data if WooCommerce is active

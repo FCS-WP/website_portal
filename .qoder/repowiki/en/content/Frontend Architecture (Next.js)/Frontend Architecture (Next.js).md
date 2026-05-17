@@ -28,16 +28,31 @@
 - [sites.ts](file://portal/frontend/src/lib/services/sites.ts)
 - [dashboard.ts](file://portal/frontend/src/lib/services/dashboard.ts)
 - [index.ts](file://portal/frontend/src/types/index.ts)
+- [credential-form-dialog.tsx](file://portal/frontend/src/components/vault/credential-form-dialog.tsx)
+- [pin-modal.tsx](file://portal/frontend/src/components/vault/pin-modal.tsx)
+- [pin-setup-dialog.tsx](file://portal/frontend/src/components/vault/pin-setup-dialog.tsx)
+- [pin-setup-banner.tsx](file://portal/frontend/src/components/vault/pin-setup-banner.tsx)
+- [share-credentials-dialog.tsx](file://portal/frontend/src/components/vault/share-credentials-dialog.tsx)
+- [active-share-links.tsx](file://portal/frontend/src/components/vault/active-share-links.tsx)
+- [vault-audit-log.tsx](file://portal/frontend/src/components/vault/vault-audit-log.tsx)
+- [credentials.ts](file://portal/frontend/src/lib/services/credentials.ts)
+- [credential-shares.ts](file://portal/frontend/src/lib/services/credential-shares.ts)
+- [vault-pin.ts](file://portal/frontend/src/lib/services/vault-pin.ts)
+- [vault-logs.ts](file://portal/frontend/src/lib/services/vault-logs.ts)
+- [security/[...]/page.tsx](file://portal/frontend/src/app/(dashboard)/security/page.tsx)
+- [security/2fa/page.tsx](file://portal/frontend/src/app/(dashboard)/security/2fa/page.tsx)
+- [security/alerts/page.tsx](file://portal/frontend/src/app/(dashboard)/security/alerts/page.tsx)
+- [vault/share/[token]/page.tsx](file://portal/frontend/src/app/vault/share/[token]/page.tsx)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive plugin management interfaces with version upload, changelog support, and deployment capabilities
-- Implemented real-time deployment monitoring with progress tracking and live status updates
-- Enhanced site management with dedicated tabs for plugins, credentials, and activity logs
-- Expanded service layer with specialized APIs for deployments, plugins, and site operations
-- Added vault credential management with PIN protection and sharing capabilities
-- Integrated dashboard statistics and improved component architecture
+- Added comprehensive credential vault management system with secure credential storage and access control
+- Implemented PIN protection system with modal dialogs, setup banners, and change functionality
+- Integrated credential sharing with secure link generation, password protection, and access monitoring
+- Added vault audit logging with filtering, pagination, and comprehensive event tracking
+- Enhanced site management with credential vault integration and security monitoring interfaces
+- Added new frontend components for credential forms, PIN management, share link management, and security monitoring
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -50,23 +65,27 @@
 8. [Deployment Monitoring](#deployment-monitoring)
 9. [Site Management Interfaces](#site-management-interfaces)
 10. [Vault Credential Management](#vault-credential-management)
-11. [Dashboard and Analytics](#dashboard-and-analytics)
-12. [Dependency Analysis](#dependency-analysis)
-13. [Performance Considerations](#performance-considerations)
-14. [Troubleshooting Guide](#troubleshooting-guide)
-15. [Conclusion](#conclusion)
-16. [Appendices](#appendices)
+11. [Security-Focused UI Components](#security-focused-ui-components)
+12. [Credential Sharing System](#credential-sharing-system)
+13. [Vault Audit and Monitoring](#vault-audit-and-monitoring)
+14. [Dashboard and Analytics](#dashboard-and-analytics)
+15. [Dependency Analysis](#dependency-analysis)
+16. [Performance Considerations](#performance-considerations)
+17. [Troubleshooting Guide](#troubleshooting-guide)
+18. [Conclusion](#conclusion)
+19. [Appendices](#appendices)
 
 ## Introduction
 This document describes the frontend architecture of the Next.js application located under portal/frontend. It covers the app directory structure, routing model, component hierarchy, TypeScript integration, state management via custom stores, API integration layer, UI component organization, styling with Tailwind CSS, build configuration, environment handling, deployment considerations, responsive design patterns, accessibility, and performance strategies.
 
-**Updated** Enhanced with comprehensive plugin management interfaces, deployment detail pages with real-time monitoring, settings management, and improved dashboard with plugin metrics. Added new services for API communication and enhanced component architecture.
+**Updated** Enhanced with comprehensive credential vault management system featuring secure credential storage, PIN protection, credential sharing, and extensive audit logging. The architecture now supports advanced security features with PIN verification, secure credential sharing with time-based access control, comprehensive audit trails, and integrated security monitoring interfaces.
 
 ## Project Structure
 The frontend is organized around Next.js App Router conventions with a clear separation of pages, components, stores, services, and shared utilities:
 - Pages and layouts live under src/app with route groups and nested layouts.
 - Reusable UI components are under src/components/ui.
 - Layout scaffolding is under src/components/layout.
+- Vault-specific components are under src/components/vault for security-focused functionality.
 - Shared logic resides in src/lib (API client, utilities), src/stores (Zustand stores), and src/hooks (React hooks).
 - Global styles and theme tokens are defined in src/app/globals.css with Tailwind v4 configuration.
 
@@ -75,13 +94,15 @@ graph TB
 subgraph "App Router"
 PAGES["Pages under src/app"]
 LAYOUTS["Root and nested layouts"]
+SECURITY["Security pages (/security/*)"]
+VAULTSHARE["Vault share pages (/vault/share/*)"]
 END
 subgraph "Components"
 UI["Reusable UI under src/components/ui"]
 LAYOUTCOMP["Layout components under src/components/layout"]
+VAULTCOMP["Vault components under src/components/vault"]
 PLUGINCOMP["Plugin-specific components under src/components/plugins"]
 SITECOMP["Site-specific components under src/components/sites"]
-VAULTCOMP["Vault components under src/components/vault"]
 END
 subgraph "Services"
 APISERVICE["API client under src/lib/api.ts"]
@@ -89,6 +110,10 @@ DEPLOYMENTS["Deployments service under src/lib/services/deployments.ts"]
 PLUGINS["Plugins service under src/lib/services/plugins.ts"]
 SITES["Sites service under src/lib/services/sites.ts"]
 DASHBOARD["Dashboard service under src/lib/services/dashboard.ts"]
+VAULTPIN["Vault PIN service under src/lib/services/vault-pin.ts"]
+CREDENTIALSHARES["Credential shares service under src/lib/services/credential-shares.ts"]
+VAULTLOGS["Vault logs service under src/lib/services/vault-logs.ts"]
+CREDENTIALS["Credentials service under src/lib/services/credentials.ts"]
 END
 subgraph "Stores"
 AUTHSTORE["Auth store under src/stores"]
@@ -105,11 +130,17 @@ APISERVICE --> DEPLOYMENTS
 APISERVICE --> PLUGINS
 APISERVICE --> SITES
 APISERVICE --> DASHBOARD
+APISERVICE --> VAULTPIN
+APISERVICE --> CREDENTIALSHARES
+APISERVICE --> VAULTLOGS
+APISERVICE --> CREDENTIALS
 UI --> TYPES
 LAYOUTCOMP --> TYPES
 PLUGINCOMP --> TYPES
 SITECOMP --> TYPES
 VAULTCOMP --> TYPES
+SECURITY --> VAULTCOMP
+VAULTSHARE --> VAULTCOMP
 ```
 
 **Diagram sources**
@@ -117,11 +148,10 @@ VAULTCOMP --> TYPES
 - [globals.css:1-130](file://portal/frontend/src/app/globals.css#L1-L130)
 - [auth-store.ts:1-64](file://portal/frontend/src/stores/auth-store.ts#L1-L64)
 - [api.ts:1-37](file://portal/frontend/src/lib/api.ts#L1-L37)
-- [deployments.ts:1-22](file://portal/frontend/src/lib/services/deployments.ts#L1-L22)
-- [plugins.ts:1-29](file://portal/frontend/src/lib/services/plugins.ts#L1-L29)
-- [sites.ts:1-17](file://portal/frontend/src/lib/services/sites.ts#L1-L17)
-- [dashboard.ts:1-37](file://portal/frontend/src/lib/services/dashboard.ts#L1-L37)
-- [index.ts:1-193](file://portal/frontend/src/types/index.ts#L1-L193)
+- [vault-pin.ts:1-13](file://portal/frontend/src/lib/services/vault-pin.ts#L1-L13)
+- [credential-shares.ts:1-78](file://portal/frontend/src/lib/services/credential-shares.ts#L1-L78)
+- [vault-logs.ts:1-36](file://portal/frontend/src/lib/services/vault-logs.ts#L1-L36)
+- [credentials.ts:1-38](file://portal/frontend/src/lib/services/credentials.ts#L1-L38)
 
 **Section sources**
 - [layout.tsx:1-38](file://portal/frontend/src/app/layout.tsx#L1-L38)
@@ -171,6 +201,8 @@ LAYOUTCOMP["App Layout Scaffold<br/>header, sidebar, main"]
 AUTHSTORE["Auth Store<br/>hydration, login, logout"]
 APICLIENT["API Client<br/>interceptors, base URL"]
 UI["UI Primitives<br/>button, input, card"]
+VAULTCOMP["Vault Components<br/>credential forms, PIN, sharing"]
+SECURITYCOMP["Security Components<br/>audit logs, 2fa, alerts"]
 CLIENT --> NEXT
 NEXT --> ROOTLAYOUT
 ROOTLAYOUT --> GLOBTHEME
@@ -178,7 +210,11 @@ NEXT --> LAYOUTCOMP
 LAYOUTCOMP --> AUTHSTORE
 AUTHSTORE --> APICLIENT
 LAYOUTCOMP --> UI
+LAYOUTCOMP --> VAULTCOMP
+LAYOUTCOMP --> SECURITYCOMP
 APICLIENT --> UI
+APICLIENT --> VAULTCOMP
+APICLIENT --> SECURITYCOMP
 ```
 
 **Diagram sources**
@@ -462,11 +498,125 @@ class Site {
 - [sites.ts:1-17](file://portal/frontend/src/lib/services/sites.ts#L1-L17)
 - [index.ts:23-39](file://portal/frontend/src/types/index.ts#L23-L39)
 
+### Credential Management Service
+The credential service provides comprehensive CRUD operations for credential management with secure access control and PIN verification.
+
+```mermaid
+classDiagram
+class CredentialService {
++list(siteId) ApiResponse~Credential[]~
++get(siteId, credentialId) ApiResponse~Credential~
++create(siteId, data) ApiResponse~Credential~
++update(siteId, credentialId, data) ApiResponse~Credential~
++delete(siteId, credentialId, vault_pin) ApiResponse~void~
++reveal(siteId, credentialId, field_key, vault_pin) ApiResponse~{ value, expires_in }~
++copy(siteId, credentialId, field_key, vault_pin) ApiResponse~{ value }~
++autologin(siteId) ApiResponse~{ redirect_url }~
++getTypes() ApiResponse~CredentialType[]~
+}
+class Credential {
++id : number
++credential_type_id : number
++label : string
++fields : CredentialField[]
++created_at : string
++updated_at : string
+}
+class CredentialField {
++id : number
++field_key : string
++field_label : string
++field_value : string
++is_sensitive : boolean
++sort_order : number
+}
+```
+
+**Diagram sources**
+- [credentials.ts:1-38](file://portal/frontend/src/lib/services/credentials.ts#L1-L38)
+- [index.ts:136-170](file://portal/frontend/src/types/index.ts#L136-L170)
+
+### Credential Sharing Service
+The credential sharing service manages secure link generation, access control, and sharing lifecycle management.
+
+```mermaid
+classDiagram
+class CredentialShareService {
++create(siteId, data) ApiResponse~ShareLinkCreateResponse~
++list(siteId) ApiResponse~ShareLink[]~
++revoke(siteId, linkId) ApiResponse~void~
++getShareInfo(token) ApiResponse~ShareInfo~
++accessShare(token, password) ApiResponse~ShareAccessResponse~
+}
+class ShareLink {
++id : number
++token : string
++credential_type_ids : number[]
++expires_at : string
++max_views : number
++view_count : number
++is_password_protected : boolean
++status : 'active' | 'expired' | 'exhausted' | 'revoked'
+}
+class ShareInfo {
++requires_password : boolean
++site_name : string
++credential_types : string[]
+}
+```
+
+**Diagram sources**
+- [credential-shares.ts:1-78](file://portal/frontend/src/lib/services/credential-shares.ts#L1-L78)
+- [index.ts:172-206](file://portal/frontend/src/types/index.ts#L172-L206)
+
+### Vault PIN Service
+The vault PIN service handles PIN setup, verification, and management for credential access control.
+
+```mermaid
+classDiagram
+class VaultPinService {
++setup(pin, pin_confirmation) ApiResponse~void~
++change(current_pin, new_pin, new_pin_confirmation) ApiResponse~void~
++verify(pin) ApiResponse~{ verified : boolean }~
+}
+```
+
+**Diagram sources**
+- [vault-pin.ts:1-13](file://portal/frontend/src/lib/services/vault-pin.ts#L1-L13)
+
+### Vault Logs Service
+The vault logs service provides comprehensive audit logging with filtering, pagination, and event tracking.
+
+```mermaid
+classDiagram
+class VaultLogService {
++list(siteId, params) ApiResponse~VaultLogsResponse~
+}
+class VaultLog {
++id : number
++user : User | null
++action : string
++field_key : string | null
++credential : { id, label } | null
++ip_address : string | null
++metadata : Record<string, unknown> | null
++created_at : string
+}
+```
+
+**Diagram sources**
+- [vault-logs.ts:1-36](file://portal/frontend/src/lib/services/vault-logs.ts#L1-L36)
+- [index.ts:208-236](file://portal/frontend/src/types/index.ts#L208-L236)
+
 **Section sources**
 - [plugins.ts:1-29](file://portal/frontend/src/lib/services/plugins.ts#L1-L29)
 - [deployments.ts:1-22](file://portal/frontend/src/lib/services/deployments.ts#L1-L22)
 - [sites.ts:1-17](file://portal/frontend/src/lib/services/sites.ts#L1-L17)
 - [dashboard.ts:1-37](file://portal/frontend/src/lib/services/dashboard.ts#L1-L37)
+- [credentials.ts:1-38](file://portal/frontend/src/lib/services/credentials.ts#L1-L38)
+- [credential-shares.ts:1-78](file://portal/frontend/src/lib/services/credential-shares.ts#L1-L78)
+- [vault-pin.ts:1-13](file://portal/frontend/src/lib/services/vault-pin.ts#L1-L13)
+- [vault-logs.ts:1-36](file://portal/frontend/src/lib/services/vault-logs.ts#L1-L36)
 
 ## Plugin Management System
 
@@ -498,16 +648,6 @@ DeploymentCreated --> [*]
 
 **Diagram sources**
 - [plugins/[id]/page.tsx:62-612](file://portal/frontend/src/app/(dashboard)/plugins/[id]/page.tsx#L62-L612)
-
-### Deploy Dialog Component
-The deploy dialog provides flexible deployment options with both bulk and selective targeting.
-
-**Features:**
-- Mode selection: All connected sites vs. selective targeting
-- Real-time site loading and filtering
-- Checkbox-based site selection with bulk operations
-- Deployment note support
-- Automatic navigation to deployment details
 
 **Section sources**
 - [plugins/[id]/page.tsx:1-613](file://portal/frontend/src/app/(dashboard)/plugins/[id]/page.tsx#L1-L613)
@@ -585,25 +725,239 @@ The credentials tab provides secure credential management with PIN protection an
 
 ## Vault Credential Management
 
-### PIN Protection System
-The vault credential management implements a robust PIN protection system for sensitive data access.
+### Comprehensive Credential Form System
+The credential form dialog provides a sophisticated interface for managing various types of credentials with pre-defined templates and custom field support.
 
-**PIN Flow:**
-1. User initiates sensitive operation (reveal, copy, delete)
-2. PIN modal appears requesting verification
-3. Backend validates PIN and returns encrypted data
-4. Data displayed temporarily with countdown timer
-5. Automatic cleanup after expiration
+**Credential Types and Templates:**
+- WordPress: Admin URL, Username, Password, Email
+- Hosting: Provider, Login URL, Login Email, Password
+- FTP/SFTP: Host, Port, Username, Password
+- Database: Host, Database Name, Username, Password
+- Custom: Flexible field definitions with sensitivity flags
 
-**Security Measures:**
-- PIN-protected API endpoints
-- Temporary data exposure with automatic cleanup
-- Visual feedback for copy operations
-- Admin-only deletion capabilities
-- Comprehensive audit logging
+**Security Features:**
+- PIN-protected credential creation and updates
+- Sensitive field masking with toggle visibility
+- Custom field management with key-value pairs
+- Field sensitivity indicators and secure handling
+- Edit mode preserves existing sensitive values
+
+**PIN Verification Workflow:**
+1. User selects credential type and enters label
+2. Predefined fields populate automatically (or custom fields for custom types)
+3. Submit triggers PIN modal for verification
+4. Successful PIN verification saves credential securely
+5. Error handling for invalid PIN attempts with attempt counters
+
+```mermaid
+sequenceDiagram
+participant User as "User"
+participant Form as "CredentialFormDialog"
+participant PinModal as "PinModal"
+participant API as "CredentialService"
+User->>Form : "Open form"
+Form->>Form : "Load credential types"
+Form->>User : "Show type selection"
+User->>Form : "Select type"
+Form->>Form : "Populate predefined fields"
+User->>Form : "Submit form"
+Form->>PinModal : "Open PIN verification"
+PinModal->>API : "Verify PIN"
+API-->>PinModal : "Verification result"
+PinModal-->>Form : "PIN success/failure"
+Form->>API : "Save credential with PIN"
+API-->>Form : "Credential saved"
+Form-->>User : "Success notification"
+```
+
+**Diagram sources**
+- [credential-form-dialog.tsx:195-257](file://portal/frontend/src/components/vault/credential-form-dialog.tsx#L195-L257)
+- [pin-modal.tsx:81-115](file://portal/frontend/src/components/vault/pin-modal.tsx#L81-L115)
+- [credentials.ts:11-18](file://portal/frontend/src/lib/services/credentials.ts#L11-L18)
 
 **Section sources**
-- [site-credentials-tab.tsx:161-255](file://portal/frontend/src/components/sites/site-credentials-tab.tsx#L161-L255)
+- [credential-form-dialog.tsx:1-478](file://portal/frontend/src/components/vault/credential-form-dialog.tsx#L1-L478)
+
+### Vault PIN Management Components
+The vault PIN system consists of several interconnected components:
+
+**PinModal Component:**
+- 6-digit PIN input with numpad interface
+- Real-time validation with error states
+- Lockout handling with 15-minute cooldown
+- Keyboard support for accessibility
+- Visual feedback with animated dots
+
+**PinSetupDialog Component:**
+- Two-step PIN setup process
+- Confirmation validation
+- Success state with completion animation
+- Error handling with user guidance
+
+**PinSetupBanner Component:**
+- Non-intrusive banner prompting PIN setup
+- Amber warning styling for security emphasis
+- Direct link to setup dialog
+- Automatic user data refresh after setup
+
+```mermaid
+sequenceDiagram
+participant User as "User"
+participant Banner as "PinSetupBanner"
+participant Dialog as "PinSetupDialog"
+participant Modal as "PinModal"
+participant API as "VaultPinService"
+User->>Banner : "Click Set up PIN"
+Banner->>Dialog : "Open setup dialog"
+Dialog->>Dialog : "Step 1 : Enter PIN"
+Dialog->>Dialog : "Step 2 : Confirm PIN"
+Dialog->>API : "POST /auth/vault-pin/setup"
+API-->>Dialog : "Success"
+Dialog-->>Banner : "onSuccess callback"
+Banner->>Banner : "Refresh user data"
+Banner->>User : "PIN ready for use"
+User->>Modal : "Attempt sensitive operation"
+Modal->>API : "POST /auth/vault-pin/verify"
+API-->>Modal : "Verification result"
+Modal-->>User : "Grant access or show error"
+```
+
+**Diagram sources**
+- [pin-setup-banner.tsx:9-48](file://portal/frontend/src/components/vault/pin-setup-banner.tsx#L9-L48)
+- [pin-setup-dialog.tsx:27-125](file://portal/frontend/src/components/vault/pin-setup-dialog.tsx#L27-L125)
+- [pin-modal.tsx:28-115](file://portal/frontend/src/components/vault/pin-modal.tsx#L28-L115)
+
+**Section sources**
+- [pin-modal.tsx:1-222](file://portal/frontend/src/components/vault/pin-modal.tsx#L1-L222)
+- [pin-setup-dialog.tsx:1-267](file://portal/frontend/src/components/vault/pin-setup-dialog.tsx#L1-L267)
+- [pin-setup-banner.tsx:1-49](file://portal/frontend/src/components/vault/pin-setup-banner.tsx#L1-L49)
+
+## Security-Focused UI Components
+
+### Security Dashboard
+The security dashboard provides centralized monitoring and management of security-related operations.
+
+**Key Features:**
+- Security score visualization and trends
+- Recent security alerts and notifications
+- 2FA status monitoring across users
+- Credential vault usage statistics
+- Security event timeline
+
+### Security 2FA Management
+The 2FA management interface allows administrators to configure and monitor two-factor authentication settings.
+
+**Management Capabilities:**
+- 2FA enrollment status tracking
+- Individual user 2FA configuration
+- QR code generation for setup
+- Backup code management
+- 2FA enforcement policies
+
+### Security Alerts Interface
+The security alerts system provides real-time monitoring of security events and threats.
+
+**Alert Types:**
+- Login attempt monitoring
+- Suspicious IP address detection
+- Failed authentication attempts
+- Security policy violations
+- System integrity alerts
+
+**Section sources**
+- [security/[...]/page.tsx](file://portal/frontend/src/app/(dashboard)/security/page.tsx)
+- [security/2fa/page.tsx](file://portal/frontend/src/app/(dashboard)/security/2fa/page.tsx)
+- [security/alerts/page.tsx](file://portal/frontend/src/app/(dashboard)/security/alerts/page.tsx)
+
+## Credential Sharing System
+
+### Share Credentials Dialog
+The credential sharing system enables secure, time-limited sharing of credentials with granular control over access permissions.
+
+**Sharing Options:**
+- Select specific credential types to share
+- Set expiration time (12h, 24h, 48h, 7 days)
+- Limit maximum views (1, 2, 5, unlimited)
+- Optional password protection
+- Real-time link generation
+
+**Security Features:**
+- Encrypted credential transmission
+- Automatic link revocation
+- Access tracking and audit logs
+- IP address monitoring
+- Time-based expiration
+
+### Active Share Links Management
+Administrators can monitor and manage all active credential sharing links.
+
+**Link Management:**
+- View all generated share links
+- Monitor usage statistics (views, expiry, IP)
+- Immediate revocation capability
+- Status indicators (active, expired, exhausted, revoked)
+- Creator attribution and timestamps
+
+```mermaid
+flowchart TD
+Start(["User clicks Share Credentials"]) --> Dialog["Open ShareCredentialsDialog"]
+Dialog --> SelectTypes["Select credential types"]
+SelectTypes --> SetOptions["Configure sharing options"]
+SetOptions --> Generate["Generate secure link"]
+Generate --> Success["Display share URL"]
+Success --> Copy["Copy to clipboard"]
+Copy --> Track["Track usage in ActiveShareLinks"]
+User["Recipient"] --> Access["Access share URL"]
+Access --> Password["Enter optional password"]
+Password --> Verify["PIN verification if required"]
+Verify --> View["View shared credentials"]
+View --> Audit["Record in vault audit log"]
+```
+
+**Diagram sources**
+- [share-credentials-dialog.tsx:57-138](file://portal/frontend/src/components/vault/share-credentials-dialog.tsx#L57-L138)
+- [active-share-links.tsx:34-82](file://portal/frontend/src/components/vault/active-share-links.tsx#L34-L82)
+
+**Section sources**
+- [share-credentials-dialog.tsx:1-341](file://portal/frontend/src/components/vault/share-credentials-dialog.tsx#L1-L341)
+- [active-share-links.tsx:1-321](file://portal/frontend/src/components/vault/active-share-links.tsx#L1-L321)
+
+## Vault Audit and Monitoring
+
+### Vault Audit Log System
+The vault audit log provides comprehensive tracking of all credential vault activities with filtering and pagination capabilities.
+
+**Audit Event Types:**
+- Credential viewing and copying
+- PIN verification attempts
+- Share link creation and access
+- Credential modifications
+- System-generated security events
+
+**Filtering and Search:**
+- Action-type filtering (viewed, copied, edited, etc.)
+- Pagination with 20 entries per page
+- Real-time refresh capability
+- Relative timestamp formatting
+
+**Security Monitoring:**
+- IP address tracking for all events
+- User attribution for administrative actions
+- Automatic cleanup of old audit entries
+- Export capabilities for compliance
+
+### Vault Share Access Flow
+The vault share system implements a secure access flow for external credential sharing.
+
+**Public Access Flow:**
+1. Recipient accesses share URL with token
+2. Optional password verification (if enabled)
+3. PIN verification for sensitive operations
+4. Credential data retrieval with temporary exposure
+5. Automatic cleanup and audit logging
+
+**Section sources**
+- [vault-audit-log.tsx:1-264](file://portal/frontend/src/components/vault/vault-audit-log.tsx#L1-L264)
 
 ## Dashboard and Analytics
 
@@ -676,6 +1030,10 @@ PKG --> TS
 - **Updated** Implement efficient polling strategies with proper cleanup to prevent memory leaks.
 - **Updated** Use component-level memoization for expensive computations in deployment monitoring.
 - **Updated** Optimize API calls with pagination and selective data fetching.
+- **Updated** Implement debounced input handling for PIN entry components to reduce API calls.
+- **Updated** Use virtualized lists for large audit log tables to improve rendering performance.
+- **Updated** Cache credential types and share link data to minimize repeated API calls.
+- **Updated** Implement request deduplication for concurrent credential access operations.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -686,6 +1044,11 @@ Common issues and resolutions:
 - **Updated** Deployment monitoring not updating: Check polling intervals and ensure proper cleanup of intervals.
 - **Updated** Plugin upload failures: Verify file size limits and supported formats in upload dialog.
 - **Updated** Credential PIN validation errors: Ensure proper PIN length and verify with backend authentication.
+- **Updated** Vault PIN lockout: Users receive 15-minute lockout after failed attempts; check admin notifications.
+- **Updated** Share link access issues: Verify link expiration, view limits, and password requirements.
+- **Updated** Audit log filtering problems: Check action filter values and pagination parameters.
+- **Updated** Credential form submission failures: Verify PIN verification before saving sensitive data.
+- **Updated** Credential reveal timeouts: Check PIN verification and ensure proper credential field selection.
 
 **Section sources**
 - [api.ts:22-34](file://portal/frontend/src/lib/api.ts#L22-L34)
@@ -696,7 +1059,7 @@ Common issues and resolutions:
 ## Conclusion
 The frontend employs a clean, modular architecture with strong separation of concerns. App Router pages and nested layouts provide a scalable routing model. Zustand simplifies state management for authentication, while a centralized API client ensures consistent request/response handling. The UI component library leverages Tailwind CSS v4 and shadcn primitives for maintainable, accessible components. With responsive hooks, theme tokens, and performance-conscious patterns, the application is well-positioned for growth and maintenance.
 
-**Updated** The enhanced architecture now supports comprehensive plugin management with real-time deployment monitoring, secure credential vault operations, and detailed site administration interfaces. The expanded service layer provides robust APIs for all major functional areas, while the component architecture ensures maintainable and scalable user interfaces.
+**Updated** The enhanced architecture now supports comprehensive credential vault management system featuring secure credential storage with PIN protection, sophisticated credential sharing with time-based access control, extensive audit logging with filtering and pagination, and integrated security monitoring interfaces. The expanded service layer provides robust APIs for all major functional areas, while the component architecture ensures maintainable and scalable user interfaces with strong security guarantees and comprehensive access control mechanisms.
 
 ## Appendices
 
@@ -723,6 +1086,10 @@ The frontend employs a clean, modular architecture with strong separation of con
 - Ensure environment variables are set for NEXT_PUBLIC_API_URL and any backend-dependent settings.
 - **Updated** Implement proper cleanup of polling intervals and WebSocket connections on component unmount.
 - **Updated** Consider implementing request deduplication to prevent multiple simultaneous API calls.
+- **Updated** Use secure cookie settings for authentication and session management.
+- **Updated** Implement rate limiting for PIN verification and credential access endpoints.
+- **Updated** Cache frequently accessed credential types and share link data to improve performance.
+- **Updated** Implement graceful error handling for network failures in credential operations.
 
 **Section sources**
 - [next.config.ts:4-11](file://portal/frontend/next.config.ts#L4-L11)

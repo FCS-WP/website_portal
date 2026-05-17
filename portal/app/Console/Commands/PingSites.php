@@ -2,10 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ExternalPluginCache;
+use App\Models\Plugin;
 use App\Models\Site;
 use App\Models\Site2faSetting;
+use App\Models\SitePlugin;
 use App\Models\PortalSetting;
 use App\Jobs\SendTelegramNotification;
+use App\Services\PluginClassificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -55,6 +59,11 @@ class PingSites extends Command
                         );
                     }
 
+                    // Sync all plugins from agent
+                    if (isset($data['all_plugins']) && is_array($data['all_plugins'])) {
+                        $this->syncAllPlugins($site, $data['all_plugins']);
+                    }
+
                     $this->line("  ✓ {$site->name} ({$site->url}) - connected");
                 } else {
                     $this->handleFailedPing($site, "HTTP {$response->status()}");
@@ -89,6 +98,68 @@ class PingSites extends Command
         } else {
             $this->warn("  ✗ {$site->name} - failed ({$reason})");
         }
+    }
+
+    private function syncAllPlugins($site, array $allPlugins): void
+    {
+        $slugs = array_column($allPlugins, 'slug');
+        $classifications = PluginClassificationService::classifyBatch($slugs);
+
+        // Get latest versions from cache for comparison
+        $cachedVersions = ExternalPluginCache::whereIn('slug', $slugs)
+            ->pluck('latest_version', 'slug')
+            ->toArray();
+
+        // Get internal plugin IDs and versions
+        $internalPlugins = Plugin::whereIn('slug', $slugs)
+            ->with('latestVersion')
+            ->get()
+            ->keyBy('slug');
+
+        $syncedSlugs = [];
+
+        foreach ($allPlugins as $pluginData) {
+            $slug = $pluginData['slug'];
+            $syncedSlugs[] = $slug;
+            $type = $classifications[$slug] ?? 'premium';
+
+            // Determine latest version and plugin_id
+            $latestVersion = null;
+            $pluginId = null;
+
+            if ($type === 'internal' && isset($internalPlugins[$slug])) {
+                $pluginId = $internalPlugins[$slug]->id;
+                $latestVersion = $internalPlugins[$slug]->latestVersion?->version;
+            } elseif ($type === 'wporg') {
+                $latestVersion = $cachedVersions[$slug] ?? null;
+            }
+
+            // Compute update_available
+            $updateAvailable = false;
+            if ($latestVersion && ($pluginData['version'] ?? null)) {
+                $updateAvailable = version_compare($pluginData['version'], $latestVersion, '<');
+            }
+
+            SitePlugin::updateOrCreate(
+                ['site_id' => $site->id, 'plugin_slug' => $slug],
+                [
+                    'plugin_id' => $pluginId,
+                    'plugin_name' => $pluginData['name'] ?? null,
+                    'plugin_file' => $pluginData['file'] ?? null,
+                    'plugin_type' => $type,
+                    'installed_version' => $pluginData['version'] ?? null,
+                    'latest_version' => $latestVersion,
+                    'is_active' => $pluginData['is_active'] ?? false,
+                    'update_available' => $updateAvailable,
+                    'last_synced_at' => now(),
+                ]
+            );
+        }
+
+        // Remove plugins that are no longer installed on the site
+        SitePlugin::where('site_id', $site->id)
+            ->whereNotIn('plugin_slug', $syncedSlugs)
+            ->delete();
     }
 
     private function sendTelegramNotification(string $message): void

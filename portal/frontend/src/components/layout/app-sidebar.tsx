@@ -17,6 +17,8 @@ import {
   Shield,
   AlertTriangle,
   Lock,
+  RefreshCw,
+  Download,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
@@ -58,6 +60,8 @@ export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }
     {
       label: "PLUGINS",
       items: [
+        { name: "Updates", href: "/plugins/updates", icon: RefreshCw },
+        { name: "Install", href: "/plugins/install", icon: Download },
         { name: "Repository", href: "/plugins", icon: Puzzle },
         { name: "Deployments", href: "/deployments", icon: Rocket },
         { name: "Scheduled", href: "/deployments/scheduled", icon: CalendarClock },

@@ -8,6 +8,7 @@ use App\Models\SecurityAlert;
 use App\Models\Site;
 use App\Models\Site2faSetting;
 use App\Models\SiteAdminUser;
+use App\Models\SitePlugin;
 use App\Models\SiteSecurityScore;
 use App\Models\SiteVulnerability;
 
@@ -22,6 +23,7 @@ class SecurityScoreService
         $score -= self::userSecurityDeductions($site);
         $score -= self::twoFaDeductions($site);
         $score -= self::maintenanceDeductions($site);
+        $score -= self::pluginMaintenanceDeductions($site);
 
         return max(0, $score);
     }
@@ -35,6 +37,7 @@ class SecurityScoreService
             'user_security' => -self::userSecurityDeductions($site),
             'two_fa' => -self::twoFaDeductions($site),
             'maintenance' => -self::maintenanceDeductions($site),
+            'plugin_maintenance' => -self::pluginMaintenanceDeductions($site),
         ];
     }
 
@@ -179,6 +182,32 @@ class SecurityScoreService
         if ($outdatedPlugins->count() > 3) {
             $deduction += 3;
         }
+
+        return $deduction;
+    }
+
+    private static function pluginMaintenanceDeductions(Site $site): int
+    {
+        $deduction = 0;
+
+        // Abandoned plugins: -3 per active abandoned WP.org plugin
+        $abandonedCount = SitePlugin::where('site_id', $site->id)
+            ->where('plugin_type', 'wporg')
+            ->where('is_active', true)
+            ->whereHas('externalPlugin', function ($q) {
+                $q->where('is_abandoned', true);
+            })
+            ->count();
+
+        $deduction += $abandonedCount * 3;
+
+        // Outdated plugins: -1 per outdated WP.org plugin, capped at 10
+        $outdatedCount = SitePlugin::where('site_id', $site->id)
+            ->where('plugin_type', 'wporg')
+            ->where('update_available', true)
+            ->count();
+
+        $deduction += min($outdatedCount, 10);
 
         return $deduction;
     }

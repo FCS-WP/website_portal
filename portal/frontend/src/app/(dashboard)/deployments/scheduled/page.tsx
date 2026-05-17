@@ -30,6 +30,14 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { CalendarClock, Pencil, X } from "lucide-react";
 
+const jobTypeConfig: Record<string, { label: string; className: string }> = {
+  deploy: { label: "Deploy", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
+  wporg_install: { label: "Install", className: "bg-green-100 text-green-800 hover:bg-green-100" },
+  wporg_update: { label: "Update", className: "bg-amber-100 text-amber-800 hover:bg-amber-100" },
+  wporg_uninstall: { label: "Uninstall", className: "bg-red-100 text-red-800 hover:bg-red-100" },
+  rollback: { label: "Rollback", className: "bg-purple-100 text-purple-800 hover:bg-purple-100" },
+};
+
 export default function ScheduledDeploymentsPage() {
   const [deployments, setDeployments] = useState<DeploymentJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,10 +128,24 @@ export default function ScheduledDeploymentsPage() {
       header: "Plugin",
       cell: ({ row }) => {
         const pv = row.original.plugin_version;
+        const name = pv?.plugin?.name || row.original.plugin_name;
         return (
           <span className="font-medium">
-            {pv?.plugin?.name || "—"}
+            {name || "—"}
           </span>
+        );
+      },
+    },
+    {
+      accessorKey: "job_type",
+      header: "Type",
+      cell: ({ row }) => {
+        const type = row.original.job_type || "deploy";
+        const config = jobTypeConfig[type] || jobTypeConfig.deploy;
+        return (
+          <Badge variant="secondary" className={config.className}>
+            {config.label}
+          </Badge>
         );
       },
     },
@@ -132,8 +154,9 @@ export default function ScheduledDeploymentsPage() {
       header: "Version",
       cell: ({ row }) => {
         const pv = row.original.plugin_version;
-        return pv ? (
-          <Badge variant="outline">{pv.version}</Badge>
+        const version = pv?.version || row.original.target_version;
+        return version ? (
+          <Badge variant="outline">{version}</Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
@@ -271,11 +294,11 @@ export default function ScheduledDeploymentsPage() {
             <AlertDialogTitle>Cancel scheduled deployment?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently cancel the scheduled deployment
-              {cancellingJob?.plugin_version?.plugin?.name && (
-                <> of <strong>{cancellingJob.plugin_version.plugin.name}</strong></>
+              {(cancellingJob?.plugin_version?.plugin?.name || cancellingJob?.plugin_name) && (
+                <> of <strong>{cancellingJob.plugin_version?.plugin?.name || cancellingJob.plugin_name}</strong></>
               )}
-              {cancellingJob?.plugin_version?.version && (
-                <> v{cancellingJob.plugin_version.version}</>
+              {(cancellingJob?.plugin_version?.version || cancellingJob?.target_version) && (
+                <> v{cancellingJob.plugin_version?.version || cancellingJob.target_version}</>
               )}
               . This action cannot be undone.
             </AlertDialogDescription>

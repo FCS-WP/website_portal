@@ -22,7 +22,7 @@ import { siteService } from "@/lib/services/sites";
 import { Site } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical, Shield } from "lucide-react";
+import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical, Shield, LayoutDashboard, Puzzle, ShoppingCart, Mail, Activity } from "lucide-react";
 import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
 import { SiteActivityTab } from "@/components/sites/site-activity-tab";
 import { SiteCredentialsTab } from "@/components/sites/site-credentials-tab";
@@ -256,15 +256,30 @@ export default function SiteDetailPage() {
 
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="plugins">Plugins</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="smtp">SMTP</TabsTrigger>
+          <TabsTrigger value="overview" className="gap-1">
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="plugins" className="gap-1">
+            <Puzzle className="h-3.5 w-3.5" />
+            Plugins
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="gap-1">
+            <ShoppingCart className="h-3.5 w-3.5" />
+            Orders
+          </TabsTrigger>
+          <TabsTrigger value="smtp" className="gap-1">
+            <Mail className="h-3.5 w-3.5" />
+            SMTP
+          </TabsTrigger>
           <TabsTrigger value="credentials" className="gap-1">
             <KeyRound className="h-3.5 w-3.5" />
             Credentials
           </TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="activity" className="gap-1">
+            <Activity className="h-3.5 w-3.5" />
+            Activity
+          </TabsTrigger>
           <TabsTrigger value="security" className="gap-1">
             <Shield className="h-3.5 w-3.5" />
             Security

@@ -40,6 +40,7 @@ require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-login-monitor.php'
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-user-monitor.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-2fa-manager.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-api.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-external-plugin-manager.php';
 
 // Activation / Deactivation hooks
 register_activation_hook(__FILE__, ['Epos_Agent_Activator', 'activate']);
@@ -72,6 +73,9 @@ function epos_agent_init() {
     Epos_Agent_Security_Api::init();
     Epos_Agent_Security_Login_Monitor::init();
     Epos_Agent_Security_User_Monitor::init();
+
+    // Initialize external plugin manager
+    Epos_Agent_External_Plugin_Manager::init();
 }
 add_action('init', 'epos_agent_init');
 

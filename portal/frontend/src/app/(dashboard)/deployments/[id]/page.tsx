@@ -37,6 +37,15 @@ import { DeploymentJob, DeploymentJobSite, DeploymentProgress } from "@/types";
 import { toast } from "sonner";
 import { formatDistanceToNow, format, differenceInSeconds } from "date-fns";
 
+// --- Job type config ---
+const jobTypeConfig: Record<string, { label: string; className: string }> = {
+  deploy: { label: "Deploy", className: "bg-blue-500/20 text-blue-400" },
+  wporg_install: { label: "Install", className: "bg-green-500/20 text-green-400" },
+  wporg_update: { label: "Update", className: "bg-amber-500/20 text-amber-400" },
+  wporg_uninstall: { label: "Uninstall", className: "bg-red-500/20 text-red-400" },
+  rollback: { label: "Rollback", className: "bg-purple-500/20 text-purple-400" },
+};
+
 // --- Status color helpers ---
 const jobStatusConfig: Record<string, { bg: string; text: string; label: string }> = {
   queued: { bg: "bg-gray-500/20", text: "text-gray-400", label: "Queued" },
@@ -284,9 +293,9 @@ export default function DeploymentDetailPage() {
   const canRetry = (deployment?.failed_count || 0) > 0;
   const canCancel = deployment?.status === "queued" || deployment?.status === "running";
 
-  const pluginName = deployment?.plugin_version?.plugin?.name || "Plugin";
-  const pluginSlug = deployment?.plugin_version?.plugin?.slug || pluginName;
-  const pluginVersion = deployment?.plugin_version?.version || "—";
+  const pluginName = deployment?.plugin_version?.plugin?.name || deployment?.plugin_name || "Plugin";
+  const pluginSlug = deployment?.plugin_version?.plugin?.slug || deployment?.plugin_slug || pluginName;
+  const pluginVersion = deployment?.plugin_version?.version || deployment?.target_version || "—";
   const changelogType = deployment?.plugin_version?.changelog?.type;
 
   // Count per filter tab
@@ -630,6 +639,15 @@ export default function DeploymentDetailPage() {
               <span className="text-muted-foreground">Job ID</span>
               <span className="text-right font-medium text-foreground">
                 DEP-{String(deployment.id).padStart(4, "0")}
+              </span>
+              <span className="text-muted-foreground">Type</span>
+              <span className="text-right">
+                <Badge
+                  variant="secondary"
+                  className={`${(jobTypeConfig[deployment.job_type || 'deploy'] || jobTypeConfig.deploy).className} border-0 text-xs`}
+                >
+                  {(jobTypeConfig[deployment.job_type || 'deploy'] || jobTypeConfig.deploy).label}
+                </Badge>
               </span>
               <span className="text-muted-foreground">Plugin</span>
               <span className="text-right font-medium text-foreground">{pluginSlug}</span>

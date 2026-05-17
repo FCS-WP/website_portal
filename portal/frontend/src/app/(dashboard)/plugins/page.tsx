@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
 import { pluginService } from "@/lib/services/plugins";
 import { Plugin } from "@/types";
 import { toast } from "sonner";
@@ -141,9 +141,11 @@ export default function PluginsPage() {
         <Button
           variant="ghost"
           size="sm"
+          className="h-8 w-8 p-0"
           onClick={() => router.push(`/plugins/${row.original.id}`)}
+          title="View details"
         >
-          View
+          <Eye className="h-4 w-4" />
         </Button>
       ),
     },

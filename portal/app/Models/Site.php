@@ -69,6 +69,16 @@ class Site extends Model
         return $this->hasMany(SitePlugin::class);
     }
 
+    public function wporgPlugins(): HasMany
+    {
+        return $this->hasMany(SitePlugin::class)->where('plugin_type', 'wporg');
+    }
+
+    public function outdatedPlugins(): HasMany
+    {
+        return $this->hasMany(SitePlugin::class)->where('update_available', true);
+    }
+
     public function deploymentJobSites(): HasMany
     {
         return $this->hasMany(DeploymentJobSite::class);

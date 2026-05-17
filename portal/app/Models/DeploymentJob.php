@@ -10,7 +10,7 @@ class DeploymentJob extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['plugin_version_id', 'initiated_by', 'status', 'job_type', 'total_sites', 'success_count', 'failed_count', 'note', 'scheduled_at', 'created_at', 'started_at', 'finished_at'];
+    protected $fillable = ['plugin_version_id', 'initiated_by', 'status', 'job_type', 'plugin_slug', 'plugin_name', 'target_version', 'download_url', 'file_hash', 'total_sites', 'success_count', 'failed_count', 'note', 'scheduled_at', 'created_at', 'started_at', 'finished_at'];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
@@ -32,5 +32,19 @@ class DeploymentJob extends Model
     public function sites(): HasMany
     {
         return $this->hasMany(DeploymentJobSite::class);
+    }
+
+    public function isWporgJob(): bool
+    {
+        return str_starts_with($this->job_type ?? '', 'wporg_');
+    }
+
+    public function getDisplayName(): string
+    {
+        if ($this->isWporgJob()) {
+            return $this->plugin_name ?? $this->plugin_slug ?? 'Unknown Plugin';
+        }
+
+        return $this->pluginVersion?->version_label ?? $this->plugin_name ?? 'Unknown';
     }
 }

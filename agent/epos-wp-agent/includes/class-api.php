@@ -49,6 +49,43 @@ class Epos_Agent_Api {
             'callback'            => [self::class, 'handle_rollback'],
             'permission_callback' => [self::class, 'verify_agent_key'],
         ]);
+
+        // External Plugin Management
+        register_rest_route($namespace, '/plugins/external/install', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_external_install'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
+
+        register_rest_route($namespace, '/plugins/external/update', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_external_update'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
+
+        register_rest_route($namespace, '/plugins/external/update-batch', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_external_update_batch'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
+
+        register_rest_route($namespace, '/plugins/external/activate', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_external_activate'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
+
+        register_rest_route($namespace, '/plugins/external/deactivate', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_external_deactivate'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
+
+        register_rest_route($namespace, '/plugins/external/uninstall', [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handle_external_uninstall'],
+            'permission_callback' => [self::class, 'verify_agent_key'],
+        ]);
     }
 
     /**
@@ -111,7 +148,82 @@ class Epos_Agent_Api {
             'php_version'    => phpversion(),
             'woo_active'     => class_exists('WooCommerce'),
             'active_plugins' => Epos_Agent_Activator::get_epos_plugins(),
+            'all_plugins'    => Epos_Agent_Ping::get_all_installed_plugins(),
         ]);
+    }
+
+    /**
+     * Handle external plugin install from WordPress.org
+     */
+    public static function handle_external_install($request) {
+        $params = $request->get_json_params();
+        $result = Epos_Agent_External_Plugin_Manager::install_plugin(
+            $params['slug'] ?? '',
+            $params['version'] ?? '',
+            $params['download_url'] ?? '',
+            $params['file_hash'] ?? null,
+            $params['activate'] ?? true
+        );
+        return new \WP_REST_Response($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Handle external plugin update
+     */
+    public static function handle_external_update($request) {
+        $params = $request->get_json_params();
+        $result = Epos_Agent_External_Plugin_Manager::update_plugin(
+            $params['slug'] ?? '',
+            $params['download_url'] ?? '',
+            $params['file_hash'] ?? null
+        );
+        return new \WP_REST_Response($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Handle batch external plugin update
+     */
+    public static function handle_external_update_batch($request) {
+        $params = $request->get_json_params();
+        $plugins = $params['plugins'] ?? [];
+        $results = Epos_Agent_External_Plugin_Manager::update_batch($plugins);
+        return new \WP_REST_Response(['success' => true, 'results' => $results], 200);
+    }
+
+    /**
+     * Handle external plugin activation
+     */
+    public static function handle_external_activate($request) {
+        $params = $request->get_json_params();
+        $result = Epos_Agent_External_Plugin_Manager::activate_plugin(
+            $params['slug'] ?? '',
+            $params['file'] ?? ''
+        );
+        return new \WP_REST_Response($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Handle external plugin deactivation
+     */
+    public static function handle_external_deactivate($request) {
+        $params = $request->get_json_params();
+        $result = Epos_Agent_External_Plugin_Manager::deactivate_plugin(
+            $params['slug'] ?? '',
+            $params['file'] ?? ''
+        );
+        return new \WP_REST_Response($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Handle external plugin uninstall
+     */
+    public static function handle_external_uninstall($request) {
+        $params = $request->get_json_params();
+        $result = Epos_Agent_External_Plugin_Manager::uninstall_plugin(
+            $params['slug'] ?? '',
+            $params['file'] ?? ''
+        );
+        return new \WP_REST_Response($result, $result['success'] ? 200 : 400);
     }
 
     /**
