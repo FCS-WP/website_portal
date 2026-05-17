@@ -395,8 +395,8 @@ class SecurityController extends Controller
                     'id' => $site->id,
                     'name' => $site->name,
                     'url' => $site->url,
-                    'two_fa_enabled' => $site->site2faSetting?->enabled ?? false,
-                    'two_fa_method' => $site->site2faSetting?->method,
+                    'is_enabled' => $site->site2faSetting?->enabled ?? false,
+                    'provider' => $site->site2faSetting?->method,
                 ];
             });
 

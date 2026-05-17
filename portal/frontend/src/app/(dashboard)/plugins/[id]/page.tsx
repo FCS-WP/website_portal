@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -371,8 +371,8 @@ export default function PluginDetailPage() {
                     </TableHeader>
                     <TableBody>
                       {versions.map((version) => (
-                        <>
-                        <TableRow key={version.id}>
+                        <Fragment key={version.id}>
+                        <TableRow>
                           <TableCell>
                             <Badge variant="outline">{version.version}</Badge>
                           </TableCell>
@@ -530,7 +530,7 @@ export default function PluginDetailPage() {
                             </TableCell>
                           </TableRow>
                         )}
-                        </>
+                        </Fragment>
                       ))}
                     </TableBody>
                   </Table>

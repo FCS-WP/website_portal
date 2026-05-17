@@ -24,6 +24,38 @@ class Epos_Agent_Ping {
     }
 
     /**
+     * Detect whether a 2FA plugin is active and return its status.
+     */
+    private static function detect_2fa_status() {
+        $two_fa_plugins = [
+            'wp-2fa/wp-2fa.php'                          => ['name' => 'WP 2FA', 'method' => 'totp'],
+            'two-factor/two-factor.php'                  => ['name' => 'Two Factor', 'method' => 'totp'],
+            'google-authenticator/google-authenticator.php' => ['name' => 'Google Authenticator', 'method' => 'totp'],
+            'wordfence/wordfence.php'                    => ['name' => 'Wordfence', 'method' => 'totp'],
+        ];
+
+        if (!function_exists('is_plugin_active')) {
+            include_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        foreach ($two_fa_plugins as $plugin_path => $info) {
+            if (is_plugin_active($plugin_path)) {
+                return [
+                    'enabled' => true,
+                    'method'  => $info['method'],
+                    'plugin'  => $info['name'],
+                ];
+            }
+        }
+
+        return [
+            'enabled' => false,
+            'method'  => null,
+            'plugin'  => null,
+        ];
+    }
+
+    /**
      * Execute the ping to Portal
      */
     public static function run() {
@@ -53,6 +85,9 @@ class Epos_Agent_Ping {
             'baseline_exists' => !empty(get_option('epos_agent_file_baseline', '')),
             'admin_count'     => count(get_users(['role' => 'administrator'])),
         ];
+
+        // Include 2FA status
+        $body['two_fa'] = self::detect_2fa_status();
 
         $response = wp_remote_post(
             rtrim($portal_url, '/') . '/api/agent/ping',

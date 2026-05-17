@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Site;
+use App\Models\Site2faSetting;
 use App\Models\PortalSetting;
 use App\Jobs\SendTelegramNotification;
 use Illuminate\Console\Command;
@@ -40,6 +41,19 @@ class PingSites extends Command
                         'wp_version' => $data['wp_version'] ?? null,
                         'php_version' => $data['php_version'] ?? null,
                     ]);
+
+                    // Sync 2FA status from agent
+                    if (isset($data['two_fa'])) {
+                        $twoFaData = $data['two_fa'];
+                        Site2faSetting::updateOrCreate(
+                            ['site_id' => $site->id],
+                            [
+                                'enabled' => $twoFaData['enabled'] ?? false,
+                                'method' => $twoFaData['method'] ?? null,
+                                'wp_plugin_used' => $twoFaData['plugin'] ?? null,
+                            ]
+                        );
+                    }
 
                     $this->line("  ✓ {$site->name} ({$site->url}) - connected");
                 } else {
