@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -22,13 +23,14 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { sidebarService, SidebarCounts } from "@/lib/services/sidebar";
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
+  badgeVariant?: "info" | "warning";
   placeholder?: boolean;
 }
 
@@ -38,10 +40,26 @@ interface NavGroup {
   items: NavItem[];
 }
 
-export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }) {
+export function AppSidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const isAdmin = user?.role === "admin";
+  const [counts, setCounts] = useState<SidebarCounts | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCounts = async () => {
+      try {
+        const res = await sidebarService.counts();
+        if (!cancelled) setCounts(res.data.data);
+      } catch {
+        // silently ignore
+      }
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
 
   const navGroups: NavGroup[] = [
     {
@@ -52,18 +70,43 @@ export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }
           name: "Sites",
           href: "/sites",
           icon: Globe,
-          badge: offlineSitesCount && offlineSitesCount > 0 ? offlineSitesCount : undefined,
+          badge: counts?.sites || undefined,
+          badgeVariant: "info",
         },
-        { name: "Hostings", href: "/hostings", icon: Server },
+        {
+          name: "Hostings",
+          href: "/hostings",
+          icon: Server,
+          badge: counts?.hostings || undefined,
+          badgeVariant: "info",
+        },
       ],
     },
     {
       label: "PLUGINS",
       items: [
-        { name: "Updates", href: "/plugins/updates", icon: RefreshCw },
+        {
+          name: "Updates",
+          href: "/plugins/updates",
+          icon: RefreshCw,
+          badge: counts?.plugin_updates || undefined,
+          badgeVariant: "warning",
+        },
         { name: "Install", href: "/plugins/install", icon: Download },
-        { name: "Repository", href: "/plugins", icon: Puzzle },
-        { name: "Deployments", href: "/deployments", icon: Rocket },
+        {
+          name: "Repository",
+          href: "/plugins",
+          icon: Puzzle,
+          badge: counts?.plugins || undefined,
+          badgeVariant: "info",
+        },
+        {
+          name: "Deployments",
+          href: "/deployments",
+          icon: Rocket,
+          badge: counts?.active_deployments || undefined,
+          badgeVariant: "warning",
+        },
         { name: "Scheduled", href: "/deployments/scheduled", icon: CalendarClock },
       ],
     },
@@ -71,7 +114,13 @@ export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }
       label: "SECURITY",
       items: [
         { name: "Overview", href: "/security", icon: Shield },
-        { name: "Alerts", href: "/security/alerts", icon: AlertTriangle },
+        {
+          name: "Alerts",
+          href: "/security/alerts",
+          icon: AlertTriangle,
+          badge: counts?.security_alerts || undefined,
+          badgeVariant: "warning",
+        },
         { name: "2FA Management", href: "/security/2fa", icon: Lock },
       ],
     },
@@ -136,15 +185,23 @@ export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }
                     )}
                   >
                     <item.icon className="h-4 w-4" />
-                    <span className="flex-1">{item.name}</span>
-                    {item.badge !== undefined && (
-                      <Badge
-                        variant="destructive"
-                        className="h-5 min-w-5 px-1.5 text-[10px] font-semibold"
-                      >
-                        {item.badge}
-                      </Badge>
-                    )}
+                    <span className="flex-1 inline-flex items-center">
+                      <span className="relative">
+                        {item.name}
+                        {item.badge !== undefined && item.badge > 0 && (
+                          <span
+                            className={cn(
+                              "absolute -top-0.5 -right-4 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none",
+                              item.badgeVariant === "warning"
+                                ? "bg-amber-500 text-white dark:bg-amber-600"
+                                : "bg-muted-foreground/20 text-muted-foreground"
+                            )}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </span>
+                    </span>
                   </Link>
                 );
               })}

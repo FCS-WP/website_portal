@@ -27,10 +27,24 @@ class DispatchBulkDeployment implements ShouldQueue
         // Get all pending sites for this deployment
         $pendingSites = $job->sites()->where('status', 'pending')->get();
 
-        // Fan out individual push jobs
+        // Fan out individual jobs based on job_type
         foreach ($pendingSites as $deploymentJobSite) {
-            PushPluginToSite::dispatch($deploymentJobSite)
-                ->onQueue('deployments');
+            if ($job->isWporgJob()) {
+                WpOrgPluginJob::dispatch(
+                    $deploymentJobSite->id,
+                    $deploymentJobSite->site_id,
+                    $job->job_type,
+                    $job->plugin_slug,
+                    $job->target_version,
+                    $job->download_url,
+                    $job->file_hash,
+                    true,
+                    null,
+                )->onQueue('deployments');
+            } else {
+                PushPluginToSite::dispatch($deploymentJobSite)
+                    ->onQueue('deployments');
+            }
         }
     }
 }

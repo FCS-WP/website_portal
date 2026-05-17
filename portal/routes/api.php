@@ -134,6 +134,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Dashboard stats
     Route::get('/dashboard/stats', [\App\Http\Controllers\Portal\DashboardController::class, 'stats']);
 
+    // Sidebar counts
+    Route::get('/sidebar/counts', [\App\Http\Controllers\Portal\SidebarController::class, 'counts']);
+
     // Sites (all users can list/view, filtered by assignment for dev/mkt)
     Route::get('/sites', [\App\Http\Controllers\Portal\SiteController::class, 'index']);
     Route::get('/sites/{site}', [\App\Http\Controllers\Portal\SiteController::class, 'show']);

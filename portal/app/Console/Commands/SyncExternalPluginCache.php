@@ -60,6 +60,9 @@ class SyncExternalPluginCache extends Command
         $bar->finish();
         $this->newLine(2);
 
+        // Reclassify site plugins based on fresh cache data
+        $this->reclassifySitePlugins();
+
         // After cache refresh, update site_plugins
         $this->updateSitePluginVersions();
 
@@ -179,6 +182,31 @@ class SyncExternalPluginCache extends Command
             });
 
         $this->info("Updated {$updated} site plugin records.");
+    }
+
+    /**
+     * Reclassify site plugins: premium → wporg if cache confirms they're on WP.org
+     */
+    private function reclassifySitePlugins(): void
+    {
+        $this->info('Reclassifying site plugins based on cache...');
+
+        $wporgSlugs = ExternalPluginCache::where('is_on_wporg', true)
+            ->pluck('slug')
+            ->toArray();
+
+        if (empty($wporgSlugs)) {
+            return;
+        }
+
+        // Update plugins currently marked as 'premium' that are actually on WP.org
+        $reclassified = SitePlugin::where('plugin_type', 'premium')
+            ->whereIn('plugin_slug', $wporgSlugs)
+            ->update(['plugin_type' => 'wporg']);
+
+        if ($reclassified > 0) {
+            $this->info("Reclassified {$reclassified} site plugin records from 'premium' to 'wporg'.");
+        }
     }
 
     /**

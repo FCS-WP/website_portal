@@ -11,6 +11,8 @@ class Epos_Agent_External_Plugin_Manager {
      * Install a plugin from WordPress.org
      */
     public static function install_plugin($slug, $version, $download_url, $file_hash, $activate = true) {
+        set_time_limit(300);
+
         // Security: only allow downloads.wordpress.org
         if (!str_starts_with($download_url, 'https://downloads.wordpress.org/')) {
             return ['success' => false, 'error' => 'Invalid download source — only downloads.wordpress.org allowed'];
@@ -66,6 +68,8 @@ class Epos_Agent_External_Plugin_Manager {
      * Update a single plugin
      */
     public static function update_plugin($slug, $download_url, $file_hash) {
+        set_time_limit(300);
+
         if (!str_starts_with($download_url, 'https://downloads.wordpress.org/')) {
             return ['success' => false, 'error' => 'Invalid download source'];
         }
@@ -164,6 +168,8 @@ class Epos_Agent_External_Plugin_Manager {
      * Uninstall (deactivate + delete) a plugin
      */
     public static function uninstall_plugin($slug, $file) {
+        set_time_limit(300);
+
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
         WP_Filesystem();

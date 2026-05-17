@@ -37,6 +37,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Eye,
+  ArrowDownToLine,
 } from "lucide-react";
 import { externalPluginService } from "@/lib/services/external-plugins";
 import type {
@@ -156,9 +157,19 @@ export default function PluginUpdatesPage() {
   };
 
   const handleUpdateAll = (plugin: PluginUpdateRow) => {
-    const fromVersions = plugin.version_breakdown
-      .filter((vb) => vb.version !== plugin.latest_version)
-      .map((vb) => `v${vb.version} (${vb.site_count} sites)`);
+    // Compute version breakdown from sites data if available
+    const sites = sitesData[plugin.slug] || [];
+    const fromVersions = sites.length > 0
+      ? Object.entries(
+          sites
+            .filter((s) => s.update_available)
+            .reduce<Record<string, number>>((acc, s) => {
+              const v = s.installed_version || "unknown";
+              acc[v] = (acc[v] || 0) + 1;
+              return acc;
+            }, {})
+        ).map(([version, count]) => `v${version} (${count} sites)`)
+      : [`${plugin.needs_update_count} site(s) need update`];
     setConfirmModal({
       open: true,
       slug: plugin.slug,
@@ -505,7 +516,7 @@ function PluginRow({
           </div>
         </TableCell>
         <TableCell>
-          <span className="text-sm">{plugin.version_breakdown.length}</span>
+          <span className="text-sm">{sites ? [...new Set(sites.map((s) => s.installed_version))].length : "—"}</span>
         </TableCell>
         <TableCell>
           <span className="text-sm">{plugin.installed_on_sites}</span>
@@ -555,8 +566,8 @@ function PluginRow({
         <TableCell>
           <div className="flex items-center gap-2">
             {plugin.needs_update_count > 0 && (
-              <Button size="sm" variant="default" onClick={onUpdateAll}>
-                Update all {plugin.needs_update_count}
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onUpdateAll} title="Update all sites">
+                <ArrowDownToLine className="h-4 w-4" />
               </Button>
             )}
             <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onToggleExpand} title="View sites">
@@ -578,7 +589,7 @@ function PluginRow({
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Version Breakdown */}
+                {/* Version Breakdown - computed from sites data */}
                 <div>
                   <h4 className="text-sm font-semibold mb-2">Version Breakdown</h4>
                   <div className="rounded-md border">
@@ -591,31 +602,42 @@ function PluginRow({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {plugin.version_breakdown.map((vb) => (
-                          <TableRow key={vb.version}>
-                            <TableCell>
-                              <Badge variant="outline">v{vb.version}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {vb.site_count} site{vb.site_count !== 1 ? "s" : ""}
-                            </TableCell>
-                            <TableCell>
-                              {vb.version !== plugin.latest_version ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => onUpdateVersionGroup(vb.version, vb.site_count)}
-                                >
-                                  Update all {vb.site_count} to v{plugin.latest_version}
-                                </Button>
-                              ) : (
-                                <span className="text-sm text-emerald-600 flex items-center gap-1">
-                                  <CheckCircle2 className="h-3 w-3" /> Up to date
-                                </span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {(() => {
+                          const versionBreakdown = sites
+                            ? Object.entries(
+                                sites.reduce<Record<string, number>>((acc, s) => {
+                                  const v = s.installed_version || "unknown";
+                                  acc[v] = (acc[v] || 0) + 1;
+                                  return acc;
+                                }, {})
+                              ).map(([version, site_count]) => ({ version, site_count }))
+                            : [];
+                          return versionBreakdown.map((vb) => (
+                            <TableRow key={vb.version}>
+                              <TableCell>
+                                <Badge variant="outline">v{vb.version}</Badge>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {vb.site_count} site{vb.site_count !== 1 ? "s" : ""}
+                              </TableCell>
+                              <TableCell>
+                                {vb.version !== plugin.latest_version ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onUpdateVersionGroup(vb.version, vb.site_count)}
+                                  >
+                                    Update all {vb.site_count} to v{plugin.latest_version}
+                                  </Button>
+                                ) : (
+                                  <span className="text-sm text-emerald-600 flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" /> Up to date
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ));
+                        })()}
                       </TableBody>
                     </Table>
                   </div>

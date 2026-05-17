@@ -30,7 +30,7 @@ class ExternalPluginController extends Controller
                 plugin_slug,
                 MAX(plugin_name) as plugin_name,
                 COUNT(*) as total_sites,
-                SUM(CASE WHEN update_available = 1 THEN 1 ELSE 0 END) as needs_update_count,
+                SUM(CASE WHEN update_available = true THEN 1 ELSE 0 END) as needs_update_count,
                 MAX(installed_version) as max_installed_version,
                 MIN(installed_version) as min_installed_version,
                 MAX(latest_version) as latest_version
@@ -49,8 +49,8 @@ class ExternalPluginController extends Controller
         // Status filter
         if ($request->filled('status')) {
             match ($request->input('status')) {
-                'has_updates' => $query->havingRaw('needs_update_count > 0'),
-                'up_to_date' => $query->havingRaw('needs_update_count = 0'),
+                'has_updates' => $query->havingRaw('SUM(CASE WHEN update_available = true THEN 1 ELSE 0 END) > 0'),
+                'up_to_date' => $query->havingRaw('SUM(CASE WHEN update_available = true THEN 1 ELSE 0 END) = 0'),
                 default => null,
             };
         }

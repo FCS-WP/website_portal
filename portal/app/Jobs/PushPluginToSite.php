@@ -31,7 +31,24 @@ class PushPluginToSite implements ShouldQueue
         $djs = $this->deploymentJobSite;
         $site = $djs->site;
         $deploymentJob = $djs->deploymentJob;
+
+        // Safety guard: WP.org jobs should be handled by WpOrgPluginJob, not here
+        if ($deploymentJob->isWporgJob()) {
+            Log::warning("PushPluginToSite received a WP.org job (type: {$deploymentJob->job_type}), skipping. Should use WpOrgPluginJob.");
+            return;
+        }
+
         $pluginVersion = $deploymentJob->pluginVersion;
+
+        if (!$pluginVersion) {
+            Log::error("PushPluginToSite: No PluginVersion found for deployment job #{$deploymentJob->id}");
+            $djs->update([
+                'status' => 'failed',
+                'error_message' => 'No plugin version associated with this deployment job.',
+            ]);
+            $this->checkDeploymentCompletion($deploymentJob);
+            return;
+        }
 
         // Mark as running
         $djs->update(['status' => 'running', 'attempt_count' => $djs->attempt_count + 1]);
@@ -103,11 +120,14 @@ class PushPluginToSite implements ShouldQueue
             ]);
 
             // Telegram notification
-            $plugin = $deploymentJob->pluginVersion->plugin;
-            $version = $deploymentJob->pluginVersion->version;
-            TelegramNotificationService::notifyAdminChannel(
-                "🚀 Deployment complete: *{$plugin->name}* v{$version}\n✅ {$successCount} success | ❌ {$failedCount} failed"
-            );
+            $pluginVersion = $deploymentJob->pluginVersion;
+            if ($pluginVersion && $pluginVersion->plugin) {
+                $plugin = $pluginVersion->plugin;
+                $version = $pluginVersion->version;
+                TelegramNotificationService::notifyAdminChannel(
+                    "🚀 Deployment complete: *{$plugin->name}* v{$version}\n✅ {$successCount} success | ❌ {$failedCount} failed"
+                );
+            }
         }
     }
 

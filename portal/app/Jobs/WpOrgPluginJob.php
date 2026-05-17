@@ -19,7 +19,7 @@ class WpOrgPluginJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
-    public int $timeout = 120;
+    public int $timeout = 360;
 
     public function __construct(
         private int $deploymentJobSiteId,
@@ -56,7 +56,7 @@ class WpOrgPluginJob implements ShouldQueue
             ];
 
             $response = match ($this->jobType) {
-                'wporg_install' => Http::timeout(90)->withHeaders($headers)
+                'wporg_install' => Http::timeout(300)->withHeaders($headers)
                     ->post("{$agentUrl}/wp-json/epos-agent/v1/plugins/external/install", [
                         'slug' => $this->pluginSlug,
                         'version' => $this->targetVersion,
@@ -64,13 +64,13 @@ class WpOrgPluginJob implements ShouldQueue
                         'file_hash' => $this->fileHash,
                         'activate' => $this->activate,
                     ]),
-                'wporg_update' => Http::timeout(90)->withHeaders($headers)
+                'wporg_update' => Http::timeout(300)->withHeaders($headers)
                     ->post("{$agentUrl}/wp-json/epos-agent/v1/plugins/external/update", [
                         'slug' => $this->pluginSlug,
                         'download_url' => $this->downloadUrl,
                         'file_hash' => $this->fileHash,
                     ]),
-                'wporg_uninstall' => Http::timeout(60)->withHeaders($headers)
+                'wporg_uninstall' => Http::timeout(300)->withHeaders($headers)
                     ->post("{$agentUrl}/wp-json/epos-agent/v1/plugins/external/uninstall", [
                         'slug' => $this->pluginSlug,
                         'file' => $this->pluginFile,
