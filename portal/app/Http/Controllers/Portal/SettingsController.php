@@ -35,6 +35,7 @@ class SettingsController extends Controller
         $request->validate([
             'telegram_bot_token' => 'nullable|string',
             'telegram_default_chat_id' => 'nullable|string',
+            'telegram_topic_id' => 'nullable|string',
             'portal_base_url' => 'nullable|url',
             'agent_ping_interval_minutes' => 'nullable|integer|min:1|max:60',
             'max_deployment_retries' => 'nullable|integer|min:0|max:10',
@@ -46,6 +47,7 @@ class SettingsController extends Controller
         $allowedKeys = [
             'telegram_bot_token',
             'telegram_default_chat_id',
+            'telegram_topic_id',
             'portal_base_url',
             'agent_ping_interval_minutes',
             'max_deployment_retries',

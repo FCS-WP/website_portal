@@ -38,6 +38,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
         // Hostings
         Route::apiResource('hostings', \App\Http\Controllers\Portal\HostingController::class);
+        Route::get('hostings/{hosting}/credentials', [\App\Http\Controllers\Portal\HostingController::class, 'getCredentials']);
         // Users
         Route::apiResource('users', \App\Http\Controllers\Portal\UserController::class)->except(['show']);
         // Settings

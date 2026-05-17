@@ -24,6 +24,7 @@ export default function SettingsPage() {
 
   const [telegramBotToken, setTelegramBotToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
+  const [telegramTopicId, setTelegramTopicId] = useState("");
   const [portalBaseUrl, setPortalBaseUrl] = useState("");
   const [agentPingInterval, setAgentPingInterval] = useState("");
   const [maxDeploymentRetries, setMaxDeploymentRetries] = useState("");
@@ -42,6 +43,7 @@ export default function SettingsPage() {
       setTelegramBotToken(data.telegram_bot_token || "");
       setOriginalMaskedToken(data.telegram_bot_token || "");
       setTelegramChatId(data.telegram_default_chat_id || "");
+      setTelegramTopicId(data.telegram_topic_id || "");
       setPortalBaseUrl(data.portal_base_url || "");
       setAgentPingInterval(data.agent_ping_interval_minutes || "");
       setMaxDeploymentRetries(data.max_deployment_retries || "");
@@ -57,6 +59,7 @@ export default function SettingsPage() {
     try {
       const payload: Record<string, string | number | null> = {
         telegram_default_chat_id: telegramChatId,
+        telegram_topic_id: telegramTopicId || null,
         portal_base_url: portalBaseUrl,
         agent_ping_interval_minutes: agentPingInterval,
         max_deployment_retries: maxDeploymentRetries,
@@ -176,6 +179,20 @@ export default function SettingsPage() {
                 @userinfobot
               </a>{" "}
               or check the Telegram API to find your chat ID
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="telegram-topic-id">Topic ID (Optional)</Label>
+            <Input
+              id="telegram-topic-id"
+              value={telegramTopicId}
+              onChange={(e) => setTelegramTopicId(e.target.value)}
+              placeholder="123"
+            />
+            <p className="text-xs text-muted-foreground">
+              For forum/topic-enabled groups, specify the message_thread_id to send
+              notifications to a specific topic. Leave empty to send to the general chat.
             </p>
           </div>
 

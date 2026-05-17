@@ -8,12 +8,14 @@ export interface ShareLink {
   credential_types?: { id: number; name: string; slug: string }[];
   expires_at: string;
   max_views: number;
-  views_count: number;
+  view_count: number;
   is_password_protected: boolean;
   last_accessed_at: string | null;
   last_accessed_ip: string | null;
+  revoked_at: string | null;
   created_at: string;
-  created_by?: { id: number; name: string };
+  created_by?: { id: number; name: string } | string;
+  status: 'active' | 'expired' | 'exhausted' | 'revoked';
 }
 
 export interface ShareLinkCreateResponse {

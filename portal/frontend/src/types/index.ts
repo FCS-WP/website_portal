@@ -15,9 +15,20 @@ export interface Hosting {
   name: string;
   provider: string;
   note: string | null;
+  ip_address: string | null;
+  username: string | null;
+  panel_url: string | null;
+  has_credentials: boolean;
   sites_count?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface HostingCredentials {
+  username: string | null;
+  password: string | null;
+  ip_address: string | null;
+  panel_url: string | null;
 }
 
 export interface Site {

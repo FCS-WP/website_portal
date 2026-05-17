@@ -25,10 +25,14 @@ class HostingController extends Controller
 
     public function store(StoreHostingRequest $request)
     {
-        $hosting = Hosting::create([
-            ...$request->validated(),
-            'created_by' => $request->user()->id,
-        ]);
+        $data = $request->validated();
+        if (isset($data['password'])) {
+            $data['password_encrypted'] = $data['password'];
+            unset($data['password']);
+        }
+        $data['created_by'] = $request->user()->id;
+
+        $hosting = Hosting::create($data);
 
         ActivityLogService::log(
             'hosting.created',
@@ -48,7 +52,12 @@ class HostingController extends Controller
 
     public function update(UpdateHostingRequest $request, Hosting $hosting)
     {
-        $hosting->update($request->validated());
+        $data = $request->validated();
+        if (isset($data['password'])) {
+            $data['password_encrypted'] = $data['password'];
+            unset($data['password']);
+        }
+        $hosting->update($data);
 
         ActivityLogService::log(
             'hosting.updated',
@@ -58,6 +67,18 @@ class HostingController extends Controller
         );
 
         return $this->successResponse($hosting, 'Hosting updated successfully.');
+    }
+
+    public function getCredentials(Hosting $hosting)
+    {
+        return response()->json([
+            'data' => [
+                'username' => $hosting->username,
+                'password' => $hosting->password_encrypted,
+                'ip_address' => $hosting->ip_address,
+                'panel_url' => $hosting->panel_url,
+            ]
+        ]);
     }
 
     public function destroy(Request $request, Hosting $hosting)

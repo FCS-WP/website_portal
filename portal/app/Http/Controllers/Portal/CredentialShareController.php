@@ -91,9 +91,18 @@ class CredentialShareController extends Controller
             'last_accessed_ip' => $link->last_accessed_ip,
             'revoked_at' => $link->revoked_at?->toISOString(),
             'created_at' => $link->created_at?->toISOString(),
+            'status' => $this->getLinkStatus($link),
         ]);
 
         return $this->successResponse($data);
+    }
+
+    private function getLinkStatus(CredentialShareLink $link): string
+    {
+        if ($link->revoked_at) return 'revoked';
+        if ($link->expires_at && $link->expires_at->isPast()) return 'expired';
+        if ($link->max_views && $link->view_count >= $link->max_views) return 'exhausted';
+        return 'active';
     }
 
     /**
@@ -111,7 +120,7 @@ class CredentialShareController extends Controller
             'revoked_by' => $request->user()->id,
         ]);
 
-        return response()->json(['message' => 'Share link revoked'], 200);
+        return $this->successResponse(['revoked_id' => $link->id], 'Share link revoked');
     }
 
     /**

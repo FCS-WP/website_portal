@@ -15,8 +15,36 @@ class Hosting extends Model
         'name',
         'provider',
         'note',
+        'ip_address',
+        'username',
+        'password_encrypted',
+        'panel_url',
         'created_by',
     ];
+
+    protected $hidden = ['password_encrypted'];
+
+    protected $appends = ['has_credentials'];
+
+    public function getHasCredentialsAttribute(): bool
+    {
+        return !empty($this->attributes['password_encrypted']);
+    }
+
+    public function setPasswordEncryptedAttribute($value)
+    {
+        $this->attributes['password_encrypted'] = $value ? encrypt($value) : null;
+    }
+
+    public function getPasswordEncryptedAttribute($value)
+    {
+        if ($value === null) return null;
+        try {
+            return decrypt($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
 
     public function sites(): HasMany
     {

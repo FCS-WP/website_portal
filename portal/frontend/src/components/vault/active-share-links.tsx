@@ -12,6 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
   Trash2,
@@ -24,7 +25,7 @@ import {
   ShareLink,
 } from "@/lib/services/credential-shares";
 import { toast } from "sonner";
-import { formatDistanceToNow, isPast, parseISO } from "date-fns";
+import { formatDistanceToNow, parseISO } from "date-fns";
 
 interface ActiveShareLinksProps {
   siteId: number | string;
@@ -62,8 +63,15 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
     setRevokeLoading(true);
     try {
       await credentialShareService.revoke(siteId, revokingId);
+      // Optimistically mark the revoked link as revoked
+      setLinks((prev) =>
+        prev.map((l) =>
+          l.id === revokingId
+            ? { ...l, status: 'revoked' as const, revoked_at: new Date().toISOString() }
+            : l
+        )
+      );
       toast.success("Share link revoked");
-      fetchLinks();
     } catch {
       toast.error("Failed to revoke share link");
     } finally {
@@ -83,14 +91,22 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
   }
 
   if (links.length === 0) {
-    return null;
+    return (
+      <div className="mt-8 space-y-3">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <LinkIcon className="h-4 w-4" />
+          Share Links
+        </h3>
+        <p className="text-sm text-muted-foreground">No share links created yet.</p>
+      </div>
+    );
   }
 
   return (
     <div className="mt-8 space-y-3">
       <h3 className="text-sm font-semibold flex items-center gap-2">
         <LinkIcon className="h-4 w-4" />
-        Active share links
+        Share Links
       </h3>
 
       <Card>
@@ -100,6 +116,9 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="text-left font-medium px-4 py-2.5">Shared</th>
+                  <th className="text-left font-medium px-4 py-2.5">
+                    Status
+                  </th>
                   <th className="text-left font-medium px-4 py-2.5">
                     Includes
                   </th>
@@ -117,11 +136,11 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
               </thead>
               <tbody>
                 {links.map((link) => {
-                  const expired = isPast(parseISO(link.expires_at));
-                  const maxReached = link.views_count >= link.max_views;
+                  const isActive = link.status === 'active';
+                  const maxReached = link.view_count >= link.max_views;
 
                   return (
-                    <tr key={link.id} className="border-b last:border-b-0">
+                    <tr key={link.id} className={`border-b last:border-b-0${!isActive ? ' opacity-60' : ''}`}>
                       {/* Shared */}
                       <td className="px-4 py-3">
                         <div className="text-xs text-muted-foreground">
@@ -131,8 +150,32 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
                         </div>
                         {link.created_by && (
                           <div className="text-xs text-muted-foreground">
-                            by {link.created_by.name}
+                            by {typeof link.created_by === 'string' ? link.created_by : link.created_by.name}
                           </div>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3">
+                        {link.status === 'active' && (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                            Active
+                          </Badge>
+                        )}
+                        {link.status === 'expired' && (
+                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
+                            Expired
+                          </Badge>
+                        )}
+                        {link.status === 'exhausted' && (
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
+                            Views Used
+                          </Badge>
+                        )}
+                        {link.status === 'revoked' && (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                            Revoked
+                          </Badge>
                         )}
                       </td>
 
@@ -156,7 +199,7 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
 
                       {/* Expires */}
                       <td className="px-4 py-3">
-                        {expired ? (
+                        {link.status === 'expired' ? (
                           <span className="text-xs text-destructive font-medium">
                             Expired
                           </span>
@@ -173,7 +216,7 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs">
-                            {link.views_count}/
+                            {link.view_count}/
                             {link.max_views === 9999
                               ? "∞"
                               : link.max_views}
@@ -207,15 +250,17 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
 
                       {/* Action */}
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRevokeClick(link.id)}
-                          className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          Revoke
-                        </Button>
+                        {isActive && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRevokeClick(link.id)}
+                            className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Revoke
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );

@@ -15,8 +15,12 @@ class StoreHostingRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255|unique:hostings,name',
-            'provider' => 'required|string|in:cloudways,cpanel,runcloud,vultr,digitalocean,other',
+            'provider' => 'required|string|in:cloudways,cpanel,runcloud,vultr,digitalocean,gridpane,spinupwp,forge,ploi,other',
             'note' => 'nullable|string',
+            'ip_address' => 'nullable|string|max:45',
+            'username' => 'nullable|string|max:255',
+            'password' => 'nullable|string|max:500',
+            'panel_url' => 'nullable|url|max:500',
         ];
     }
 }

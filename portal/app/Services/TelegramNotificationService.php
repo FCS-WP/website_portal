@@ -23,13 +23,20 @@ class TelegramNotificationService
         }
 
         try {
+            $payload = [
+                'chat_id' => $chatId,
+                'text' => $message,
+                'parse_mode' => 'Markdown',
+            ];
+
+            $topicId = self::getTopicId();
+            if ($topicId) {
+                $payload['message_thread_id'] = (int) $topicId;
+            }
+
             $response = Http::timeout(10)->post(
                 "https://api.telegram.org/bot{$token}/sendMessage",
-                [
-                    'chat_id' => $chatId,
-                    'text' => $message,
-                    'parse_mode' => 'Markdown',
-                ]
+                $payload
             );
 
             if ($response->successful()) {
@@ -76,22 +83,35 @@ class TelegramNotificationService
     }
 
     /**
-     * Get the bot token from settings (cached).
+     * Get the bot token from settings (cached), with env fallback.
      */
     private static function getBotToken(): ?string
     {
         return Cache::remember('telegram_bot_token', 300, function () {
-            return PortalSetting::where('key', 'telegram_bot_token')->value('value');
+            $dbValue = PortalSetting::where('key', 'telegram_bot_token')->value('value');
+            return !empty($dbValue) ? $dbValue : config('services.telegram.bot_token');
         });
     }
 
     /**
-     * Get the default chat ID from settings (cached).
+     * Get the default chat ID from settings (cached), with env fallback.
      */
     private static function getDefaultChatId(): ?string
     {
         return Cache::remember('telegram_default_chat_id', 300, function () {
-            return PortalSetting::where('key', 'telegram_default_chat_id')->value('value');
+            $dbValue = PortalSetting::where('key', 'telegram_default_chat_id')->value('value');
+            return !empty($dbValue) ? $dbValue : config('services.telegram.chat_id');
+        });
+    }
+
+    /**
+     * Get the topic ID from settings (cached), with env fallback.
+     */
+    private static function getTopicId(): ?string
+    {
+        return Cache::remember('telegram_topic_id', 300, function () {
+            $dbValue = PortalSetting::where('key', 'telegram_topic_id')->value('value');
+            return !empty($dbValue) ? $dbValue : config('services.telegram.topic_id');
         });
     }
 
@@ -102,5 +122,6 @@ class TelegramNotificationService
     {
         Cache::forget('telegram_bot_token');
         Cache::forget('telegram_default_chat_id');
+        Cache::forget('telegram_topic_id');
     }
 }

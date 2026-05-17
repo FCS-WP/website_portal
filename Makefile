@@ -4,6 +4,8 @@
        db-shell \
        queue queue-stop queue-restart schedule schedule-run \
        workers-up workers-down workers-logs \
+       ping \
+       wp-cron \
        fresh setup
 
 # Variables
@@ -119,6 +121,16 @@ workers-logs: ## Tail queue + scheduler logs
 
 db-shell: ## Open psql shell inside DB container
 	$(DC) exec postgres psql -U $${DB_USERNAME:-epos} -d $${DB_DATABASE:-epos_portal}
+
+# ─── Site Monitoring ────────────────────────────────────────────────────────
+
+ping: ## Ping all sites to check connectivity
+	$(EXEC) php artisan sites:ping
+
+# ─── WP Agent ──────────────────────────────────────────────────────────────
+
+wp-cron: ## Trigger WP cron manually (for testing)
+	docker exec epos_com curl -s http://localhost/wp-cron.php?doing_wp_cron
 
 # ─── Utilities ───────────────────────────────────────────────────────────────
 

@@ -16,8 +16,12 @@ class UpdateHostingRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:255', Rule::unique('hostings', 'name')->ignore($this->hosting)],
-            'provider' => 'sometimes|string|in:cloudways,cpanel,runcloud,vultr,digitalocean,other',
+            'provider' => 'sometimes|string|in:cloudways,cpanel,runcloud,vultr,digitalocean,gridpane,spinupwp,forge,ploi,other',
             'note' => 'nullable|string',
+            'ip_address' => 'nullable|string|max:45',
+            'username' => 'nullable|string|max:255',
+            'password' => 'nullable|string|max:500',
+            'panel_url' => 'nullable|url|max:500',
         ];
     }
 }
