@@ -14,6 +14,9 @@ import {
   Mail,
   FileText,
   CalendarClock,
+  Shield,
+  AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
@@ -58,6 +61,14 @@ export function AppSidebar({ offlineSitesCount }: { offlineSitesCount?: number }
         { name: "Repository", href: "/plugins", icon: Puzzle },
         { name: "Deployments", href: "/deployments", icon: Rocket },
         { name: "Scheduled", href: "/deployments/scheduled", icon: CalendarClock },
+      ],
+    },
+    {
+      label: "SECURITY",
+      items: [
+        { name: "Overview", href: "/security", icon: Shield },
+        { name: "Alerts", href: "/security/alerts", icon: AlertTriangle },
+        { name: "2FA Management", href: "/security/2fa", icon: Lock },
       ],
     },
     {

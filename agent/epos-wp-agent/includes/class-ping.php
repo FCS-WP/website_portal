@@ -47,6 +47,13 @@ class Epos_Agent_Ping {
             $body['orders'] = $order_sync->get_recent_orders();
         }
 
+        // Include security data
+        $body['security'] = [
+            'login_events'    => Epos_Agent_Security_Login_Monitor::flush_buffer(),
+            'baseline_exists' => !empty(get_option('epos_agent_file_baseline', '')),
+            'admin_count'     => count(get_users(['role' => 'administrator'])),
+        ];
+
         $response = wp_remote_post(
             rtrim($portal_url, '/') . '/api/agent/ping',
             [

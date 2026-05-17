@@ -45,6 +45,27 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/settings', [\App\Http\Controllers\Portal\SettingsController::class, 'index']);
         Route::put('/settings', [\App\Http\Controllers\Portal\SettingsController::class, 'update']);
         Route::post('/settings/telegram/test', [\App\Http\Controllers\Portal\SettingsController::class, 'testTelegram']);
+
+        // Security
+        Route::prefix('security')->group(function () {
+            Route::get('/overview', [\App\Http\Controllers\Portal\SecurityController::class, 'overview']);
+            Route::get('/alerts', [\App\Http\Controllers\Portal\SecurityController::class, 'alerts']);
+            Route::patch('/alerts/{alert}', [\App\Http\Controllers\Portal\SecurityController::class, 'updateAlert']);
+            Route::get('/vulnerabilities', [\App\Http\Controllers\Portal\SecurityController::class, 'vulnerabilities']);
+            Route::get('/vulnerability-definitions', [\App\Http\Controllers\Portal\SecurityController::class, 'vulnerabilityDefinitions']);
+            Route::get('/scores', [\App\Http\Controllers\Portal\SecurityController::class, 'scores']);
+            Route::get('/2fa-dashboard', [\App\Http\Controllers\Portal\SecurityController::class, 'twofaDashboard']);
+            Route::get('/sites/{site}', [\App\Http\Controllers\Portal\SecurityController::class, 'siteSecurityDetail']);
+            Route::get('/sites/{site}/file-findings', [\App\Http\Controllers\Portal\SecurityController::class, 'siteFileFindings']);
+            Route::get('/sites/{site}/login-events', [\App\Http\Controllers\Portal\SecurityController::class, 'siteLoginEvents']);
+            Route::get('/sites/{site}/admin-users', [\App\Http\Controllers\Portal\SecurityController::class, 'siteAdminUsers']);
+            Route::get('/sites/{site}/2fa', [\App\Http\Controllers\Portal\SecurityController::class, 'site2faStatus']);
+            Route::post('/sites/{site}/2fa/enable', [\App\Http\Controllers\Portal\SecurityController::class, 'enable2fa']);
+            Route::post('/sites/{site}/2fa/disable', [\App\Http\Controllers\Portal\SecurityController::class, 'disable2fa']);
+            Route::post('/sites/{site}/scan/files', [\App\Http\Controllers\Portal\SecurityController::class, 'triggerFileScan']);
+            Route::post('/sites/{site}/baseline/create', [\App\Http\Controllers\Portal\SecurityController::class, 'triggerBaselineCreate']);
+            Route::post('/sites/{site}/score/recalculate', [\App\Http\Controllers\Portal\SecurityController::class, 'recalculateScore']);
+        });
     });
 
     // Admin + Dev routes

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Builder;
 
 class Site extends Model
@@ -71,6 +72,51 @@ class Site extends Model
     public function deploymentJobSites(): HasMany
     {
         return $this->hasMany(DeploymentJobSite::class);
+    }
+
+    public function securityAlerts(): HasMany
+    {
+        return $this->hasMany(SecurityAlert::class);
+    }
+
+    public function fileIntegrityBaseline(): HasOne
+    {
+        return $this->hasOne(FileIntegrityBaseline::class);
+    }
+
+    public function fileIntegrityFindings(): HasMany
+    {
+        return $this->hasMany(FileIntegrityFinding::class);
+    }
+
+    public function siteVulnerabilities(): HasMany
+    {
+        return $this->hasMany(SiteVulnerability::class);
+    }
+
+    public function loginEvents(): HasMany
+    {
+        return $this->hasMany(LoginEvent::class);
+    }
+
+    public function siteAdminUsers(): HasMany
+    {
+        return $this->hasMany(SiteAdminUser::class);
+    }
+
+    public function site2faSetting(): HasOne
+    {
+        return $this->hasOne(Site2faSetting::class);
+    }
+
+    public function securityScores(): HasMany
+    {
+        return $this->hasMany(SiteSecurityScore::class);
+    }
+
+    public function securityScanRuns(): HasMany
+    {
+        return $this->hasMany(SecurityScanRun::class);
     }
 
     /**

@@ -22,10 +22,11 @@ import { siteService } from "@/lib/services/sites";
 import { Site } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical } from "lucide-react";
+import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical, Shield } from "lucide-react";
 import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
 import { SiteActivityTab } from "@/components/sites/site-activity-tab";
 import { SiteCredentialsTab } from "@/components/sites/site-credentials-tab";
+import { SiteSecurityTab } from "@/components/sites/site-security-tab";
 import { ApiKeyDialog } from "@/components/sites/api-key-dialog";
 
 export default function SiteDetailPage() {
@@ -148,23 +149,18 @@ export default function SiteDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <h1 className="text-3xl font-bold">{site.name}</h1>
-        <StatusBadge status={site.status} />
-        {site.is_beta_tester && (
-          <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">BETA</span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant={site.is_beta_tester ? "default" : "outline"}
-            size="sm"
-            onClick={handleToggleBeta}
-            disabled={togglingBeta}
-            className={site.is_beta_tester ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
-          >
-            <FlaskConical className="mr-2 h-4 w-4" />
-            {togglingBeta ? "Updating..." : site.is_beta_tester ? "Beta Tester ✓" : "Enable Beta"}
-          </Button>
+      <div className="space-y-4">
+        {/* Title row */}
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">{site.name}</h1>
+          <StatusBadge status={site.status} />
+          {site.is_beta_tester && (
+            <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-medium">BETA</span>
+          )}
+        </div>
+
+        {/* Actions row */}
+        <div className="flex items-center gap-2 flex-wrap">
           {["connected", "online"].includes(site.status) && (
             <Button
               variant="outline"
@@ -172,26 +168,38 @@ export default function SiteDetailPage() {
               onClick={handleAutologin}
               disabled={autologinLoading}
             >
-              <ExternalLink className="mr-2 h-4 w-4" />
+              <ExternalLink className="mr-1.5 h-4 w-4" />
               {autologinLoading ? "Opening..." : "Open WP Admin"}
             </Button>
           )}
+          <Button
+            variant={site.is_beta_tester ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleBeta}
+            disabled={togglingBeta}
+            className={site.is_beta_tester ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
+          >
+            <FlaskConical className="mr-1.5 h-4 w-4" />
+            {togglingBeta ? "Updating..." : site.is_beta_tester ? "Beta Tester ✓" : "Enable Beta"}
+          </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setRegenerateDialogOpen(true)}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
+            <RefreshCw className="mr-1.5 h-4 w-4" />
             Regenerate API Key
           </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete Site
-          </Button>
+          <div className="ml-auto">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              Delete Site
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -257,6 +265,10 @@ export default function SiteDetailPage() {
             Credentials
           </TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="security" className="gap-1">
+            <Shield className="h-3.5 w-3.5" />
+            Security
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -425,6 +437,10 @@ export default function SiteDetailPage() {
 
         <TabsContent value="activity" className="mt-6">
           <SiteActivityTab siteId={site.id} />
+        </TabsContent>
+
+        <TabsContent value="security" className="mt-6">
+          <SiteSecurityTab siteId={site.id} />
         </TabsContent>
       </Tabs>
     </div>

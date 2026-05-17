@@ -378,34 +378,19 @@ export function SiteCredentialsTab({
 
   const uniqueTypes = getUniqueTypes(credentials);
   const grouped = groupByType(credentials);
-  const hasWordPress = credentials.some((c) => c.credential_type.slug === "wordpress");
 
   return (
     <div className="space-y-4">
       {/* Top action bar */}
       <div className="flex items-center justify-end gap-2">
-        {hasWordPress && (
-          <Button
-            variant="outline"
-            onClick={handleAutologin}
-            disabled={autologinLoading}
-          >
-            {autologinLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            ) : (
-              <ExternalLink className="h-4 w-4 mr-1" />
-            )}
-            Open WP Admin
-          </Button>
-        )}
         {isAdmin && (
-          <Button variant="outline" onClick={() => setShareDialogOpen(true)}>
-            <Share2 className="h-4 w-4 mr-1" />
+          <Button variant="outline" size="sm" onClick={() => setShareDialogOpen(true)}>
+            <Share2 className="h-4 w-4 mr-1.5" />
             Share with client
           </Button>
         )}
-        <Button onClick={handleAddClick}>
-          <Plus className="h-4 w-4 mr-1" />
+        <Button size="sm" onClick={handleAddClick}>
+          <Plus className="h-4 w-4 mr-1.5" />
           Add Credentials
         </Button>
       </div>

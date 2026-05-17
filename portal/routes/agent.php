@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Agent\AgentController;
+use App\Http\Controllers\Agent\SecurityReportController;
 use App\Http\Controllers\Portal\AutologinController;
 
 /*
@@ -21,4 +22,12 @@ Route::middleware(\App\Http\Middleware\AgentAuthMiddleware::class)->group(functi
     Route::post('/verify-login-token', [AutologinController::class, 'verifyToken']);
     Route::post('/sync-credentials', [AgentController::class, 'syncCredentials']);
     Route::post('/deployment/health-report', [AgentController::class, 'healthReport']);
+
+    // Security reporting endpoints
+    Route::post('/security/baseline', [SecurityReportController::class, 'storeBaseline']);
+    Route::post('/security/file-report', [SecurityReportController::class, 'storeFileReport']);
+    Route::post('/security/login-events', [SecurityReportController::class, 'storeLoginEvents']);
+    Route::post('/security/user-alert', [SecurityReportController::class, 'handleUserAlert']);
+    Route::post('/security/users-sync', [SecurityReportController::class, 'syncAdminUsers']);
+    Route::post('/security/2fa-status', [SecurityReportController::class, 'store2faStatus']);
 });

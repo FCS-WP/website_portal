@@ -35,6 +35,11 @@ require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-smtp-config.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-autologin.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-health-check.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-rollback.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-file-monitor.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-login-monitor.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-user-monitor.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-2fa-manager.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-api.php';
 
 // Activation / Deactivation hooks
 register_activation_hook(__FILE__, ['Epos_Agent_Activator', 'activate']);
@@ -62,6 +67,11 @@ function epos_agent_init() {
 
     // Initialize health check cron handler
     Epos_Agent_Health_Check::init();
+
+    // Initialize security modules
+    Epos_Agent_Security_Api::init();
+    Epos_Agent_Security_Login_Monitor::init();
+    Epos_Agent_Security_User_Monitor::init();
 }
 add_action('init', 'epos_agent_init');
 
