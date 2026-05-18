@@ -12,7 +12,11 @@
 
 # Variables
 DC = docker-compose
-DC_PROD = docker-compose -f docker-compose.yml -f docker-compose.prod.yml
+# Dev/prod are now selected via docker-compose `profiles:` (defined in
+# docker-compose.yml). The frontend-dev and frontend-prod services are
+# mutually exclusive — pick one with `--profile dev` or `--profile prod`.
+DC_DEV  = $(DC) --profile dev
+DC_PROD = $(DC) --profile prod
 EXEC = $(DC) exec -T -w /var/www/portal app
 EXEC_IT = $(DC) exec -w /var/www/portal app
 FRONTEND_DIR = portal/frontend
@@ -30,62 +34,67 @@ help: ## Show this help
 
 # ─── Docker ──────────────────────────────────────────────────────────────────
 
-up: ## Start all containers (detached)
-	$(DC) up -d
+up: ## Start DEV stack (next dev + HMR). Run `make use-dev-env` first.
+	$(DC_DEV) up -d
 
-down: ## Stop all containers
-	$(DC) down
+down: ## Stop ALL containers (any profile)
+	$(DC) --profile dev --profile prod down
 
-restart: ## Restart all containers
-	$(DC) restart
+restart: ## Restart DEV containers
+	$(DC_DEV) restart
 
-rebuild: ## Rebuild and restart containers
-	$(DC) up -d --build
+rebuild: ## Rebuild + restart DEV
+	$(DC_DEV) up -d --build
 
-logs: ## Tail all container logs
-	$(DC) logs -f
+logs: ## Tail DEV logs
+	$(DC_DEV) logs -f
 
-ps: ## Show running containers
+ps: ## Show running containers (any profile)
 	$(DC) ps
 
 # ─── Production ──────────────────────────────────────────────────────────────
 
-up-prod: ## Start prod stack (uses docker-compose.prod.yml overlay)
+up-prod: ## Start PROD stack (next build + start). Run `make use-prod-env` first.
 	$(DC_PROD) up -d
 
-down-prod: ## Stop prod stack
+down-prod: ## Stop PROD containers
 	$(DC_PROD) down
 
-restart-prod: ## Restart prod stack
+restart-prod: ## Restart PROD containers
 	$(DC_PROD) restart
 
-rebuild-prod: ## Rebuild and restart prod stack
+rebuild-prod: ## Rebuild + restart PROD
 	$(DC_PROD) up -d --build
 
-logs-prod: ## Tail prod logs
+logs-prod: ## Tail PROD logs
 	$(DC_PROD) logs -f
 
-ps-prod: ## Show prod containers
+ps-prod: ## Show PROD containers
 	$(DC_PROD) ps
 
-use-prod-env: ## Swap portal/.env -> portal/.env.production (backup current as .env.dev.bak)
-	@cp -n portal/.env portal/.env.dev.bak 2>/dev/null || true
-	cp portal/.env.production portal/.env
-	@echo "✔ portal/.env now points at production. Backup at portal/.env.dev.bak"
-	@echo "  Run: make up-prod && make artisan cmd=\"config:cache\""
+use-dev-env: ## Switch to DEV mode (copies .env.dev templates into live envs)
+	@test -f portal/.env.dev || (echo "✗ portal/.env.dev missing — run snapshot first" && exit 1)
+	@test -f portal/frontend/.env.local.dev || (echo "✗ portal/frontend/.env.local.dev missing" && exit 1)
+	cp portal/.env.dev portal/.env
+	cp portal/frontend/.env.local.dev portal/frontend/.env.local
+	@echo "✔ Switched to DEV mode."
+	@echo "  Next: 'make down && docker compose --profile dev up -d --build' (or 'make up')"
 
-use-dev-env: ## Restore portal/.env from portal/.env.dev.bak
-	@test -f portal/.env.dev.bak || (echo "No portal/.env.dev.bak found"; exit 1)
-	cp portal/.env.dev.bak portal/.env
-	@echo "✔ portal/.env restored from dev backup."
+use-prod-env: ## Switch to PROD mode (copies .env.prod templates into live envs)
+	@test -f portal/.env.prod || (echo "✗ portal/.env.prod missing — run snapshot first" && exit 1)
+	@test -f portal/frontend/.env.local.prod || (echo "✗ portal/frontend/.env.local.prod missing" && exit 1)
+	cp portal/.env.prod portal/.env
+	cp portal/frontend/.env.local.prod portal/frontend/.env.local
+	@echo "✔ Switched to PROD mode."
+	@echo "  Next: 'make down && docker compose --profile prod up -d --build'"
 
-prod-setup: ## First-time prod setup on this host: swap env, build, migrate, cache
+prod-setup: ## First-time prod bring-up: swap to prod env, build, migrate, cache routes
 	$(MAKE) use-prod-env
-	$(DC_PROD) up -d --build
-	$(DC_PROD) exec -T app chmod -R 777 /var/www/portal/storage /var/www/portal/bootstrap/cache
-	$(DC_PROD) exec -T -w /var/www/portal app php artisan migrate --force
-	$(DC_PROD) exec -T -w /var/www/portal app php artisan config:cache
-	$(DC_PROD) exec -T -w /var/www/portal app php artisan route:cache
+	$(DC) --profile prod up -d --build
+	$(DC) exec -T app chmod -R 777 /var/www/portal/storage /var/www/portal/bootstrap/cache
+	$(DC) exec -T -w /var/www/portal app php artisan migrate --force
+	$(DC) exec -T -w /var/www/portal app php artisan config:cache
+	$(DC) exec -T -w /var/www/portal app php artisan route:cache
 	@echo ""
 	@echo "✔ Prod up. Tunnel should route portal.theshin.info -> :3000 and web-backend.theshin.info -> :8000"
 

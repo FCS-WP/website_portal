@@ -104,7 +104,7 @@ export function OrderSearchModal({ open, onOpenChange, defaultSiteId = null }: P
 
           <div className="space-y-1">
             <Label htmlFor="siteId">Site (optional)</Label>
-            <Select value={siteId} onValueChange={setSiteId}>
+            <Select value={siteId} onValueChange={(v) => setSiteId(v ?? "all")}>
               <SelectTrigger><SelectValue placeholder="All sites" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All sites</SelectItem>

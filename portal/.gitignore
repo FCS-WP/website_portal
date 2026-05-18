@@ -3,6 +3,10 @@
 .env
 .env.backup
 .env.production
+# Dev/prod mode templates contain real secrets (APP_KEY, VAULT_MASTER_KEY,
+# admin password, Telegram token) — kept gitignored alongside the live .env.
+.env.dev
+.env.prod
 .phpactor.json
 .phpunit.result.cache
 /.fleet

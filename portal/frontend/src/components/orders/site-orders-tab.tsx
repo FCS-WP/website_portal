@@ -143,7 +143,7 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+        <Select value={status} onValueChange={(v) => { setStatus(v ?? "all"); setPage(1); }}>
           <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
@@ -153,7 +153,7 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={payment} onValueChange={(v) => { setPayment(v); setPage(1); }}>
+        <Select value={payment} onValueChange={(v) => { setPayment(v ?? "all"); setPage(1); }}>
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All payments</SelectItem>
@@ -163,7 +163,7 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={range} onValueChange={(v) => { setRange(v); setPage(1); }}>
+        <Select value={range} onValueChange={(v) => { setRange(v ?? "7d"); setPage(1); }}>
           <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {DATE_RANGES.map((r) => (

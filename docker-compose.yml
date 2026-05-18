@@ -26,7 +26,19 @@ services:
     depends_on:
       - app
 
-  frontend:
+  # ── Frontend ────────────────────────────────────────────────────────────
+  # Two services, gated by docker-compose `profiles:`. Exactly ONE runs at a
+  # time (whichever profile you pass to `up`). They share the same host port
+  # and container name so the rest of the stack (nginx, tunnel) doesn't need
+  # to know which mode is active.
+  #
+  # Switch modes:
+  #   make use-dev-env  && docker compose --profile dev  up -d --build
+  #   make use-prod-env && docker compose --profile prod up -d --build
+  #
+  # The `make up` / `make up-prod` targets wrap these.
+
+  frontend-dev:
     image: node:20-alpine
     container_name: epos-frontend
     working_dir: /var/www/frontend
@@ -34,11 +46,37 @@ services:
       - ./portal/frontend:/var/www/frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+    # DEV: next dev with HMR. portal/frontend/.env.local must contain
+    #   NEXT_PUBLIC_API_URL=/api  +  API_PROXY_TARGET=http://nginx
     command: sh -c "npm install && npm run dev"
     networks:
       - epos-network
     depends_on:
       - nginx
+    profiles:
+      - dev
+
+  frontend-prod:
+    image: node:20-alpine
+    container_name: epos-frontend
+    working_dir: /var/www/frontend
+    volumes:
+      - ./portal/frontend:/var/www/frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    # PROD: install ALL deps (Tailwind v4 + TS need devDependencies even in
+    # prod builds), build the bundle once, serve. NEXT_PUBLIC_* are inlined
+    # into the bundle at build time — portal/frontend/.env.local must point
+    # at the public backend URL (e.g. https://web-backend.theshin.info/api).
+    command: sh -c "npm ci --include=dev && npm run build && npm run start -- -H 0.0.0.0 -p 3000"
+    environment:
+      NODE_ENV: production
+    networks:
+      - epos-network
+    depends_on:
+      - nginx
+    profiles:
+      - prod
 
   postgres:
     image: postgres:15-alpine

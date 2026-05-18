@@ -126,7 +126,7 @@ export default function ActivityLogsPage() {
 
         {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={action} onValueChange={(v) => { setAction(v); setPage(1); }}>
+          <Select value={action} onValueChange={(v) => { setAction(v ?? "all"); setPage(1); }}>
             <SelectTrigger className="w-[200px]"><SelectValue placeholder="All actions" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All actions</SelectItem>
@@ -136,7 +136,7 @@ export default function ActivityLogsPage() {
             </SelectContent>
           </Select>
 
-          <Select value={userId} onValueChange={(v) => { setUserId(v); setPage(1); }}>
+          <Select value={userId} onValueChange={(v) => { setUserId(v ?? "all"); setPage(1); }}>
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="All users" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All users</SelectItem>
@@ -146,7 +146,7 @@ export default function ActivityLogsPage() {
             </SelectContent>
           </Select>
 
-          <Select value={siteId} onValueChange={(v) => { setSiteId(v); setPage(1); }}>
+          <Select value={siteId} onValueChange={(v) => { setSiteId(v ?? "all"); setPage(1); }}>
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="All sites" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All sites</SelectItem>
@@ -156,7 +156,7 @@ export default function ActivityLogsPage() {
             </SelectContent>
           </Select>
 
-          <Select value={range} onValueChange={(v) => { setRange(v); setPage(1); }}>
+          <Select value={range} onValueChange={(v) => { setRange(v ?? "7d"); setPage(1); }}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {DATE_RANGES.map((r) => (
