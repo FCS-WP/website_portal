@@ -11,12 +11,24 @@
        fresh setup env-copy
 
 # Variables
-DC = docker-compose
-# Dev/prod are now selected via docker-compose `profiles:` (defined in
+#
+# This laptop still has the legacy `docker-compose` v1 binary, while the prod
+# box only ships the v2 plugin (`docker compose`, two words). Rather than
+# forcing one or the other, dev targets use DC (v1) and prod targets use
+# DC_BIN (v2). Both read the same docker-compose.yml.
+DC      = docker-compose
+DC_BIN  = docker compose
+# Dev/prod are selected via docker-compose `profiles:` (defined in
 # docker-compose.yml). The frontend-dev and frontend-prod services are
-# mutually exclusive — pick one with `--profile dev` or `--profile prod`.
+# mutually exclusive; queue + scheduler live under the `worker` profile so
+# they're only on when explicitly requested.
+#
+# DC_PROD stacks `--profile prod --profile worker` so production always runs
+# the queue worker and the artisan scheduler alongside the prod frontend.
+# Without those, scheduled jobs (WP.org cache refresh, sites:ping, etc.)
+# and queued deployment dispatches silently never run.
 DC_DEV  = $(DC) --profile dev
-DC_PROD = $(DC) --profile prod
+DC_PROD = $(DC_BIN) --profile prod --profile worker
 EXEC = $(DC) exec -T -w /var/www/portal app
 EXEC_IT = $(DC) exec -w /var/www/portal app
 FRONTEND_DIR = portal/frontend
@@ -90,13 +102,16 @@ use-prod-env: ## Switch to PROD mode (copies .env.prod templates into live envs)
 
 prod-setup: ## First-time prod bring-up: swap to prod env, build, migrate, cache routes
 	$(MAKE) use-prod-env
-	$(DC) --profile prod up -d --build
-	$(DC) exec -T app chmod -R 777 /var/www/portal/storage /var/www/portal/bootstrap/cache
-	$(DC) exec -T -w /var/www/portal app php artisan migrate --force
-	$(DC) exec -T -w /var/www/portal app php artisan config:cache
-	$(DC) exec -T -w /var/www/portal app php artisan route:cache
+	$(DC_PROD) up -d --build
+	$(DC_BIN) exec -T app chmod -R 777 /var/www/portal/storage /var/www/portal/bootstrap/cache
+	$(DC_BIN) exec -T -w /var/www/portal app php artisan migrate --force
+	$(DC_BIN) exec -T -w /var/www/portal app php artisan config:cache
+	$(DC_BIN) exec -T -w /var/www/portal app php artisan route:cache
 	@echo ""
 	@echo "✔ Prod up. Tunnel should route portal.theshin.info -> :3000 and web-backend.theshin.info -> :8000"
+	@echo "   Queue + scheduler are running (worker profile auto-included)."
+	@echo "   Raw command if 'make' is unavailable on the prod box:"
+	@echo "     docker compose --profile prod --profile worker up -d --build"
 
 # ─── Backend (Laravel) ───────────────────────────────────────────────────────
 
