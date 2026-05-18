@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PluginVersion;
+use App\Models\PortalSetting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -26,7 +27,17 @@ class SignedUrlService
             'file_hash' => $version->file_hash,
         ], $expiresAt);
 
-        $baseUrl = config('app.url', 'http://localhost:8081');
+        // The download URL must use the hostname the AGENT can resolve, not
+        // the one browsers use. Inside docker the WP agent reaches the portal
+        // via `host.docker.internal:8000`; from a remote site it'd be the
+        // public portal hostname. `portal_base_url` (in portal_settings) is
+        // the dedicated "agent-reachable URL" — falling back to APP_URL only
+        // when the setting is missing.
+        $baseUrl = rtrim(
+            PortalSetting::where('key', 'portal_base_url')->value('value')
+                ?: config('app.url', 'http://localhost:8000'),
+            '/'
+        );
 
         return [
             'url' => "{$baseUrl}/api/plugin-downloads/{$token}",

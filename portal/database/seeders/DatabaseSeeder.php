@@ -51,7 +51,7 @@ class DatabaseSeeder extends Seeder
             // Stored as a JSON array of slug prefixes; any agent-reported slug
             // starting with one of these AND present in the `plugins` registry
             // is classified as internal.
-            'company_plugin_prefixes' => json_encode(['epos-', 'zippy-']),
+            'company_plugin_prefixes' => json_encode(['epos-', 'zippy-', 'wp-portal-']),
             // Phase 7 — Orders Management
             'orders_per_site_limit' => env('ORDERS_PER_SITE_LIMIT', '200'),
             'order_spike_enabled' => env('ORDER_SPIKE_ENABLED', 'true'),
@@ -72,9 +72,12 @@ class DatabaseSeeder extends Seeder
         // treats a slug as "internal" only when it matches a company prefix AND
         // has a row in this table — so the prefix list alone isn't enough.
         $zippyPlugins = [
-            ['slug' => 'zippy-crm',  'name' => 'Zippy CRM'],
-            ['slug' => 'zippy-pay',  'name' => 'Zippy Pay'],
-            ['slug' => 'zippy-core', 'name' => 'Zippy Core'],
+            ['slug' => 'zippy-crm',       'name' => 'Zippy CRM'],
+            ['slug' => 'zippy-pay',       'name' => 'Zippy Pay'],
+            ['slug' => 'zippy-core',      'name' => 'Zippy Core'],
+            // The agent plugin itself — registering it makes Portal push
+            // updates possible (treated like any other company plugin).
+            ['slug' => 'wp-portal-agent', 'name' => 'EPOS WP Agent'],
         ];
         foreach ($zippyPlugins as $p) {
             \App\Models\Plugin::firstOrCreate(

@@ -103,10 +103,21 @@ class Epos_Agent_Plugin_Installer {
         $rollback = new Epos_Agent_Rollback();
         $rollback->backup_current_version($plugin_slug);
 
-        // Check if plugin already exists
-        $plugin_dir = WP_PLUGIN_DIR . '/' . $plugin_slug;
-        $plugin_file = $plugin_slug . '/' . $plugin_slug . '.php';
-        $was_active = false;
+        // Resolve the plugin's entry file. The earlier convention of
+        // "{slug}/{slug}.php" works for most company plugins (zippy-crm
+        // points at zippy-crm/zippy-crm.php) but breaks for the agent
+        // itself, whose entry is wp-portal-agent/epos-wp-agent.php. We
+        // probe get_plugins() to find the real entry under the slug dir.
+        $plugin_dir  = WP_PLUGIN_DIR . '/' . $plugin_slug;
+        $plugin_file = self::resolve_plugin_file($plugin_slug)
+            ?? ($plugin_slug . '/' . $plugin_slug . '.php'); // fallback to old convention
+        $was_active  = false;
+
+        // Detect self-update: are we being asked to overwrite ourselves?
+        // Compare against EPOS_AGENT_PLUGIN_BASENAME (e.g. "wp-portal-agent/epos-wp-agent.php")
+        // — the slug is the directory portion before the slash.
+        $is_self_update = defined('EPOS_AGENT_PLUGIN_BASENAME')
+            && strpos(EPOS_AGENT_PLUGIN_BASENAME, $plugin_slug . '/') === 0;
 
         if (is_dir($plugin_dir)) {
             $was_active = is_plugin_active($plugin_file);
@@ -138,8 +149,22 @@ class Epos_Agent_Plugin_Installer {
             ), 500);
         }
 
-        // Activate the plugin if it was previously active or is a fresh install
-        if ($was_active || !is_dir($plugin_dir)) {
+        // After overwrite, the entry file may have moved (e.g. the new
+        // version renamed its bootstrap). Re-resolve so subsequent
+        // activate_plugin() targets the correct file.
+        $plugin_file = self::resolve_plugin_file($plugin_slug) ?? $plugin_file;
+
+        // Activate the plugin if it was previously active or is a fresh install.
+        //
+        // Self-update guard: when the slug IS the agent itself and it was
+        // already active, skip activate_plugin(). The overwrite kept the
+        // plugin in active_plugins; calling the new file's activation hook
+        // inside this same request would `require` new code on top of the
+        // old classes that PHP already has in memory, producing a fatal
+        // "cannot redeclare class" error. The next request will load the
+        // new code cleanly via WordPress's normal plugin loader.
+        $should_activate = ($was_active || !is_dir($plugin_dir));
+        if ($should_activate && !($is_self_update && $was_active)) {
             if (!is_plugin_active($plugin_file)) {
                 activate_plugin($plugin_file);
             }
@@ -167,7 +192,33 @@ class Epos_Agent_Plugin_Installer {
                 'slug' => $plugin_slug,
                 'version' => $version,
                 'was_active' => $was_active,
+                'is_self_update' => $is_self_update,
             ),
         ), 200);
+    }
+
+    /**
+     * Resolve the bootstrap PHP file for a plugin directory.
+     *
+     * Plugin slugs (directory names) don't always match the entry-file
+     * name. Examples: "wp-portal-agent/epos-wp-agent.php" — directory
+     * "wp-portal-agent", entry "epos-wp-agent.php". get_plugins() walks
+     * every registered plugin and reads the header; we pick the one
+     * inside our slug's directory.
+     *
+     * Returns the relative plugin file path ("slug/entry.php") on success,
+     * null when no plugin under that directory is registered with WP.
+     */
+    private static function resolve_plugin_file(string $plugin_slug): ?string {
+        if (!function_exists('get_plugins')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $needle = $plugin_slug . '/';
+        foreach (get_plugins() as $file => $_data) {
+            if (strpos($file, $needle) === 0) {
+                return $file;
+            }
+        }
+        return null;
     }
 }
