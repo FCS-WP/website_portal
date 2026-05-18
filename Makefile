@@ -8,7 +8,7 @@
        workers-up workers-down workers-logs \
        ping \
        wp-cron \
-       fresh setup
+       fresh setup env-copy
 
 # Variables
 DC = docker-compose
@@ -185,11 +185,31 @@ fresh: ## Full reset: migrate fresh + seed + clear caches
 	$(EXEC) php artisan view:clear
 	$(EXEC) php artisan cache:clear
 
-setup: ## First-time setup: copy .env, install deps, migrate, seed
-	@if [ ! -f portal/.env ]; then cp portal/.env.example portal/.env; echo "Copied .env"; fi
-	$(EXEC) composer install
-	$(EXEC) php artisan key:generate
-	$(EXEC) php artisan migrate --seed
-	cd $(FRONTEND_DIR) && pnpm install
+env-copy: ## Copy *.example -> live env files (idempotent, never overwrites)
+	@if [ ! -f .env ]; then cp .env.example .env; echo "✔ Copied .env (repo root)"; else echo "↷ .env already exists at repo root — skipped"; fi
+	@if [ ! -f portal/.env ]; then cp portal/.env.example portal/.env; echo "✔ Copied portal/.env"; else echo "↷ portal/.env already exists — skipped"; fi
+	@if [ ! -f portal/frontend/.env.local ]; then cp portal/frontend/.env.local.example portal/frontend/.env.local; echo "✔ Copied portal/frontend/.env.local"; else echo "↷ portal/frontend/.env.local already exists — skipped"; fi
+
+setup: env-copy ## First-time setup: copy envs, start containers, install deps, migrate, seed
 	@echo ""
-	@echo "✔ Setup complete. Run 'make up' to start containers, then 'make dev' for frontend."
+	@echo "→ Bringing up the stack so composer/artisan have somewhere to run…"
+	$(DC) up -d --build
+	@echo ""
+	@echo "→ Installing Laravel dependencies…"
+	$(EXEC) composer install
+	@echo ""
+	@echo "→ Generating APP_KEY if missing…"
+	@if grep -q '^APP_KEY=$$' portal/.env; then $(EXEC) php artisan key:generate; else echo "↷ APP_KEY already set — skipped"; fi
+	@echo ""
+	@echo "→ Running migrations + seed…"
+	$(EXEC) php artisan migrate --seed
+	@echo ""
+	@echo "✔ Setup complete."
+	@echo "   • Backend:  http://localhost:8000"
+	@echo "   • Frontend: http://localhost:3000  (give next dev ~30s on first start)"
+	@echo "   • Workers:  run 'make workers-up' to start the scheduler + queue containers"
+	@echo ""
+	@echo "⚠  Before you log in: open portal/.env and set SEED_ADMIN_EMAIL,"
+	@echo "   SEED_ADMIN_PASSWORD, and VAULT_MASTER_KEY (generate the vault key with:"
+	@echo "   make artisan cmd=\"tinker --execute='echo bin2hex(random_bytes(32));'\")."
+	@echo "   Then re-run: make artisan cmd=\"db:seed --force\""

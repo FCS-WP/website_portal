@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# but DO commit example templates so fresh checkouts can bootstrap
+!.env.local.example
+!.env.example
 
 # vercel
 .vercel

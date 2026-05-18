@@ -302,3 +302,29 @@ export interface OrderSearchFallback {
   site_name: string;
   url: string;
 }
+
+// ─── Activity Logs ────────────────────────────────────────────────
+export interface ActivityLogEntry {
+  id: number;
+  action: string;
+  subject_type: string;
+  subject_id: number | null;
+  description: string;
+  user_id: number | null;
+  user_name: string;
+  ip_address: string | null;
+  created_at: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface ActivityLogMeta {
+  total: number;
+  page: number;
+  per_page: number;
+  last_page: number;
+}
+
+export interface ActivityLogFilterOptions {
+  actions: string[];
+  users: { id: number; name: string; role: string }[];
+}

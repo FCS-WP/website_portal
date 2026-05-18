@@ -127,6 +127,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/sites/{site}/plugins/external/deactivate', [ExternalPluginController::class, 'deactivate']);
         Route::post('/sites/{site}/plugins/external/uninstall', [ExternalPluginController::class, 'uninstall']);
         Route::post('/sites/{site}/plugins/external/update-all', [ExternalPluginController::class, 'updateAllOnSite']);
+
+        // Activity logs (admin sees everything; dev sees rows for their
+        // assigned sites plus non-site rows — scoped inside the controller).
+        Route::get('/activity-logs/filter-options', [\App\Http\Controllers\Portal\ActivityLogController::class, 'filterOptions']);
+        Route::get('/activity-logs', [\App\Http\Controllers\Portal\ActivityLogController::class, 'index']);
     });
 
     // All authenticated users (admin, dev, mkt)
