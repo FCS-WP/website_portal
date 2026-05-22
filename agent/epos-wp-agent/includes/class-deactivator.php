@@ -17,5 +17,9 @@ class Epos_Agent_Deactivator {
 
         // Update connection status
         update_option('epos_agent_connection_status', 'disconnected');
+
+        // Drop the /epos-login rewrite so wp-login.php is reachable again
+        // (and admins aren't locked out) once the plugin is off.
+        flush_rewrite_rules();
     }
 }

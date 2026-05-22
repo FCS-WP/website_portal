@@ -20,6 +20,18 @@ class Epos_Agent_Activator {
         add_option('epos_agent_api_key', '');
         add_option('epos_agent_connection_status', 'pending');
 
+        // Default the login customizer to on. Stored as an option so admins
+        // can flip it off later from the settings page without disabling
+        // the entire plugin.
+        add_option('epos_login_customizer_enabled', '1');
+
+        // Register the /epos-login rewrite rule, then flush so the new
+        // route is recognized without forcing a manual permalinks re-save.
+        if (class_exists('Epos_Agent_Login_Customizer')) {
+            Epos_Agent_Login_Customizer::register_rewrite();
+        }
+        flush_rewrite_rules();
+
         // Attempt handshake if settings already exist
         $portal_url = get_option('epos_agent_portal_url');
         $api_key = get_option('epos_agent_api_key');

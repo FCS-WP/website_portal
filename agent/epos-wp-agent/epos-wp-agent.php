@@ -3,7 +3,7 @@
  * Plugin Name: EPOS WP Agent
  * Plugin URI: https://portal.epos.com
  * Description: Communication bridge between this WordPress site and the EPOS Central Control Portal.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: EPOS Team
  * Author URI: https://epos.com
  * License: GPL-2.0+
@@ -18,7 +18,7 @@ if (!defined('WPINC')) {
     die;
 }
 
-define('EPOS_AGENT_VERSION', '1.0.0');
+define('EPOS_AGENT_VERSION', '1.1.0');
 define('EPOS_AGENT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('EPOS_AGENT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('EPOS_AGENT_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -42,6 +42,7 @@ require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-2fa-manager.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-security-api.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-external-plugin-manager.php';
 require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-deactivation-guard.php';
+require_once EPOS_AGENT_PLUGIN_DIR . 'includes/class-login-customizer.php';
 
 // Activation / Deactivation hooks
 register_activation_hook(__FILE__, ['Epos_Agent_Activator', 'activate']);
@@ -77,6 +78,10 @@ function epos_agent_init() {
 
     // Initialize external plugin manager
     Epos_Agent_External_Plugin_Manager::init();
+
+    // Hidden login URL + branded login UI (gated by wp_option
+    // epos_login_customizer_enabled — defaults to true).
+    Epos_Agent_Login_Customizer::init();
 }
 add_action('init', 'epos_agent_init');
 

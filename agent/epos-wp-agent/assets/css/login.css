@@ -1,0 +1,716 @@
+/*
+ * EPOS Login Customizer — UI port of the Modern-Admin-Login reference.
+ *
+ * Markup lives in class-login-customizer.php (open_layout + close_layout
+ * wrap the WordPress <form>). This stylesheet mirrors the reference HTML
+ * 1:1 with all selectors prefixed `.epos-` and scoped under either
+ * `.epos-login-page` (our <main> wrapper) or `body.epos-login-page`
+ * (the body class added by login_body_class) so styles can't leak
+ * into wp-admin pages.
+ *
+ * Fonts: DM Sans via Google Fonts. The reference also loads Fraunces +
+ * DM Serif Display but never applies them — DM Sans does everything.
+ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&display=swap');
+
+/* ── Tokens ───────────────────────────────────────────────────────── */
+body.epos-login-page {
+  --epos-accent:        #06B957;
+  --epos-radius-panel:  28px;
+  --epos-bg:            #eef2ef;
+  --epos-ink:           #11221a;
+  --epos-muted:         #66736c;
+  --epos-line:          rgba(17, 34, 26, .12);
+  --epos-surface:       rgba(255, 255, 255, .82);
+  --epos-shadow:        0 28px 90px rgba(24, 39, 31, .14),
+                        0 12px 28px rgba(24, 39, 31, .08);
+}
+
+/* ── Reset WP-default login chrome ────────────────────────────────── */
+/* The background needs to span the full DOCUMENT height (not just the
+   viewport) so a tall shell that scrolls doesn't reveal a bare strip
+   below the gradient. We set the gradient on <html>, make <body>
+   transparent, and pin both to min-height: 100vh so short content
+   doesn't leave the gradient short either. */
+html:has(body.epos-login-page),
+body.epos-login-page {
+  min-height: 100vh;
+}
+html:has(body.epos-login-page) {
+  background:
+    radial-gradient(circle at 8% 8%,  rgba(6, 185, 87, .14), transparent 30%),
+    radial-gradient(circle at 92% 88%, rgba(6, 185, 87, .16), transparent 32%),
+    linear-gradient(135deg, #f7faf8 0%, var(--epos-bg) 52%, #e4ebe6 100%);
+  background-attachment: fixed;
+}
+body.epos-login-page {
+  margin: 0;
+  min-width: 320px;
+  color: var(--epos-ink);
+  font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: transparent;
+}
+
+/* WP's own #login wrapper + header logo + nav links are hidden so the
+   only thing rendered is OUR shell. WP's <form> still sits inside, just
+   wrapped by the .epos-form-pane__form container. */
+body.epos-login-page #login {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+body.epos-login-page #login h1,
+body.epos-login-page .language-switcher,
+body.epos-login-page .privacy-policy-page-link,
+body.epos-login-page #nav,
+body.epos-login-page #backtoblog,
+/* WP core renders its own .wp-hide-pw eye button next to the password
+   field. We render our own custom-styled eye toggle via login.js, so
+   hide WP's to avoid the duplicate icon. */
+body.epos-login-page .wp-pwd .wp-hide-pw,
+body.epos-login-page .wp-pwd button.wp-hide-pw {
+  display: none !important;
+}
+
+/* ── Page wrapper ─────────────────────────────────────────────────── */
+/* `overflow: hidden` was removed: it was clipping the bottom of the
+   shell on viewports shorter than the form, leaving a visible bare
+   strip under the card. We rely on the fixed-attachment gradient on
+   <html> for the always-on background. */
+body.epos-login-page .epos-login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 3vw, 42px);
+  position: relative;
+}
+
+/* Subtle grain overlay for texture; pure CSS, no asset. */
+body.epos-login-page .epos-grain {
+  position: fixed;
+  inset: 0;
+  opacity: .28;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.21'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+/* ── Glass shell ──────────────────────────────────────────────────── */
+body.epos-login-page .epos-auth-shell {
+  width: min(1180px, 100%);
+  min-height: min(760px, calc(100vh - 48px));
+  display: grid;
+  grid-template-columns: minmax(340px, 4fr) minmax(0, 6fr);
+  background: rgba(255, 255, 255, .58);
+  border: 1px solid rgba(255, 255, 255, .72);
+  box-shadow: var(--epos-shadow);
+  border-radius: var(--epos-radius-panel);
+  overflow: hidden;
+  backdrop-filter: blur(22px);
+  position: relative;
+}
+
+/* ── Left column ──────────────────────────────────────────────────── */
+body.epos-login-page .epos-form-pane {
+  padding: clamp(28px, 4vw, 58px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.76));
+  border-right: 1px solid var(--epos-line);
+  text-align: left;
+}
+
+body.epos-login-page .epos-brand-mini {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #17251d;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+/* Brand mark: actual Zippy logo PNG. Sized to fit the 42x42 box from
+   the reference, rounded corners, soft accent-colored shadow. */
+body.epos-login-page img.epos-brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 12px 22px rgba(6, 185, 87, .26);
+}
+
+body.epos-login-page .epos-form-wrap {
+  max-width: 388px;
+  width: 100%;
+}
+
+body.epos-login-page .epos-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid rgba(6, 185, 87, .22);
+  border-radius: 999px;
+  background: rgba(6, 185, 87, .08);
+  color: #066b35;
+  font-size: 13px;
+  font-weight: 700;
+}
+body.epos-login-page .epos-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--epos-accent);
+  box-shadow: 0 0 0 6px rgba(6, 185, 87, .12);
+}
+
+body.epos-login-page #epos-login-title {
+  margin: 20px 0 10px;
+  font-size: clamp(2rem, 3.2vw, 2.72rem);
+  line-height: 1.13;
+  letter-spacing: -.018em;
+  text-wrap: balance;
+  color: var(--epos-ink);
+  font-weight: 600;
+}
+
+body.epos-login-page .epos-intro {
+  margin: 0 0 30px;
+  color: var(--epos-muted);
+  line-height: 1.65;
+  font-size: 1rem;
+}
+
+/* ── Form fields ──────────────────────────────────────────────────── */
+body.epos-login-page .epos-form-pane__form #loginform {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 18px;
+}
+body.epos-login-page .epos-form-pane__form #loginform p {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+body.epos-login-page .epos-form-pane__form #loginform label {
+  font-size: .9rem;
+  font-weight: 700;
+  color: #213128;
+}
+
+/* The .epos-input-wrap is added at runtime by login.js so we can absolute-
+   position the user / eye icons. Match the input's height (52px) exactly
+   so `top: 50%` on the icons resolves to the input's vertical center.
+   `display: block` (not flex) avoids stretching the wrapper if a stray
+   sibling (e.g. WP's hidden .wp-hide-pw or a text-strength meter) sneaks
+   in at runtime. */
+body.epos-login-page .epos-input-wrap {
+  position: relative;
+  display: block;
+  height: 52px;
+  line-height: 52px;
+}
+body.epos-login-page .epos-input-wrap > input {
+  display: block;
+  vertical-align: middle;
+}
+/* WP wraps the password input in a .wp-pwd <div> with padding-right,
+   background, border and (sometimes) flex layout reserved for its own
+   eye button. Since we hide that button, strip everything so the input
+   sits flush inside our own .epos-input-wrap and the eye toggle lands
+   on the input's edge, not the wrapper's edge. */
+body.epos-login-page .wp-pwd {
+  position: relative !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* High-specificity overrides for WP's wp-admin/forms.css. */
+body.epos-login-page .epos-form-pane__form #loginform input[type="text"],
+body.epos-login-page .epos-form-pane__form #loginform input[type="email"],
+body.epos-login-page .epos-form-pane__form #loginform input[type="password"],
+body.epos-login-page .epos-form-pane__form #loginform input.input {
+  width: 100% !important;
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(26, 45, 35, .14) !important;
+  background: rgba(247, 250, 248, .9) !important;
+  padding: 0 48px 0 16px !important;
+  color: var(--epos-ink) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font: inherit !important;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+body.epos-login-page .epos-form-pane__form #loginform input[type="text"]:hover,
+body.epos-login-page .epos-form-pane__form #loginform input[type="email"]:hover,
+body.epos-login-page .epos-form-pane__form #loginform input[type="password"]:hover {
+  background: #fff !important;
+  border-color: rgba(6, 185, 87, .28) !important;
+}
+body.epos-login-page .epos-form-pane__form #loginform input[type="text"]:focus,
+body.epos-login-page .epos-form-pane__form #loginform input[type="email"]:focus,
+body.epos-login-page .epos-form-pane__form #loginform input[type="password"]:focus {
+  border-color: var(--epos-accent) !important;
+  box-shadow: 0 0 0 4px rgba(6, 185, 87, .16) !important;
+  background: #fff !important;
+}
+/* Suppress Chrome autofill blue (#E8F0FE). Chrome ignores `background`
+   on autofilled inputs and uses its own paint; the only reliable fix is
+   to paint over it with a large inset box-shadow + a delayed transition
+   so the override outlives Chrome's color flash. */
+body.epos-login-page .epos-form-pane__form #loginform input:-webkit-autofill,
+body.epos-login-page .epos-form-pane__form #loginform input:-webkit-autofill:hover,
+body.epos-login-page .epos-form-pane__form #loginform input:-webkit-autofill:focus,
+body.epos-login-page .epos-form-pane__form #loginform input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(247, 250, 248, .9) inset !important;
+  box-shadow: 0 0 0 1000px rgba(247, 250, 248, .9) inset !important;
+  -webkit-text-fill-color: var(--epos-ink) !important;
+  caret-color: var(--epos-ink);
+  transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s;
+}
+
+body.epos-login-page .epos-input-icon {
+  position: absolute;
+  right: 14px;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  margin: auto 0;
+  color: #789082;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+body.epos-login-page .epos-eye-toggle {
+  position: absolute;
+  right: 8px;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  height: 36px;
+  margin: auto 0;
+  border: 0;
+  background: transparent;
+  color: #789082;
+  cursor: pointer;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  line-height: 0;
+}
+body.epos-login-page .epos-eye-toggle:hover { color: #064d28; }
+
+/* Remember + Forgot row — built by login.js after WP renders the form. */
+body.epos-login-page .epos-row-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 2px;
+}
+body.epos-login-page .epos-form-pane__form #loginform .forgetmenot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: .91rem;
+  color: #45534b;
+  font-weight: 500;
+  cursor: pointer;
+  margin: 0;
+}
+body.epos-login-page .epos-form-pane__form #loginform .forgetmenot input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--epos-accent);
+}
+body.epos-login-page .epos-row-meta a {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #286d45;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: .91rem;
+}
+body.epos-login-page .epos-row-meta a:hover {
+  color: #064d28;
+  text-decoration: underline;
+}
+
+/* Submit button. */
+body.epos-login-page .epos-form-pane__form #loginform .submit { margin: 0; }
+body.epos-login-page .epos-form-pane__form #loginform .button-primary {
+  width: 100% !important;
+  min-height: 54px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: var(--epos-accent) !important;
+  color: #fff !important;
+  font-weight: 800 !important;
+  font-size: 15px !important;
+  letter-spacing: 0 !important;
+  text-shadow: none !important;
+  cursor: pointer;
+  box-shadow: 0 16px 32px rgba(6, 185, 87, .28) !important;
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+body.epos-login-page .epos-form-pane__form #loginform .button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 38px rgba(6,185,87,.34) !important;
+}
+body.epos-login-page .epos-form-pane__form #loginform .button-primary:active {
+  transform: translateY(1px) scale(.99);
+  filter: saturate(.92);
+}
+
+/* WP messages / errors styled inside the form pane. */
+body.epos-login-page #login_error,
+body.epos-login-page .message {
+  margin: 0 0 18px;
+  min-height: 42px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: .9rem;
+  line-height: 1.45;
+  box-shadow: none;
+}
+body.epos-login-page .message {
+  color: #476052;
+  background: rgba(6, 185, 87, .07);
+  border: 1px solid rgba(6, 185, 87, .13);
+}
+body.epos-login-page #login_error {
+  color: #7a1f1f;
+  background: rgba(217, 70, 70, .06);
+  border: 1px solid rgba(217, 70, 70, .18);
+}
+
+/* Tip card */
+body.epos-login-page .epos-form-note {
+  margin-top: 18px;
+  min-height: 42px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: #476052;
+  background: rgba(6, 185, 87, .07);
+  border: 1px solid rgba(6, 185, 87, .13);
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+/* Footer links */
+body.epos-login-page .epos-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: center;
+  color: var(--epos-muted);
+  font-size: .91rem;
+}
+body.epos-login-page .epos-return-link {
+  color: #286d45;
+  font-weight: 700;
+  text-decoration: none;
+}
+body.epos-login-page .epos-return-link:hover {
+  color: #064d28;
+  text-decoration: underline;
+}
+body.epos-login-page .epos-lang-button {
+  min-height: 38px;
+  border: 1px solid var(--epos-line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.68);
+  padding: 0 13px;
+  color: #39483f;
+  cursor: pointer;
+  font: inherit;
+  font-size: .9rem;
+}
+
+/* ── Right column (banner) ────────────────────────────────────────── */
+body.epos-login-page .epos-banner-column {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: grid;
+  align-content: stretch;
+  min-height: 560px;
+  padding: clamp(28px, 4vw, 58px);
+  background:
+    linear-gradient(145deg, rgba(7, 141, 69, .94), rgba(6, 185, 87, .82) 50%, rgba(17, 34, 26, .96)),
+    var(--epos-accent);
+  color: #fff;
+}
+body.epos-login-page .epos-banner-column::before,
+body.epos-login-page .epos-banner-column::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: -1;
+}
+body.epos-login-page .epos-banner-column::before {
+  width: 520px;
+  height: 520px;
+  right: -170px;
+  top: -170px;
+  background: radial-gradient(circle, rgba(255,255,255,.32), rgba(255,255,255,.04) 58%, transparent 70%);
+  filter: blur(2px);
+  animation: epos-orbit 13s ease-in-out infinite;
+}
+body.epos-login-page .epos-banner-column::after {
+  width: 420px;
+  height: 420px;
+  left: -130px;
+  bottom: -140px;
+  background: radial-gradient(circle, rgba(15, 30, 23, .38), transparent 64%);
+}
+
+body.epos-login-page .epos-mesh-lines {
+  position: absolute;
+  inset: 0;
+  opacity: .18;
+  background-image:
+    linear-gradient(rgba(255,255,255,.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.16) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: radial-gradient(circle at 55% 45%, black, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle at 55% 45%, black, transparent 72%);
+}
+
+body.epos-login-page .epos-floating-card {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.12);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 54px rgba(0,0,0,.16);
+  border-radius: 22px;
+  animation: epos-floatY 6s ease-in-out infinite;
+  pointer-events: none;
+}
+body.epos-login-page .epos-card-a {
+  width: 156px; min-height: 96px;
+  right: 5%; top: 7%;
+  padding: 14px;
+  opacity: .82;
+  z-index: 0;
+}
+body.epos-login-page .epos-card-b {
+  width: 184px; min-height: 88px;
+  left: 5%; bottom: 7%;
+  padding: 14px;
+  opacity: .76;
+  z-index: 0;
+  animation-delay: -2.2s;
+}
+body.epos-login-page .epos-metric {
+  font-size: 1.75rem;
+  font-weight: 900;
+  letter-spacing: -.035em;
+  color: #fff;
+}
+body.epos-login-page .epos-metric-label {
+  margin-top: 3px;
+  font-size: .78rem;
+  color: rgba(255,255,255,.78);
+  line-height: 1.35;
+}
+
+body.epos-login-page .epos-banner-content {
+  position: relative;
+  min-height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  max-width: 510px;
+  z-index: 2;
+}
+
+body.epos-login-page .epos-banner-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.86);
+  font-weight: 700;
+  font-size: .9rem;
+}
+
+/* The big "zippy" word — DM Sans heavy-black, NOT Fraunces. The
+   reference uses font-weight: 950 which is non-standard; DM Sans tops
+   out at 1000 in variable mode, so 900 is the safe ceiling here. */
+body.epos-login-page .epos-zippy-word {
+  font-size: clamp(3.4rem, 7vw, 5.8rem);
+  line-height: .92;
+  margin: 0;
+  letter-spacing: -.055em;
+  font-weight: 900;
+  text-transform: lowercase;
+  color: rgba(255,255,255,.96);
+  text-shadow: 0 22px 70px rgba(0,0,0,.16);
+}
+
+body.epos-login-page .epos-banner-title {
+  max-width: 500px;
+  margin: 24px 0 16px;
+  font-size: clamp(1.8rem, 3vw, 2.55rem);
+  line-height: 1.15;
+  letter-spacing: -.012em;
+  font-weight: 800;
+  text-wrap: balance;
+  color: #fff;
+}
+
+body.epos-login-page .epos-banner-copy {
+  max-width: 500px;
+  margin: 0;
+  color: rgba(255,255,255,.8);
+  font-size: clamp(1rem, 1.4vw, 1.1rem);
+  line-height: 1.68;
+}
+
+body.epos-login-page .epos-security-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+body.epos-login-page .epos-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: rgba(255,255,255,.88);
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.16);
+  font-weight: 700;
+  font-size: .86rem;
+}
+body.epos-login-page .epos-chip svg { flex: 0 0 auto; }
+
+body.epos-login-page .epos-toast {
+  position: absolute;
+  right: clamp(18px, 3vw, 34px);
+  bottom: clamp(18px, 3vw, 34px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 300px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.2);
+  backdrop-filter: blur(18px);
+  color: rgba(255,255,255,.88);
+  box-shadow: 0 18px 45px rgba(0,0,0,.14);
+  pointer-events: none;
+  z-index: 3;
+}
+body.epos-login-page .epos-toast strong {
+  display: block;
+  color: #fff;
+  font-size: .95rem;
+}
+body.epos-login-page .epos-toast > span > span {
+  display: block;
+  margin-top: 2px;
+  font-size: .82rem;
+}
+
+/* ── Animations ───────────────────────────────────────────────────── */
+@keyframes epos-orbit {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-38px, 46px, 0) scale(1.08); }
+}
+@keyframes epos-floatY {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-14px); }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 1280px) {
+  body.epos-login-page .epos-floating-card,
+  body.epos-login-page .epos-toast { display: none; }
+}
+@media (max-width: 900px) {
+  body.epos-login-page .epos-login-page {
+    padding: 0;
+    place-items: stretch;
+  }
+  body.epos-login-page .epos-auth-shell {
+    min-height: 100vh;
+    width: 100%;
+    border-radius: 0;
+    grid-template-columns: 1fr;
+    box-shadow: none;
+  }
+  body.epos-login-page .epos-form-pane {
+    order: 2;
+    border-right: 0;
+  }
+  body.epos-login-page .epos-banner-column {
+    order: 1;
+    min-height: 360px;
+    padding-bottom: 70px;
+  }
+  body.epos-login-page .epos-banner-content {
+    max-width: 600px;
+  }
+  body.epos-login-page .epos-zippy-word {
+    font-size: clamp(3.4rem, 17vw, 6.4rem);
+  }
+}
+@media (max-width: 560px) {
+  body.epos-login-page .epos-form-pane {
+    padding: 26px 20px 30px;
+  }
+  body.epos-login-page .epos-banner-column {
+    padding: 28px 20px 64px;
+    min-height: 320px;
+  }
+  body.epos-login-page .epos-row-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  body.epos-login-page .epos-form-wrap { max-width: none; }
+  body.epos-login-page .epos-footer-links {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.epos-login-page *,
+  body.epos-login-page *::before,
+  body.epos-login-page *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
