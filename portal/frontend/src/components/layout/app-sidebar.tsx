@@ -146,7 +146,7 @@ export function AppSidebar() {
       label: "OPERATIONS",
       items: [
         { name: "Orders", href: "/orders", icon: ShoppingCart },
-        { name: "SMTP", href: "/smtp", icon: Mail, placeholder: true, roles: ["admin", "dev"] },
+        { name: "SMTP", href: "/smtp", icon: Mail, roles: ["admin", "dev"] },
         { name: "Activity Logs", href: "/activity-logs", icon: FileText, roles: ["admin", "dev"] },
       ],
     },

@@ -13,6 +13,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(\App\Services\CredentialEncryptionService::class);
         $this->app->singleton(\App\Services\VaultAuditService::class);
+        $this->app->singleton(\App\Services\PortalMailConfigService::class);
     }
 
     /**
@@ -20,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Apply portal-wide SMTP settings stored in PortalSetting onto
+        // config('mail.*') so outgoing portal mail uses the admin-configured
+        // server instead of static .env values.
+        app(\App\Services\PortalMailConfigService::class)->apply();
     }
 }

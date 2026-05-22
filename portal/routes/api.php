@@ -47,6 +47,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/settings', [\App\Http\Controllers\Portal\SettingsController::class, 'update']);
         Route::post('/settings/telegram/test', [\App\Http\Controllers\Portal\SettingsController::class, 'testTelegram']);
 
+        // Portal-wide SMTP (admin-only). Per-site SMTP routes live under the
+        // admin+dev group below since dev users can manage their own sites.
+        Route::get('/smtp/portal', [\App\Http\Controllers\Portal\SmtpController::class, 'showPortal']);
+        Route::put('/smtp/portal', [\App\Http\Controllers\Portal\SmtpController::class, 'updatePortal']);
+        Route::post('/smtp/portal/test', [\App\Http\Controllers\Portal\SmtpController::class, 'testPortal']);
+        Route::post('/smtp/portal/apply-to-sites', [\App\Http\Controllers\Portal\SmtpController::class, 'applyToSites']);
+
         // Security
         Route::prefix('security')->group(function () {
             Route::get('/overview', [\App\Http\Controllers\Portal\SecurityController::class, 'overview']);
@@ -132,6 +139,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         // assigned sites plus non-site rows — scoped inside the controller).
         Route::get('/activity-logs/filter-options', [\App\Http\Controllers\Portal\ActivityLogController::class, 'filterOptions']);
         Route::get('/activity-logs', [\App\Http\Controllers\Portal\ActivityLogController::class, 'index']);
+
+        // Per-site SMTP — controller calls AuthorizesSiteAccess so dev users
+        // are limited to sites in their site_users pivot.
+        Route::get('/sites/{site}/smtp', [\App\Http\Controllers\Portal\SmtpController::class, 'showSite']);
+        Route::put('/sites/{site}/smtp', [\App\Http\Controllers\Portal\SmtpController::class, 'updateSite']);
+        Route::post('/sites/{site}/smtp/test', [\App\Http\Controllers\Portal\SmtpController::class, 'testSite']);
     });
 
     // All authenticated users (admin, dev, mkt)

@@ -36,6 +36,7 @@ import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
 import { SiteActivityTab } from "@/components/sites/site-activity-tab";
 import { SiteCredentialsTab } from "@/components/sites/site-credentials-tab";
 import { SiteSecurityTab } from "@/components/sites/site-security-tab";
+import { SiteSmtpTab } from "@/components/sites/site-smtp-tab";
 import { SiteOrdersTab } from "@/components/orders/site-orders-tab";
 import { ApiKeyDialog } from "@/components/sites/api-key-dialog";
 
@@ -513,13 +514,7 @@ export default function SiteDetailPage() {
 
         {!isMkt && (
           <TabsContent value="smtp" className="mt-6">
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">
-                  SMTP configuration coming in Phase 2.
-                </p>
-              </CardContent>
-            </Card>
+            <SiteSmtpTab siteId={site.id} siteName={site.name} />
           </TabsContent>
         )}
 

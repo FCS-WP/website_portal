@@ -105,6 +105,13 @@ class SiteController extends Controller
             $request->ip()
         );
 
+        // Inherit the admin's default portal SMTP config so newly added sites
+        // can send wp_mail without an extra trip to the SMTP tab. No-op when
+        // the portal SMTP isn't configured yet (returns 'no_defaults' from
+        // the seeder, which we ignore here).
+        app(\App\Services\SiteSmtpSeederService::class)
+            ->seedSite($site, overwrite: false, actorUserId: $request->user()->id);
+
         // Return the plain key ONCE (it cannot be retrieved again)
         $siteData = $site->toArray();
         $siteData['api_key'] = $plainKey;
