@@ -37,7 +37,16 @@ class Epos_Agent_Login_Customizer {
         // ── URL rewrite ────────────────────────────────────────────────
         // Add a rewrite rule and a query var so /epos-login routes through
         // WordPress (rather than the webserver) and we can detect the hit.
-        add_action('init', [self::class, 'register_rewrite']);
+        //
+        // Call register_rewrite() DIRECTLY rather than hooking it on `init`:
+        // this init() method is itself called from epos_agent_init() which
+        // already runs on `init`. Adding a nested init action would queue
+        // the rule registration AFTER WP has finished processing init
+        // hooks — so the rule never lands in the persistent rules table
+        // until something else (activation, permalinks save) triggers a
+        // flush, and even then only if the request happens to load before
+        // our nested hook is bypassed.
+        self::register_rewrite();
         add_filter('query_vars', [self::class, 'register_query_var']);
 
         // When the rewrite matches, hand off to wp-login.php internally.
