@@ -76,7 +76,35 @@ class AgentController extends Controller
                 'tags'              => $site->tags,
                 'portal_time'       => now()->toIso8601String(),
             ],
+            // Hosts the agent should trust when validating download URLs in
+            // plugin install/update requests. portal_base_url is where signed
+            // download URLs are issued from (often a separate backend host),
+            // and APP_URL covers the case where they're the same.
+            'download_hosts' => $this->trustedDownloadHosts(),
         ]);
+    }
+
+    /**
+     * Build the list of hosts the agent should trust for plugin downloads.
+     * Combines the portal's APP_URL and the PortalSetting `portal_base_url`
+     * (which the SignedUrlService uses to construct download links) so the
+     * agent accepts both whether they're the same domain or split across
+     * frontend + backend hosts in production.
+     */
+    private function trustedDownloadHosts(): array
+    {
+        $candidates = [
+            config('app.url'),
+            \App\Models\PortalSetting::where('key', 'portal_base_url')->value('value'),
+        ];
+
+        $hosts = [];
+        foreach ($candidates as $url) {
+            if (!$url) continue;
+            $host = parse_url($url, PHP_URL_HOST);
+            if ($host) $hosts[] = strtolower($host);
+        }
+        return array_values(array_unique(array_filter($hosts)));
     }
 
     /**
@@ -159,6 +187,11 @@ class AgentController extends Controller
             'message' => 'Ping received.',
             'plugins_received_count' => $pluginsAccepted,
             'orders_received_count' => $ordersAccepted,
+            // Ping responses also carry the trusted-host list so the
+            // agent's epos_agent_download_hosts option auto-refreshes when
+            // an admin changes portal_base_url, without needing a manual
+            // re-handshake.
+            'download_hosts' => $this->trustedDownloadHosts(),
         ]);
     }
 

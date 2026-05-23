@@ -46,18 +46,39 @@ class Epos_Agent_Plugin_Installer {
         require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
-        // Security: Only allow downloads from the configured Portal URL
-        $portal_url = get_option('epos_agent_portal_url', '');
-        if (!empty($portal_url)) {
-            $allowed_domain = parse_url($portal_url, PHP_URL_HOST);
-            $download_domain = parse_url($download_url, PHP_URL_HOST);
+        // Security: Only allow downloads from the configured Portal URL,
+        // OR any additional hosts the portal has registered via the
+        // wp_option `epos_agent_download_hosts` (comma-separated). This
+        // covers the common production setup where the Next.js frontend
+        // is at portal.example.com but signed download URLs come from a
+        // separate backend host (e.g. web-backend.example.com).
+        $portal_url     = get_option('epos_agent_portal_url', '');
+        $extra_hosts    = get_option('epos_agent_download_hosts', '');
+        $allowed_hosts  = array();
 
-            if ($download_domain !== $allowed_domain) {
-                return new WP_REST_Response(array(
-                    'success' => false,
-                    'message' => 'Download URL host not allowed. Expected: ' . $allowed_domain . ', Got: ' . $download_domain,
-                ), 403);
+        if (!empty($portal_url)) {
+            $h = parse_url($portal_url, PHP_URL_HOST);
+            if ($h) {
+                $allowed_hosts[] = strtolower($h);
             }
+        }
+        if (!empty($extra_hosts)) {
+            foreach (explode(',', $extra_hosts) as $h) {
+                $h = strtolower(trim($h));
+                if ($h !== '') {
+                    $allowed_hosts[] = $h;
+                }
+            }
+        }
+        $allowed_hosts = array_values(array_unique($allowed_hosts));
+
+        $download_domain = strtolower((string) parse_url($download_url, PHP_URL_HOST));
+
+        if (!empty($allowed_hosts) && !in_array($download_domain, $allowed_hosts, true)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Download URL host not allowed. Allowed: ' . implode(', ', $allowed_hosts) . '. Got: ' . $download_domain,
+            ), 403);
         }
 
         // Use wp_remote_get (not download_url/wp_safe_remote_get) to avoid

@@ -103,6 +103,16 @@ class Epos_Agent_Activator {
             update_option('epos_agent_connection_status', 'connected');
             update_option('epos_agent_last_error', '');
 
+            // Persist the portal-supplied list of hosts that may legitimately
+            // serve plugin download URLs (e.g. a separate backend host like
+            // web-backend.example.com when the portal frontend is at
+            // portal.example.com). Used by class-plugin-installer.php to
+            // validate incoming download_url params.
+            if (!empty($data['download_hosts']) && is_array($data['download_hosts'])) {
+                $hosts = array_map('strtolower', array_filter($data['download_hosts'], 'is_string'));
+                update_option('epos_agent_download_hosts', implode(',', $hosts));
+            }
+
             if ($return_details) {
                 return [
                     'success' => true,

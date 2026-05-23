@@ -23,3 +23,6 @@ portal/vendor/
 # Frontend build
 portal/frontend/.next/
 portal/frontend/node_modules/
+
+# Agent plugin build artifacts (manually-uploaded zips)
+agent/*.zip
