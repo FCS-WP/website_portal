@@ -152,9 +152,8 @@ class Epos_Agent_Ping {
                 $order_sync->mark_synced();
             }
 
-            // Refresh the trusted-host list for download_url validation so
-            // changes to portal_base_url on the portal side propagate within
-            // one ping cycle. See class-plugin-installer.php for usage.
+            // Refresh download-host allow-list each ping so portal_base_url
+            // changes propagate within one cycle.
             $body_raw = wp_remote_retrieve_body($response);
             $body_json = json_decode($body_raw, true);
             if (!empty($body_json['download_hosts']) && is_array($body_json['download_hosts'])) {

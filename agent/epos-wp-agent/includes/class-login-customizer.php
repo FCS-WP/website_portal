@@ -1,32 +1,12 @@
 <?php
 /**
- * Login Customizer
- *
- * Two things:
- *
- *   1. URL rewrite — /epos-login serves the WordPress login. Direct hits to
- *      wp-login.php return 404 so bot probes against the canonical URL fail
- *      without revealing whether the site runs WordPress.
- *
- *   2. UI override — a two-column Zippy-branded login page replaces the
- *      stock WordPress one. The left column hosts the actual <form> (so
- *      WordPress's auth flow is untouched); the right column is a static
- *      banner with floating "feature" cards.
- *
- * The customizer can be toggled off without uninstalling the plugin by
- * setting wp_option `epos_login_customizer_enabled` to false (defaults to
- * true). When disabled, both the URL rewrite and the UI swap are no-ops.
- *
- * Activator must flush rewrite rules so /epos-login is recognized; the
- * existing Epos_Agent_Activator already calls flush_rewrite_rules() so we
- * piggy-back on that.
+ * Hides wp-login.php behind /epos-login and replaces the stock login UI
+ * with a Zippy-branded two-column page. Toggle off per-site by setting
+ * wp_option `epos_login_customizer_enabled` to '0'.
  */
 class Epos_Agent_Login_Customizer {
 
-    /** Slug for the new login URL (path segment after the home URL). */
-    const LOGIN_SLUG = 'epos-login';
-
-    /** wp_option name used to disable the whole feature per-site. */
+    const LOGIN_SLUG  = 'epos-login';
     const OPT_ENABLED = 'epos_login_customizer_enabled';
 
     public static function init() {
@@ -34,70 +14,34 @@ class Epos_Agent_Login_Customizer {
             return;
         }
 
-        // ── URL rewrite ────────────────────────────────────────────────
-        // Add a rewrite rule and a query var so /epos-login routes through
-        // WordPress (rather than the webserver) and we can detect the hit.
-        //
-        // Call register_rewrite() DIRECTLY rather than hooking it on `init`:
-        // this init() method is itself called from epos_agent_init() which
-        // already runs on `init`. Adding a nested init action would queue
-        // the rule registration AFTER WP has finished processing init
-        // hooks — so the rule never lands in the persistent rules table
-        // until something else (activation, permalinks save) triggers a
-        // flush, and even then only if the request happens to load before
-        // our nested hook is bypassed.
+        // We're already inside epos_agent_init() (hooked on `init`), so a
+        // nested add_action('init', ...) would never fire. Register
+        // synchronously instead.
         self::register_rewrite();
         add_filter('query_vars', [self::class, 'register_query_var']);
 
-        // When the rewrite matches, hand off to wp-login.php internally.
-        // Hook on `parse_request` (which fires before `redirect_canonical`)
-        // so WP doesn't try to "fix" the slug into something else and 404.
+        // parse_request runs before redirect_canonical, so the slug can't
+        // be 301'd into a trailing-slash variant before we hand off.
         add_action('parse_request', [self::class, 'serve_login_on_slug']);
-
-        // Suppress canonical redirect (e.g. /epos-login -> /epos-login/) for
-        // our slug; we want the rewrite-driven handoff to fire on the bare
-        // URL, not after a 301 round-trip.
         add_filter('redirect_canonical', [self::class, 'maybe_block_canonical_redirect'], 10, 2);
 
-        // Block direct access to wp-login.php. Anyone hitting it gets a
-        // 404 (so we don't leak the fact that this is a WordPress site).
-        // The internal handoff above sets a flag that lets the real
-        // wp-login.php through.
         add_action('login_init', [self::class, 'block_direct_wp_login']);
 
-        // Rewrite every wp-login.php URL the WP core emits (e.g.
-        // wp_login_url(), wp_lostpassword_url()) to /epos-login so links
-        // in emails, redirects, and the "Log in" links don't expose the
-        // hidden URL.
         add_filter('site_url', [self::class, 'filter_login_urls'], 10, 4);
         add_filter('network_site_url', [self::class, 'filter_login_urls'], 10, 3);
         add_filter('wp_redirect', [self::class, 'filter_login_redirect'], 10, 2);
 
-        // ── UI override ────────────────────────────────────────────────
         add_action('login_enqueue_scripts', [self::class, 'enqueue_assets']);
-        add_action('login_head', [self::class, 'inject_head']);
         add_filter('login_headerurl', [self::class, 'header_url']);
         add_filter('login_headertext', [self::class, 'header_text']);
-
-        // Wrap the WP login form in our two-column layout. login_form_top
-        // fires inside the existing <form>, so we open our left-column DOM
-        // BEFORE the form via login_header, and close + render the right
-        // column AFTER the form via login_footer.
         add_action('login_header', [self::class, 'open_layout']);
         add_action('login_footer', [self::class, 'close_layout']);
-
-        // Suppress the default WordPress logo/links/etc. by adding a body
-        // class our CSS targets.
         add_filter('login_body_class', [self::class, 'body_class']);
     }
-
-    // ─── Toggle ──────────────────────────────────────────────────────
 
     public static function is_enabled() {
         return (bool) get_option(self::OPT_ENABLED, true);
     }
-
-    // ─── Rewrite + hide wp-login.php ─────────────────────────────────
 
     public static function register_rewrite() {
         add_rewrite_rule(
@@ -112,24 +56,14 @@ class Epos_Agent_Login_Customizer {
         return $vars;
     }
 
-    /**
-     * When the request matches /epos-login, hand control to wp-login.php
-     * with a marker so block_direct_wp_login() lets it through.
-     *
-     * Hooked on `parse_request` (not `template_redirect`) so we run BEFORE
-     * `redirect_canonical` decides to 301 the slug into something else.
-     * The hook passes the WP object; we inspect query_vars directly because
-     * get_query_var() isn't populated yet at this stage.
-     */
     public static function serve_login_on_slug($wp) {
         if (empty($wp->query_vars[self::LOGIN_SLUG]) || $wp->query_vars[self::LOGIN_SLUG] !== '1') {
             return;
         }
 
-        // Mark this request so block_direct_wp_login() lets it through.
-        // $_REQUEST is built from $_GET/$_POST/$_COOKIE at request start,
-        // so we must update it explicitly (modifying $_GET alone is not
-        // enough). All three are written to cover any future check.
+        // $_REQUEST is built once at request start from $_GET/$_POST/$_COOKIE;
+        // mutating $_GET alone doesn't update it, so write all three for
+        // block_direct_wp_login() to see the marker.
         $_GET['epos_login_via_slug']     = '1';
         $_POST['epos_login_via_slug']    = '1';
         $_REQUEST['epos_login_via_slug'] = '1';
@@ -138,11 +72,6 @@ class Epos_Agent_Login_Customizer {
         exit;
     }
 
-    /**
-     * Cancel the canonical redirect that would otherwise 301 our slug into
-     * a trailing-slash variant (or "fix" it into a 404). Without this, WP's
-     * redirect_canonical kicks in BEFORE our parse_request handoff runs.
-     */
     public static function maybe_block_canonical_redirect($redirect_url, $requested_url) {
         $req_path = is_string($requested_url) ? wp_parse_url($requested_url, PHP_URL_PATH) : '';
         if (is_string($req_path) && preg_match('#(^|/)' . preg_quote(self::LOGIN_SLUG, '#') . '/?$#', $req_path)) {
@@ -151,27 +80,18 @@ class Epos_Agent_Login_Customizer {
         return $redirect_url;
     }
 
-    /**
-     * Return 404 for direct hits to wp-login.php unless we routed there
-     * ourselves via /epos-login. We can't 404 *too* early — wp-login.php
-     * needs to be reachable for the form action POST. We check the
-     * marker set in serve_login_on_slug() to distinguish.
-     */
     public static function block_direct_wp_login() {
         if (isset($_REQUEST['epos_login_via_slug'])) {
             return;
         }
 
-        // Allow logged-in users (they may be hitting wp-login.php to log out)
-        // and the logout action itself.
         $action = isset($_REQUEST['action']) ? sanitize_key($_REQUEST['action']) : '';
         if ($action === 'logout') {
             return;
         }
 
-        // For the POST submission, the form action lives at wp-login.php
-        // and won't carry our marker. Detect this by Referer pointing at
-        // /epos-login on the same host.
+        // The POST submission's form action is wp-login.php and carries no
+        // marker; trust it when the Referer points at our slug.
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $referer = isset($_SERVER['HTTP_REFERER']) ? wp_parse_url($_SERVER['HTTP_REFERER']) : null;
             $home    = wp_parse_url(home_url('/'));
@@ -192,7 +112,6 @@ class Epos_Agent_Login_Customizer {
         if ($wp_query) {
             $wp_query->set_404();
         }
-        // Render the theme's 404 template if available, otherwise a minimal body.
         $template = get_404_template();
         if ($template && file_exists($template)) {
             include $template;
@@ -202,10 +121,6 @@ class Epos_Agent_Login_Customizer {
         exit;
     }
 
-    /**
-     * Rewrite outgoing wp-login.php URLs (login, logout, lostpassword) to
-     * /epos-login so the real path never appears in emails or redirects.
-     */
     public static function filter_login_urls($url, $path = '', $scheme = null, $blog_id = null) {
         if (strpos($url, 'wp-login.php') === false) {
             return $url;
@@ -220,11 +135,7 @@ class Epos_Agent_Login_Customizer {
         return $location;
     }
 
-    // ─── UI override ─────────────────────────────────────────────────
-
     public static function enqueue_assets() {
-        // Load Google fonts inline-via-CSS rather than a separate enqueue,
-        // because the login screen tends to dequeue arbitrary handles.
         wp_enqueue_style(
             'epos-login-customizer',
             EPOS_AGENT_PLUGIN_URL . 'assets/css/login.css',
@@ -240,10 +151,6 @@ class Epos_Agent_Login_Customizer {
         );
     }
 
-    public static function inject_head() {
-        // Nothing currently — kept as a hook for future per-site overrides.
-    }
-
     public static function header_url() {
         return home_url('/');
     }
@@ -257,11 +164,6 @@ class Epos_Agent_Login_Customizer {
         return $classes;
     }
 
-    /**
-     * Renders the opening DOM that wraps the WordPress login form. WordPress
-     * emits the form INSIDE the .epos-form-pane div thanks to the CSS grid
-     * — there's no DOM-reparent, the form just lives in the left column.
-     */
     public static function open_layout() {
         $logo_url = EPOS_AGENT_PLUGIN_URL . 'assets/images/logo-zippy.png';
         ?>
@@ -280,11 +182,6 @@ class Epos_Agent_Login_Customizer {
         <?php
     }
 
-    /**
-     * Closes the left column, renders the right banner column, plus the
-     * floating-cube widget cards. Hooked to login_footer so it runs AFTER
-     * the WordPress form output.
-     */
     public static function close_layout() {
         $forgot_url = wp_lostpassword_url();
         $home_url   = home_url('/');
@@ -347,10 +244,6 @@ class Epos_Agent_Login_Customizer {
           </section><!-- /.epos-auth-shell -->
         </main>
 
-        <?php
-        // Hidden helper: store the forgot-password URL so login.js can
-        // turn the "Forgot password?" link into a real anchor at runtime
-        // (we can't print it directly inside the WP-rendered <form>).
         ?>
         <script>window.EPOS_LOGIN = <?php echo wp_json_encode(['forgotUrl' => $forgot_url]); ?>;</script>
         <?php

@@ -359,6 +359,7 @@ body.epos-login-page .epos-row-meta a:hover {
 /* Submit button. */
 body.epos-login-page .epos-form-pane__form #loginform .submit { margin: 0; }
 body.epos-login-page .epos-form-pane__form #loginform .button-primary {
+  position: relative;
   width: 100% !important;
   min-height: 54px !important;
   border: 0 !important;
@@ -380,6 +381,32 @@ body.epos-login-page .epos-form-pane__form #loginform .button-primary:hover {
 body.epos-login-page .epos-form-pane__form #loginform .button-primary:active {
   transform: translateY(1px) scale(.99);
   filter: saturate(.92);
+}
+
+/* Submit-loading: JS adds .is-loading on form submit. The button label
+   stays in the DOM but goes transparent so width doesn't jump, and a
+   spinner overlay rotates in the centre. */
+body.epos-login-page .epos-form-pane__form #loginform .button-primary.is-loading {
+  color: transparent !important;
+  cursor: progress !important;
+  pointer-events: none;
+  position: relative;
+}
+body.epos-login-page .epos-form-pane__form #loginform .button-primary.is-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: epos-spin .8s linear infinite;
+}
+@keyframes epos-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* WP messages / errors styled inside the form pane. */

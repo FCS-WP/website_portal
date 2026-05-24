@@ -10,32 +10,24 @@ class Epos_Agent_Activator {
      * - Trigger initial handshake with Portal
      */
     public static function activate() {
-        // Schedule the 5-minute ping cron
         if (!wp_next_scheduled('epos_agent_ping_hook')) {
             wp_schedule_event(time(), 'every_five_minutes', 'epos_agent_ping_hook');
         }
 
-        // Set default options
         add_option('epos_agent_portal_url', '');
         add_option('epos_agent_api_key', '');
         add_option('epos_agent_connection_status', 'pending');
-
-        // Default the login customizer to on. Stored as an option so admins
-        // can flip it off later from the settings page without disabling
-        // the entire plugin.
         add_option('epos_login_customizer_enabled', '1');
 
-        // Register the /epos-login rewrite rule, then flush so the new
-        // route is recognized without forcing a manual permalinks re-save.
+        // Pre-register the slug before flush so /epos-login resolves without
+        // requiring a manual permalinks re-save.
         if (class_exists('Epos_Agent_Login_Customizer')) {
             Epos_Agent_Login_Customizer::register_rewrite();
         }
         flush_rewrite_rules();
 
-        // Attempt handshake if settings already exist
         $portal_url = get_option('epos_agent_portal_url');
         $api_key = get_option('epos_agent_api_key');
-
         if (!empty($portal_url) && !empty($api_key)) {
             self::perform_handshake($portal_url, $api_key);
         }
@@ -103,11 +95,9 @@ class Epos_Agent_Activator {
             update_option('epos_agent_connection_status', 'connected');
             update_option('epos_agent_last_error', '');
 
-            // Persist the portal-supplied list of hosts that may legitimately
-            // serve plugin download URLs (e.g. a separate backend host like
-            // web-backend.example.com when the portal frontend is at
-            // portal.example.com). Used by class-plugin-installer.php to
-            // validate incoming download_url params.
+            // Used by class-plugin-installer.php to validate download_url
+            // host. Covers split deployments where the backend URL differs
+            // from the registered portal URL.
             if (!empty($data['download_hosts']) && is_array($data['download_hosts'])) {
                 $hosts = array_map('strtolower', array_filter($data['download_hosts'], 'is_string'));
                 update_option('epos_agent_download_hosts', implode(',', $hosts));

@@ -46,12 +46,9 @@ class Epos_Agent_Plugin_Installer {
         require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
-        // Security: Only allow downloads from the configured Portal URL,
-        // OR any additional hosts the portal has registered via the
-        // wp_option `epos_agent_download_hosts` (comma-separated). This
-        // covers the common production setup where the Next.js frontend
-        // is at portal.example.com but signed download URLs come from a
-        // separate backend host (e.g. web-backend.example.com).
+        // Allow downloads from the registered portal URL plus any hosts
+        // the portal pushes via epos_agent_download_hosts. Covers split
+        // frontend/backend deployments (e.g. portal.x.com + web-backend.x.com).
         $portal_url     = get_option('epos_agent_portal_url', '');
         $extra_hosts    = get_option('epos_agent_download_hosts', '');
         $allowed_hosts  = array();

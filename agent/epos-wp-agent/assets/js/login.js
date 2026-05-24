@@ -1,19 +1,3 @@
-/*
- * EPOS Login Customizer — runtime enhancements
- *
- * The WordPress login <form> is rendered by core PHP; we can't change its
- * markup at the source. This script post-processes it after DOMContentLoaded
- * to add:
- *
- *   - A user-icon decoration on the username input.
- *   - An eye-toggle button on the password input (show/hide).
- *   - A "Forgot password?" link on the same row as the Remember-Me checkbox,
- *     pulled from window.EPOS_LOGIN.forgotUrl (set in login_footer PHP).
- *
- * No external deps. Bails silently if the form isn't on the page (we
- * also run on lost-password / reset-password screens where the structure
- * differs).
- */
 (function () {
   'use strict';
 
@@ -22,7 +6,6 @@
     document.addEventListener('DOMContentLoaded', fn);
   }
 
-  // Inline SVG icons keep us off external assets.
   var ICON_USER =
     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
     '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>';
@@ -54,7 +37,7 @@
 
   ready(function () {
     var form = document.getElementById('loginform');
-    if (!form) return; // not on the main login screen (lost-pw, reset, etc.)
+    if (!form) return;
 
     var userInput = form.querySelector('#user_login');
     var passInput = form.querySelector('#user_pass');
@@ -64,10 +47,8 @@
     }
 
     if (passInput) {
-      // WordPress injects its own .wp-hide-pw eye button next to the
-      // password input. We render our own custom-styled one, so remove
-      // theirs from the DOM (CSS also hides it as a fallback for any
-      // race where JS doesn't run).
+      // WordPress injects its own .wp-hide-pw eye button; remove it so
+      // ours is the only icon. CSS hides it as a fallback if JS is off.
       var wpEye = form.querySelector('.wp-hide-pw');
       if (wpEye && wpEye.parentNode) {
         wpEye.parentNode.removeChild(wpEye);
@@ -82,8 +63,6 @@
       });
     }
 
-    // Move the Remember-Me row into our styled .epos-row-meta and inject
-    // the forgot-password link.
     var remember = form.querySelector('.forgetmenot');
     if (remember) {
       var row = document.createElement('div');
@@ -99,5 +78,31 @@
         row.appendChild(a);
       }
     }
+
+    // Swap WP's <input type="submit"> for a <button type="submit"> so the
+    // CSS `.is-loading::after` spinner can render (pseudo-elements don't
+    // work on replaced elements like <input>). The button keeps the same
+    // name/value so the form POST is byte-identical.
+    var oldSubmit = form.querySelector('#wp-submit');
+    var submitBtn = null;
+    if (oldSubmit && oldSubmit.tagName === 'INPUT') {
+      submitBtn = document.createElement('button');
+      submitBtn.type = 'submit';
+      submitBtn.id = oldSubmit.id;
+      submitBtn.name = oldSubmit.name;
+      submitBtn.value = oldSubmit.value;
+      submitBtn.className = oldSubmit.className;
+      submitBtn.textContent = oldSubmit.value || 'Log In';
+      oldSubmit.parentNode.replaceChild(submitBtn, oldSubmit);
+    } else {
+      submitBtn = oldSubmit;
+    }
+
+    form.addEventListener('submit', function () {
+      if (!submitBtn) return;
+      submitBtn.classList.add('is-loading');
+      submitBtn.setAttribute('aria-busy', 'true');
+      submitBtn.disabled = true;
+    });
   });
 })();
