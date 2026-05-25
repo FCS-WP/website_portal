@@ -146,11 +146,11 @@ export function VaultAuditLog({ siteId }: VaultAuditLogProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold">Access History</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Select value={actionFilter} onValueChange={handleFilterChange}>
-            <SelectTrigger className="w-[160px] h-9">
+            <SelectTrigger className="h-9 w-full sm:w-[160px]">
               <SelectValue placeholder="Filter actions" />
             </SelectTrigger>
             <SelectContent>
@@ -190,12 +190,12 @@ export function VaultAuditLog({ siteId }: VaultAuditLogProps) {
 
       {/* Pagination */}
       {meta && meta.last_page > 1 && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Page {meta.current_page} of {meta.last_page}
             <span className="ml-2">({meta.total} entries)</span>
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"

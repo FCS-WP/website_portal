@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -316,14 +317,21 @@ export default function InstallPluginPage() {
 
       {/* Empty / initial state */}
       {!searching && !hasSearched && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-20 text-center">
-          <Download className="mb-4 size-12 text-muted-foreground/50" />
-          <p className="text-lg font-medium text-muted-foreground">
-            Search WordPress.org&apos;s 60,000+ free plugins
+        <div className="flex flex-col items-center justify-center rounded-xl border bg-linear-to-b from-muted/40 to-transparent py-24 text-center">
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 ring-8 ring-primary/5">
+            <Download className="size-9 text-primary" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight">
+            60,000+ free plugins
           </p>
-          <p className="mt-1 text-sm text-muted-foreground/70">
-            Type a plugin name or keyword above to get started
+          <p className="mt-2 text-sm text-muted-foreground max-w-xs">
+            Search the entire WordPress.org plugin directory and deploy to any of your sites in one click
           </p>
+          <div className="mt-6 flex items-center gap-6 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />Free forever</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />Instant deploy</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500" />Multi-site</span>
+          </div>
         </div>
       )}
 
@@ -579,11 +587,9 @@ export default function InstallPluginPage() {
                           key={site.id}
                           className="flex items-center gap-2 rounded p-1.5 hover:bg-muted cursor-pointer"
                         >
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selectedSiteIds.includes(site.id)}
                             onChange={() => toggleSite(site.id)}
-                            className="size-4 rounded border-border"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">
@@ -604,11 +610,9 @@ export default function InstallPluginPage() {
 
                 {/* Activate option */}
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={activateAfterInstall}
                     onChange={(e) => setActivateAfterInstall(e.target.checked)}
-                    className="size-4 rounded border-border"
                   />
                   <span className="text-sm">Activate after install</span>
                 </label>

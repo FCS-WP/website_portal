@@ -105,15 +105,16 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold">Orders</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <Button
             size="sm"
             variant="outline"
             onClick={handleSync}
             disabled={syncing}
             title="Force the WP agent to push the latest orders now"
+            className="w-full sm:w-auto"
           >
             {syncing ? (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -126,6 +127,7 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
             <Button
               size="sm"
               variant="outline"
+              className="w-full sm:w-auto"
               render={<a href={wpAdminOrdersUrl} target="_blank" rel="noopener noreferrer" />}
             >
               Open WooCommerce Orders <ExternalLink className="ml-1 h-3.5 w-3.5" />
@@ -142,9 +144,9 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Select value={status} onValueChange={(v) => { setStatus(v ?? "all"); setPage(1); }}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
             {filterOpts?.statuses.map((s) => (
@@ -154,7 +156,7 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
         </Select>
 
         <Select value={payment} onValueChange={(v) => { setPayment(v ?? "all"); setPage(1); }}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All payments</SelectItem>
             {filterOpts?.payment_methods.map((p) => (
@@ -164,7 +166,7 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
         </Select>
 
         <Select value={range} onValueChange={(v) => { setRange(v ?? "7d"); setPage(1); }}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {DATE_RANGES.map((r) => (
               <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
@@ -176,11 +178,11 @@ export function SiteOrdersTab({ siteId, siteUrl }: Props) {
       <OrdersTable orders={orders} loading={loading} hideSite />
 
       {meta && meta.last_page > 1 && (
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="text-muted-foreground">
             Showing {orders.length} of {meta.total} orders
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" disabled={meta.page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</Button>
             <span>Page {meta.page} / {meta.last_page}</span>

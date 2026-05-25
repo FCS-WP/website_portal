@@ -6,6 +6,15 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreSiteRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('url')) {
+            $this->merge([
+                'url' => rtrim((string) $this->input('url'), '/'),
+            ]);
+        }
+    }
+
     public function authorize(): bool
     {
         return true;

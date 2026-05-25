@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { userService } from "@/lib/services/users";
 import { User } from "@/types";
@@ -38,6 +39,7 @@ const roleBadgeColor: Record<string, string> = {
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -180,17 +182,12 @@ export default function UsersPage() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Users</h1>

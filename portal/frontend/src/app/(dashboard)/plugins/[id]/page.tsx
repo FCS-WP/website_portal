@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +44,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import {
   ArrowLeft,
   Upload,
@@ -79,6 +81,7 @@ export default function PluginDetailPage() {
   const [plugin, setPlugin] = useState<Plugin | null>(null);
   const [versions, setVersions] = useState<PluginVersion[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [changelogDialogOpen, setChangelogDialogOpen] = useState(false);
   const [selectedChangelog, setSelectedChangelog] = useState<PluginVersion | null>(null);
@@ -247,13 +250,8 @@ export default function PluginDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader variant="detail" />;
   }
 
   if (!plugin) {
@@ -265,7 +263,7 @@ export default function PluginDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Back link */}
       <Link
         href="/plugins"
@@ -641,12 +639,10 @@ export default function PluginDetailPage() {
 
               {uploadTrack === 'stable' && (
               <div className="flex items-center gap-2">
-                <input
+                <Checkbox
                   id="version-stable"
-                  type="checkbox"
                   checked={uploadIsStable}
                   onChange={(e) => setUploadIsStable(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
                 />
                 <Label htmlFor="version-stable" className="cursor-pointer">
                   Mark as stable release

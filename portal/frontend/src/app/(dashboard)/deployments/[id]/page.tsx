@@ -5,8 +5,10 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import {
   ArrowLeft,
   RotateCcw,
@@ -74,6 +76,7 @@ export default function DeploymentDetailPage() {
   const [deployment, setDeployment] = useState<DeploymentJob | null>(null);
   const [progress, setProgress] = useState<DeploymentProgress | null>(null);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [retrying, setRetrying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -318,19 +321,8 @@ export default function DeploymentDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4 p-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader variant="detail" />;
   }
 
   if (!deployment) {
@@ -344,7 +336,7 @@ export default function DeploymentDetailPage() {
   const statusCfg = jobStatusConfig[deployment.status] || jobStatusConfig.queued;
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Back link */}
       <Link
         href="/deployments"
@@ -787,11 +779,10 @@ function SiteRow({
     <div className="px-2 py-3">
       <div className="grid grid-cols-[auto_1fr_1fr_80px_100px] gap-3 items-start">
         <div className="pt-0.5">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={selected}
             onChange={onToggle}
-            className="h-3.5 w-3.5 rounded border-border"
+            className="size-3.5"
           />
         </div>
         <div>

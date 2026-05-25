@@ -12,7 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Eye, EyeOff, Send, Save, Loader2, Plus, X } from "lucide-react";
 import { settingsService } from "@/lib/services/settings";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ function normalizePrefix(raw: string): string {
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [showToken, setShowToken] = useState(false);
@@ -134,18 +136,12 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader variant="cards" />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">

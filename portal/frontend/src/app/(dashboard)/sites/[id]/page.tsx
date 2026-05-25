@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +55,7 @@ export default function SiteDetailPage() {
 
   const [site, setSite] = useState<Site | null>(null);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
@@ -171,12 +174,9 @@ export default function SiteDetailPage() {
     }
   };
 
-  if (loading) {
+  if (showLoader) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <PageLoader variant="detail" />
     );
   }
 
@@ -189,11 +189,11 @@ export default function SiteDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div className="space-y-4">
         {/* Title row */}
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{site.name}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="break-words text-2xl font-bold">{site.name}</h1>
           <StatusBadge status={site.status} />
           {site.is_beta_tester && (
             <span className="bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full font-medium">BETA</span>
@@ -201,13 +201,14 @@ export default function SiteDetailPage() {
         </div>
 
         {/* Actions row — primary actions inline, rare/risky ones in a kebab menu */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {["connected", "online"].includes(site.status) && (
             <Button
               variant="outline"
               size="sm"
               onClick={handleAutologin}
               disabled={autologinLoading}
+              className="w-full sm:w-auto"
             >
               {autologinLoading ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -224,6 +225,7 @@ export default function SiteDetailPage() {
             onClick={handleSyncNow}
             disabled={syncing}
             title="Force the WP agent to push fresh orders, plugins, and status"
+            className="w-full sm:w-auto"
           >
             {syncing ? (
               <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -240,7 +242,7 @@ export default function SiteDetailPage() {
               The menu is hidden entirely for MKT (every item is admin/dev-only,
               so showing an empty kebab would just confuse them). */}
           {!isMkt && (
-            <div className="ml-auto">
+            <div className="flex w-full justify-end sm:ml-auto sm:w-auto">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
@@ -334,38 +336,59 @@ export default function SiteDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview" className="gap-1">
+      <Tabs defaultValue="overview" className="gap-4">
+        <TabsList className="group-data-horizontal/tabs:h-auto min-h-11 w-full flex-nowrap items-center gap-1 rounded-xl border border-border/70 bg-muted/55 p-1 sm:flex-wrap">
+          <TabsTrigger
+            value="overview"
+            className="h-9 rounded-lg px-3.5 py-2 text-sm font-medium gap-2"
+          >
             <LayoutDashboard className="h-3.5 w-3.5" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="plugins" className="gap-1">
+          <TabsTrigger
+            value="plugins"
+            className="h-9 rounded-lg px-3.5 py-2 text-sm font-medium gap-2"
+          >
             <Puzzle className="h-3.5 w-3.5" />
             Plugins
           </TabsTrigger>
-          <TabsTrigger value="orders" className="gap-1">
+          <TabsTrigger
+            value="orders"
+            className="h-9 rounded-lg px-3.5 py-2 text-sm font-medium gap-2"
+          >
             <ShoppingCart className="h-3.5 w-3.5" />
             Orders
           </TabsTrigger>
           {!isMkt && (
-            <TabsTrigger value="smtp" className="gap-1">
+            <TabsTrigger
+              value="smtp"
+              className="h-9 rounded-lg px-3.5 py-2 text-sm font-medium gap-2"
+            >
               <Mail className="h-3.5 w-3.5" />
               SMTP
             </TabsTrigger>
           )}
-          <TabsTrigger value="credentials" className="gap-1">
+          <TabsTrigger
+            value="credentials"
+            className="h-9 rounded-lg px-3.5 py-2 text-sm font-medium gap-2"
+          >
             <KeyRound className="h-3.5 w-3.5" />
             Credentials
           </TabsTrigger>
           {!isMkt && (
-            <TabsTrigger value="activity" className="gap-1">
+            <TabsTrigger
+              value="activity"
+              className="h-9 rounded-lg px-3.5 py-2 text-sm font-medium gap-2"
+            >
               <Activity className="h-3.5 w-3.5" />
               Activity
             </TabsTrigger>
           )}
           {isAdmin && (
-            <TabsTrigger value="security" className="gap-1">
+            <TabsTrigger
+              value="security"
+              className="h-9 rounded-lg px-3.5 py-2 text-sm font-medium gap-2"
+            >
               <Shield className="h-3.5 w-3.5" />
               Security
             </TabsTrigger>
@@ -390,7 +413,7 @@ export default function SiteDetailPage() {
                       href={site.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:text-primary/80 transition-colors"
+                      className="break-all text-primary transition-colors hover:text-primary/80"
                     >
                       {site.url}
                     </a>
@@ -489,7 +512,7 @@ export default function SiteDetailPage() {
                   {site.users.map((user) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between py-2 border-b last:border-0"
+                      className="flex flex-col gap-2 border-b py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
                         <p className="font-medium text-sm">{user.name}</p>

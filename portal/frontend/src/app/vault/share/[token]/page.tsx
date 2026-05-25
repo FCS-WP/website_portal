@@ -84,10 +84,16 @@ export default function VaultSharePage() {
       setCredentials(res.data.data);
       setState("credentials");
     } catch (err: unknown) {
-      const error = err as { response?: { status?: number; data?: { message?: string } } };
-      if (error.response?.status === 403 || error.response?.status === 422) {
+      const error = err as { response?: { status?: number; data?: { error?: string; message?: string } } };
+      if (
+        error.response?.status === 401 ||
+        error.response?.status === 403 ||
+        error.response?.status === 422
+      ) {
         setPasswordError(
-          error.response?.data?.message || "Incorrect password"
+          error.response?.data?.error ||
+            error.response?.data?.message ||
+            "Incorrect password"
         );
       } else {
         setState("invalid");
@@ -221,7 +227,15 @@ export default function VaultSharePage() {
                 {/* Type header */}
                 <div className="flex items-center gap-2 border-b px-4 py-3 bg-muted/30">
                   <Icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm">{group.type}</span>
+                  <span className="font-medium text-sm">
+                    {group.type}
+                    {group.label && (
+                      <span className="text-muted-foreground font-normal">
+                        {" — "}
+                        {group.label}
+                      </span>
+                    )}
+                  </span>
                 </div>
 
                 {/* Fields */}

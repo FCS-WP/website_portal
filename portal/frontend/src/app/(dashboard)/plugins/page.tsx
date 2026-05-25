@@ -17,7 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Eye, Plus } from "lucide-react";
 import { pluginService } from "@/lib/services/plugins";
 import { Plugin } from "@/types";
@@ -27,6 +28,7 @@ export default function PluginsPage() {
   const router = useRouter();
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
@@ -151,17 +153,12 @@ export default function PluginsPage() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Plugins</h1>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table";
@@ -76,6 +78,7 @@ export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [hostings, setHostings] = useState<Hosting[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [newApiKey, setNewApiKey] = useState("");
@@ -355,19 +358,14 @@ export default function SitesPage() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader />;
   }
 
   return (
     <TooltipProvider delay={120}>
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="page-content space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Sites</h1>
           <p className="text-muted-foreground">Manage your WordPress sites</p>
@@ -384,15 +382,15 @@ export default function SitesPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Input
           placeholder="Search by name or URL..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
+          className="w-full sm:max-w-xs"
         />
         <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val ?? "all")}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -404,7 +402,7 @@ export default function SitesPage() {
         </Select>
         {hostings.length > 0 && (
           <Select value={filterHosting} onValueChange={(val) => setFilterHosting(val ?? "all")}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Hosting" />
             </SelectTrigger>
             <SelectContent>

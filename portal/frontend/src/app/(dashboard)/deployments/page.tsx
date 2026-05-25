@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Button } from "@/components/ui/button";
 import { deploymentsService } from "@/lib/services/deployments";
 import { DeploymentJob } from "@/types";
@@ -34,6 +35,7 @@ export default function DeploymentsPage() {
   const router = useRouter();
   const [deployments, setDeployments] = useState<DeploymentJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
 
@@ -166,17 +168,12 @@ export default function DeploymentsPage() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Deployments</h1>
         <p className="text-muted-foreground">

@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import {
   Table,
   TableBody,
@@ -57,6 +59,7 @@ export default function PluginUpdatesPage() {
   const [data, setData] = useState<PluginUpdatesResponse | null>(null);
   const [cacheStatus, setCacheStatus] = useState<ExternalPluginCacheStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -276,30 +279,14 @@ export default function PluginUpdatesPage() {
     { value: "abandoned", label: "Abandoned" },
   ];
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64 mt-2" />
-          </div>
-          <Skeleton className="h-9 w-36" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-        </div>
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader variant="cards" />;
   }
 
   const stats = data?.stats;
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

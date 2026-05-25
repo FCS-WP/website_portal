@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Rocket, Clock } from "lucide-react";
@@ -230,11 +231,9 @@ export function DeployDialog({
                         key={site.id}
                         className="flex items-center gap-2 p-1.5 rounded hover:bg-muted cursor-pointer"
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selectedSiteIds.includes(site.id)}
                           onChange={() => toggleSite(site.id)}
-                          className="h-4 w-4 rounded border-gray-300"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
@@ -267,11 +266,9 @@ export function DeployDialog({
           {/* Schedule for later */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={scheduleEnabled}
                 onChange={(e) => setScheduleEnabled(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
               />
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Schedule for later</span>

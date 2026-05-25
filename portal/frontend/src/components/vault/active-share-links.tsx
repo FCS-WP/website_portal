@@ -182,7 +182,16 @@ export function ActiveShareLinks({ siteId }: ActiveShareLinksProps) {
                       {/* Includes */}
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {link.credential_types?.map((ct) => (
+                          {link.credentials && link.credentials.length > 0 ? (
+                            link.credentials.map((credential) => (
+                              <span
+                                key={credential.id}
+                                className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium"
+                              >
+                                {credential.label}
+                              </span>
+                            ))
+                          ) : link.credential_types?.map((ct) => (
                             <span
                               key={ct.id}
                               className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium"

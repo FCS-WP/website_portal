@@ -200,6 +200,7 @@ export interface CredentialField {
   field_label: string;
   field_value: string | null;
   is_sensitive: boolean;
+  has_value?: boolean;
   sort_order: number;
 }
 

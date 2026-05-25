@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Plus, Pencil, Trash2, Eye, Copy, EyeOff } from "lucide-react";
 import { hostingService } from "@/lib/services/hostings";
 import { Hosting, HostingCredentials } from "@/types";
@@ -51,6 +53,7 @@ const providerLabel = (v: string) =>
 export default function HostingsPage() {
   const [hostings, setHostings] = useState<Hosting[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [credentialsDialogOpen, setCredentialsDialogOpen] = useState(false);
@@ -251,17 +254,12 @@ export default function HostingsPage() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Hostings</h1>
