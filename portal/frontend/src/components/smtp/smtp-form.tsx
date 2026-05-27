@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -115,10 +116,8 @@ export function SmtpForm({
     <div className="space-y-5">
       {showEnableToggle && (
         <div className="flex items-center gap-3">
-          <input
+          <Checkbox
             id="smtp-enabled"
-            type="checkbox"
-            className="h-4 w-4 rounded border-input"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
           />
@@ -197,7 +196,7 @@ export function SmtpForm({
             value={encryption}
             onValueChange={(v) => setEncryption((v as SmtpEncryption) ?? "tls")}
           >
-            <SelectTrigger id="smtp-encryption">
+            <SelectTrigger id="smtp-encryption" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -242,7 +241,7 @@ export function SmtpForm({
 
       <div className="border-t pt-5 space-y-3">
         <Label htmlFor="smtp-test-to">Send a test email</Label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             id="smtp-test-to"
             type="email"
@@ -250,7 +249,12 @@ export function SmtpForm({
             value={testEmail}
             onChange={(e) => setTestEmail(e.target.value)}
           />
-          <Button variant="secondary" onClick={handleTest} disabled={testing}>
+          <Button
+            variant="secondary"
+            onClick={handleTest}
+            disabled={testing}
+            className="w-full sm:w-auto"
+          >
             {testing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (

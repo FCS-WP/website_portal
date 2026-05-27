@@ -31,12 +31,43 @@ class CredentialShareController extends Controller
     public function store(Request $request, Site $site): JsonResponse
     {
         $request->validate([
-            'credential_type_ids' => 'required|array',
+            'credential_type_ids' => 'required_without:credential_ids|array',
             'credential_type_ids.*' => 'integer|exists:credential_types,id',
+            'credential_ids' => 'required_without:credential_type_ids|array',
+            'credential_ids.*' => 'integer|exists:site_credentials,id',
             'expires_hours' => 'required|integer|in:12,24,48,168',
-            'max_views' => 'required|integer|min:1|max:100',
+            'max_views' => 'required|integer|min:1|max:9999',
             'share_password' => 'nullable|string|min:1',
         ]);
+
+        $credentialIds = collect($request->input('credential_ids', []))
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (!empty($credentialIds)) {
+            $validCredentialIds = SiteCredential::where('site_id', $site->id)
+                ->whereIn('id', $credentialIds)
+                ->pluck('id')
+                ->all();
+
+            if (count($validCredentialIds) !== count($credentialIds)) {
+                return $this->errorResponse('One or more credentials do not belong to this site.', 422);
+            }
+
+            $credentialTypeIds = SiteCredential::whereIn('id', $credentialIds)
+                ->pluck('credential_type_id')
+                ->unique()
+                ->values()
+                ->all();
+        } else {
+            $credentialTypeIds = collect($request->input('credential_type_ids', []))
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
 
         $token = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $token);
@@ -49,7 +80,8 @@ class CredentialShareController extends Controller
         $link = CredentialShareLink::create([
             'site_id' => $site->id,
             'token_hash' => $tokenHash,
-            'credential_type_ids' => $request->credential_type_ids,
+            'credential_type_ids' => $credentialTypeIds,
+            'credential_ids' => $credentialIds ?: null,
             'created_by' => $request->user()->id,
             'expires_at' => now()->addHours($request->expires_hours),
             'max_views' => $request->max_views,
@@ -62,6 +94,7 @@ class CredentialShareController extends Controller
             'id' => $link->id,
             'share_url' => "/vault/share/{$token}",
             'token' => $token,
+            'credential_ids' => $link->credential_ids,
             'expires_at' => $link->expires_at->toISOString(),
             'max_views' => $link->max_views,
             'is_password_protected' => $link->is_password_protected,
@@ -82,6 +115,11 @@ class CredentialShareController extends Controller
         $data = $links->map(fn(CredentialShareLink $link) => [
             'id' => $link->id,
             'credential_type_ids' => $link->credential_type_ids,
+            'credential_ids' => $link->credential_ids,
+            'credential_types' => CredentialType::whereIn('id', $link->credential_type_ids)
+                ->get(['id', 'name', 'slug'])
+                ->values(),
+            'credentials' => $this->getSharedCredentialSummaries($link),
             'created_by' => $link->createdBy?->name,
             'expires_at' => $link->expires_at?->toISOString(),
             'max_views' => $link->max_views,
@@ -139,12 +177,16 @@ class CredentialShareController extends Controller
         $typeNames = CredentialType::whereIn('id', $link->credential_type_ids)
             ->pluck('name')
             ->toArray();
+        $credentialNames = $this->getSharedCredentialSummaries($link)
+            ->pluck('label')
+            ->toArray();
 
         return response()->json([
             'data' => [
                 'requires_password' => $link->is_password_protected,
                 'site_name' => $site->name,
                 'credential_types' => $typeNames,
+                'credentials' => $credentialNames,
             ],
         ]);
     }
@@ -169,11 +211,18 @@ class CredentialShareController extends Controller
             }
         }
 
-        // Fetch credentials for the allowed types
-        $credentials = SiteCredential::where('site_id', $link->site_id)
-            ->whereIn('credential_type_id', $link->credential_type_ids)
-            ->with(['credentialType', 'fields'])
-            ->get();
+        // Fetch credentials for the explicitly selected accounts when present.
+        // Older share links fall back to type-level sharing.
+        $credentialsQuery = SiteCredential::where('site_id', $link->site_id)
+            ->with(['credentialType', 'fields']);
+
+        if (!empty($link->credential_ids)) {
+            $credentialsQuery->whereIn('id', $link->credential_ids);
+        } else {
+            $credentialsQuery->whereIn('credential_type_id', $link->credential_type_ids);
+        }
+
+        $credentials = $credentialsQuery->get();
 
         $credentialData = $credentials->map(function (SiteCredential $credential) {
             $fields = $credential->fields->map(function ($field) {
@@ -188,12 +237,14 @@ class CredentialShareController extends Controller
                 return [
                     'field_key' => $field->field_key,
                     'field_label' => $field->field_label,
+                    'label' => $field->field_label,
                     'value' => $value,
                 ];
             })->toArray();
 
             return [
                 'type' => $credential->credentialType?->name,
+                'type_slug' => $credential->credentialType?->slug,
                 'label' => $credential->label,
                 'fields' => $fields,
             ];
@@ -206,7 +257,9 @@ class CredentialShareController extends Controller
             'last_accessed_ip' => $request->ip(),
         ]);
 
-        $viewsRemaining = max(0, $link->max_views - $link->view_count);
+        $viewsRemaining = $link->max_views >= 9999
+            ? 9999
+            : max(0, $link->max_views - $link->view_count);
 
         return response()->json([
             'data' => [
@@ -233,5 +286,23 @@ class CredentialShareController extends Controller
             ->where('expires_at', '>', now())
             ->whereColumn('view_count', '<', 'max_views')
             ->first();
+    }
+
+    private function getSharedCredentialSummaries(CredentialShareLink $link)
+    {
+        if (empty($link->credential_ids)) {
+            return collect();
+        }
+
+        return SiteCredential::where('site_id', $link->site_id)
+            ->whereIn('id', $link->credential_ids)
+            ->with('credentialType')
+            ->get()
+            ->map(fn(SiteCredential $credential) => [
+                'id' => $credential->id,
+                'label' => $credential->label ?: $credential->credentialType?->name,
+                'type' => $credential->credentialType?->name,
+                'type_slug' => $credential->credentialType?->slug,
+            ]);
     }
 }

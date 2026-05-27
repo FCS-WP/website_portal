@@ -49,7 +49,7 @@ export function OrderDetailPanel({ order, hideSite = false }: Props) {
       {/* Left: order info */}
       <div className="space-y-3">
         <div className="text-sm font-semibold">Order information</div>
-        <dl className="grid grid-cols-[120px_1fr] gap-y-1.5 text-sm">
+        <dl className="grid grid-cols-[96px_1fr] gap-y-1.5 text-sm sm:grid-cols-[120px_1fr]">
           <dt className="text-muted-foreground">Order ID</dt>
           <dd className="font-mono">#{full.woo_order_id}</dd>
 
@@ -84,7 +84,7 @@ export function OrderDetailPanel({ order, hideSite = false }: Props) {
       {/* Right: customer + items */}
       <div className="space-y-3">
         <div className="text-sm font-semibold">Customer</div>
-        <dl className="grid grid-cols-[120px_1fr] gap-y-1.5 text-sm">
+        <dl className="grid grid-cols-[96px_1fr] gap-y-1.5 text-sm sm:grid-cols-[120px_1fr]">
           <dt className="text-muted-foreground">Name</dt>
           <dd>{full.customer_name ?? "—"}</dd>
           <dt className="text-muted-foreground">Email</dt>
@@ -106,9 +106,9 @@ export function OrderDetailPanel({ order, hideSite = false }: Props) {
           {full.line_items && full.line_items.length > 0 ? (
             <ul className="divide-y rounded border bg-background text-sm">
               {full.line_items.slice(0, 10).map((it, i) => (
-                <li key={i} className="flex items-center justify-between px-3 py-1.5">
-                  <span className="truncate pr-2">{it.name} × {it.qty}</span>
-                  <span className="tabular-nums">{it.total}</span>
+                <li key={i} className="flex flex-col gap-1 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="break-words pr-2">{it.name} × {it.qty}</span>
+                  <span className="tabular-nums sm:text-right">{it.total}</span>
                 </li>
               ))}
               {full.line_items.length > 10 && (

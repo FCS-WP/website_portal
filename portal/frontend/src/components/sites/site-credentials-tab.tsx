@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Loader2,
@@ -141,12 +142,19 @@ export function SiteCredentialsTab({
 
   // Share dialog
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [selectedShareCredentialIds, setSelectedShareCredentialIds] = useState<Set<number>>(new Set());
+  const [shareLinksRefreshKey, setShareLinksRefreshKey] = useState(0);
 
   const fetchCredentials = useCallback(async () => {
     try {
       setError(null);
       const res = await credentialService.list(siteId);
-      setCredentials(res.data.data || []);
+      const nextCredentials = res.data.data || [];
+      setCredentials(nextCredentials);
+      setSelectedShareCredentialIds((prev) => {
+        const availableIds = new Set(nextCredentials.map((credential: Credential) => credential.id));
+        return new Set(Array.from(prev).filter((id) => availableIds.has(id)));
+      });
     } catch {
       setError("Failed to load credentials");
     } finally {
@@ -216,6 +224,31 @@ export function SiteCredentialsTab({
   const handleAddClick = () => {
     setEditingCredential(undefined);
     setFormDialogOpen(true);
+  };
+
+  const handleToggleShareCredential = (credentialId: number) => {
+    setSelectedShareCredentialIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(credentialId)) {
+        next.delete(credentialId);
+      } else {
+        next.add(credentialId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllShareCredentials = () => {
+    setSelectedShareCredentialIds(new Set(credentials.map((credential) => credential.id)));
+  };
+
+  const handleClearShareSelection = () => {
+    setSelectedShareCredentialIds(new Set());
+  };
+
+  const handleShareComplete = () => {
+    handleClearShareSelection();
+    setShareLinksRefreshKey((key) => key + 1);
   };
 
   const handleAutologin = async () => {
@@ -392,16 +425,45 @@ export function SiteCredentialsTab({
 
   const uniqueTypes = getUniqueTypes(credentials);
   const grouped = groupByType(credentials);
+  const selectedShareCredentials = credentials.filter((credential) =>
+    selectedShareCredentialIds.has(credential.id)
+  );
 
   return (
     <div className="space-y-4">
       {/* Top action bar */}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
         {isAdmin && (
-          <Button variant="outline" size="sm" onClick={() => setShareDialogOpen(true)}>
-            <Share2 className="h-4 w-4 mr-1.5" />
-            Share with client
-          </Button>
+          <>
+            <span className="text-xs text-muted-foreground">
+              {selectedShareCredentialIds.size} selected
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAllShareCredentials}
+              disabled={selectedShareCredentialIds.size === credentials.length}
+            >
+              Select all
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearShareSelection}
+              disabled={selectedShareCredentialIds.size === 0}
+            >
+              Clear
+            </Button>
+            <Button
+              variant={selectedShareCredentialIds.size > 0 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShareDialogOpen(true)}
+              disabled={selectedShareCredentialIds.size === 0}
+            >
+              <Share2 className="h-4 w-4 mr-1.5" />
+              Share with client
+            </Button>
+          </>
         )}
         {canMutate && (
           <Button size="sm" onClick={handleAddClick}>
@@ -444,12 +506,24 @@ export function SiteCredentialsTab({
         >
           {creds.map((credential) => {
             const Icon = getTypeIcon(credential.credential_type.slug);
+            const isSelectedForShare = selectedShareCredentialIds.has(credential.id);
             return (
-              <Card key={credential.id}>
+              <Card
+                key={credential.id}
+                className={isSelectedForShare ? "border-primary/60 ring-1 ring-primary/40" : undefined}
+              >
                 <CardContent className="p-0">
                   {/* Credential header */}
-                  <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex flex-col gap-3 border-b px-4 pb-3 pt-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      {isAdmin && (
+                        <Checkbox
+                          aria-label={`Select ${credential.label || credential.credential_type.name} for sharing`}
+                          checked={isSelectedForShare}
+                          onChange={() => handleToggleShareCredential(credential.id)}
+                          className="accent-black"
+                        />
+                      )}
                       <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="font-medium text-sm truncate">
                         {credential.credential_type.name}
@@ -469,13 +543,14 @@ export function SiteCredentialsTab({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex flex-wrap items-center gap-1 sm:flex-shrink-0">
                       {credential.credential_type.slug === "wordpress" && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={handleAutologin}
                           disabled={autologinLoading}
+                          className="w-full sm:w-auto"
                         >
                           {autologinLoading ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
@@ -507,7 +582,7 @@ export function SiteCredentialsTab({
                   </div>
 
                   {/* Fields grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 px-4 pb-3 pt-3">
                     {credential.fields
                       .sort((a, b) => a.sort_order - b.sort_order)
                       .map((field) => (
@@ -560,10 +635,12 @@ export function SiteCredentialsTab({
         onClose={() => setShareDialogOpen(false)}
         siteId={siteId}
         siteName={siteName}
+        selectedCredentials={selectedShareCredentials}
+        onShareComplete={handleShareComplete}
       />
 
       {/* Active share links (admin only) */}
-      {isAdmin && <ActiveShareLinks siteId={siteId} />}
+      {isAdmin && <ActiveShareLinks key={shareLinksRefreshKey} siteId={siteId} />}
 
       {/* Delete confirmation dialog */}
       <Dialog
@@ -631,6 +708,7 @@ function FieldCell({
   const key = makeFieldKey(credentialId, field.field_key);
   const revealed = revealedValues.get(key);
   const isCopied = copiedFields.has(key);
+  const hasSensitiveValue = field.has_value ?? true;
 
   if (!field.is_sensitive) {
     // Non-sensitive field
@@ -639,8 +717,8 @@ function FieldCell({
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {field.field_label}
         </p>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-mono truncate flex-1">
+        <div className="flex items-start gap-2">
+          <span className="flex-1 break-all text-sm font-mono">
             {field.field_value || "—"}
           </span>
           {field.field_value && (
@@ -667,10 +745,12 @@ function FieldCell({
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
         {field.field_label}
       </p>
-      <div className="flex items-center gap-2">
-        {revealed ? (
-          <span className="text-sm font-mono truncate flex-1">
-            {revealed.value}
+      <div className="flex items-start gap-2">
+        {!hasSensitiveValue ? (
+          <span className="flex-1 text-sm text-muted-foreground">Not set</span>
+        ) : revealed ? (
+          <span className="flex-1 break-all text-sm font-mono">
+            {revealed.value || "—"}
             <span className="text-xs text-muted-foreground ml-1.5">
               ({revealed.remaining}s)
             </span>
@@ -683,6 +763,7 @@ function FieldCell({
           size="icon-xs"
           onClick={() => onReveal(credentialId, field.field_key)}
           title={revealed ? "Hide" : "Reveal"}
+          disabled={!hasSensitiveValue}
         >
           {revealed ? (
             <EyeOff className="h-3 w-3" />
@@ -701,6 +782,7 @@ function FieldCell({
             )
           }
           title="Copy"
+          disabled={!hasSensitiveValue}
         >
           {isCopied ? (
             <Check className="h-3 w-3 text-green-600" />

@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppSidebarMobile } from "./app-sidebar";
 
 export function AppHeader() {
   const { user, logout } = useAuthStore();
@@ -38,14 +39,25 @@ export function AppHeader() {
   };
 
   return (
-    <header className="h-16 border-b bg-background flex items-center justify-end px-6 gap-4">
-      <ThemeToggle />
-      {user && (
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium">{user.name}</span>
+    <header className="flex h-16 items-center justify-between gap-3 border-b bg-background px-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <AppSidebarMobile />
+        <div className="min-w-0 lg:hidden">
+          <p className="truncate text-sm font-semibold">EPOS Portal</p>
+          <p className="truncate text-[11px] text-muted-foreground">Central Platform</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 sm:gap-4">
+        <ThemeToggle />
+        {user && (
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <span className="hidden truncate text-sm font-medium md:inline">
+            {user.name}
+          </span>
           <Badge
             variant="secondary"
-            className={roleBadgeColor[user.role] || ""}
+            className={`hidden sm:inline-flex ${roleBadgeColor[user.role] || ""}`}
           >
             {user.role.toUpperCase()}
           </Badge>
@@ -69,8 +81,9 @@ export function AppHeader() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </header>
   );
 }

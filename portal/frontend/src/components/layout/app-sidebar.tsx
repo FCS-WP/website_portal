@@ -20,10 +20,20 @@ import {
   Lock,
   RefreshCw,
   Download,
+  Menu,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
 import { sidebarService, SidebarCounts } from "@/lib/services/sidebar";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 type Role = "admin" | "dev" | "mkt";
 
@@ -33,50 +43,47 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   badgeVariant?: "info" | "warning";
-  placeholder?: boolean;
-  /** If set, only these roles see this item. Omit to allow everyone. */
   roles?: Role[];
 }
 
 interface NavGroup {
   label: string;
-  /** Legacy flag — equivalent to roles=["admin"]. Kept so other groups don't break. */
   adminOnly?: boolean;
-  /** If set, only these roles see this whole group. Falls back to per-item filtering. */
   roles?: Role[];
   items: NavItem[];
 }
 
-export function AppSidebar() {
-  const pathname = usePathname();
-  const { user } = useAuthStore();
-  const role = (user?.role ?? "mkt") as Role;
-  const isAdmin = role === "admin";
+function useSidebarCounts() {
   const [counts, setCounts] = useState<SidebarCounts | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+
     const fetchCounts = async () => {
       try {
         const res = await sidebarService.counts();
-        if (!cancelled) setCounts(res.data.data);
+        if (!cancelled) {
+          setCounts(res.data.data);
+        }
       } catch {
         // silently ignore
       }
     };
+
     fetchCounts();
     const interval = setInterval(fetchCounts, 60000);
-    return () => { cancelled = true; clearInterval(interval); };
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
-  // Role-based sidebar shape. Per our scope audit:
-  //   admin → sees everything
-  //   dev   → sees MAIN (no Hostings), PLUGINS, OPERATIONS, no SECURITY/ADMIN
-  //   mkt   → sees Dashboard + Sites (MAIN) and Orders (OPERATIONS) only
-  //
-  // `roles` on a group hides the whole group. `roles` on an item hides
-  // individual rows so we don't end up with an empty group header.
-  const navGroups: NavGroup[] = [
+  return counts;
+}
+
+function getNavGroups(counts: SidebarCounts | null): NavGroup[] {
+  return [
     {
       label: "MAIN",
       items: [
@@ -159,111 +166,201 @@ export function AppSidebar() {
       ],
     },
   ];
+}
 
-  const canSeeGroup = (group: NavGroup): boolean => {
-    if (group.adminOnly && !isAdmin) return false;
-    if (group.roles && !group.roles.includes(role)) return false;
-    return true;
-  };
+function getFilteredGroups(role: Role, counts: SidebarCounts | null) {
+  const isAdmin = role === "admin";
 
-  const canSeeItem = (item: NavItem): boolean => {
-    if (item.roles && !item.roles.includes(role)) return false;
-    return true;
-  };
+  return getNavGroups(counts)
+    .filter((group) => {
+      if (group.adminOnly && !isAdmin) return false;
+      if (group.roles && !group.roles.includes(role)) return false;
+      return true;
+    })
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.roles || item.roles.includes(role)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
-  // First filter items inside each group, then drop any group that
-  // ended up with zero visible items (so we don't render an empty header).
-  const filteredGroups = navGroups
-    .filter(canSeeGroup)
-    .map((g) => ({ ...g, items: g.items.filter(canSeeItem) }))
-    .filter((g) => g.items.length > 0);
+function BrandBlock() {
+  return (
+    <Link href="/dashboard" className="flex items-center gap-3">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600">
+        <LayoutDashboard className="h-4 w-4 text-white" />
+      </div>
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-semibold leading-tight">EPOS Portal</span>
+        <span className="truncate text-[11px] leading-tight text-muted-foreground">
+          Central Platform
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function UserFooter({ user }: { user: ReturnType<typeof useAuthStore>["user"] }) {
+  if (!user) return null;
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r bg-sidebar">
-      {/* Brand Header */}
-      <div className="flex h-16 items-center px-6 border-b">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
-            <LayoutDashboard className="h-4 w-4 text-white" />
+    <div className="flex items-center gap-3">
+      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+        {user.name
+          ?.split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2) || "U"}
+      </div>
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-medium">{user.name}</span>
+        <span className="text-[11px] capitalize text-muted-foreground">
+          {user.role === "admin"
+            ? "Administrator"
+            : user.role === "dev"
+              ? "Developer"
+              : "Marketing"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SidebarNavSections({
+  groups,
+  pathname,
+  onNavigate,
+}: {
+  groups: NavGroup[];
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  return (
+    <>
+      {groups.map((group) => (
+        <div key={group.label}>
+          <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            {group.label}
           </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-sm leading-tight">EPOS Portal</span>
-            <span className="text-[11px] text-muted-foreground leading-tight">Central Platform</span>
+          <div className="space-y-0.5">
+            {group.items.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (pathname.startsWith(item.href + "/") &&
+                  !group.items.some(
+                    (other) => other.href !== item.href && pathname.startsWith(other.href)
+                  ));
+
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary [&_svg]:text-primary"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 truncate text-left">{item.name}</span>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span
+                      className={cn(
+                        "ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-none tabular-nums",
+                        item.badgeVariant === "warning"
+                          ? "bg-amber-500 text-white dark:bg-amber-600"
+                          : "bg-muted-foreground/20 text-muted-foreground"
+                      )}
+                    >
+                      {item.badge > 99 ? "99+" : item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </div>
-        </Link>
+        </div>
+      ))}
+    </>
+  );
+}
+
+export function AppSidebar() {
+  const pathname = usePathname();
+  const { user } = useAuthStore();
+  const role = (user?.role ?? "mkt") as Role;
+  const counts = useSidebarCounts();
+  const filteredGroups = getFilteredGroups(role, counts);
+
+  return (
+    <aside className="hidden border-r bg-sidebar lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+      <div className="flex h-16 items-center border-b px-6">
+        <BrandBlock />
       </div>
 
-      {/* Navigation Groups */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        {filteredGroups.map((group) => (
-          <div key={group.label}>
-            <div className="px-3 mb-2 text-[11px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
-              {group.label}
-            </div>
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const isActive = pathname === item.href || 
-                  (pathname.startsWith(item.href + "/") && 
-                   !group.items.some((other) => other.href !== item.href && pathname.startsWith(other.href)));
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={cn(
-                      // Base: row layout + a transparent left border that the
-                      // active state lights up. Using a border slot avoids
-                      // layout shift between active/inactive states.
-                      "flex items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors",
-                      isActive
-                        ? // Active: primary-tinted background, primary text,
-                          // and a primary left accent. Icon picks up the
-                          // primary color through `[&_svg]:text-primary` so
-                          // the whole row reads as the selected nav item.
-                          "border-primary bg-primary/10 text-primary [&_svg]:text-primary"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    <span className="flex-1 truncate">{item.name}</span>
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <span
-                        className={cn(
-                          "ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-none tabular-nums",
-                          item.badgeVariant === "warning"
-                            ? "bg-amber-500 text-white dark:bg-amber-600"
-                            : "bg-muted-foreground/20 text-muted-foreground"
-                        )}
-                      >
-                        {item.badge > 99 ? "99+" : item.badge}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+        <SidebarNavSections groups={filteredGroups} pathname={pathname} />
       </nav>
 
-      {/* User Footer */}
       {user && (
         <div className="border-t px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
-              {user.name
-                ?.split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2) || "U"}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium truncate">{user.name}</span>
-              <span className="text-[11px] text-muted-foreground capitalize">{user.role === "admin" ? "Administrator" : user.role === "dev" ? "Developer" : "Marketing"}</span>
-            </div>
-          </div>
+          <UserFooter user={user} />
         </div>
       )}
     </aside>
+  );
+}
+
+export function AppSidebarMobile() {
+  const pathname = usePathname();
+  const { user } = useAuthStore();
+  const role = (user?.role ?? "mkt") as Role;
+  const counts = useSidebarCounts();
+  const filteredGroups = getFilteredGroups(role, counts);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="lg:hidden"
+            aria-label="Open navigation"
+          />
+        }
+      >
+        <Menu className="h-4 w-4" />
+      </SheetTrigger>
+
+      <SheetContent side="left" className="w-[min(20rem,calc(100vw-1rem))] p-0 lg:hidden">
+        <SheetHeader className="border-b pr-14">
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetDescription className="sr-only">
+            Browse the portal sections
+          </SheetDescription>
+          <BrandBlock />
+        </SheetHeader>
+
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+          <SidebarNavSections
+            groups={filteredGroups}
+            pathname={pathname}
+            onNavigate={() => setOpen(false)}
+          />
+        </nav>
+
+        {user && (
+          <div className="border-t px-4 py-3">
+            <UserFooter user={user} />
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

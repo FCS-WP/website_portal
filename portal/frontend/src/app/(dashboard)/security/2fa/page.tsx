@@ -13,7 +13,9 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import {
   Table,
   TableBody,
@@ -47,6 +49,7 @@ import type { TwofaDashboard } from "@/types/security";
 export default function TwoFaManagementPage() {
   const [dashboard, setDashboard] = useState<TwofaDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
 
   // Enable dialog state
   const [enableDialogOpen, setEnableDialogOpen] = useState(false);
@@ -192,25 +195,12 @@ export default function TwoFaManagementPage() {
     ? dashboard.sites_list.filter((s) => !s.is_enabled)
     : [];
 
-  if (loading) {
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        <div>
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="mt-2 h-4 w-80" />
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader variant="cards" />;
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="page-content flex flex-1 flex-col gap-6 p-6">
       {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">
@@ -333,12 +323,10 @@ export default function TwoFaManagementPage() {
                 <TableRow key={site.id}>
                   <TableCell>
                     {!site.is_enabled && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedSites.has(site.id)}
                         onChange={() => toggleSiteSelection(site.id)}
                         disabled={bulkEnabling}
-                        className="size-4 rounded border-border"
                       />
                     )}
                   </TableCell>

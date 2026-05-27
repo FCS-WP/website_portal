@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,7 @@ export default function SecurityOverviewPage() {
   const [overview, setOverview] = useState<SecurityOverview | null>(null);
   const [poorSites, setPoorSites] = useState<SiteSecurityScore[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = useCallback(async (isRefresh = false) => {
@@ -50,8 +53,12 @@ export default function SecurityOverviewPage() {
 
   const handleRefresh = () => fetchData(true);
 
+  if (showLoader) {
+    return <PageLoader variant="cards" />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,7 @@ export default function ActivityLogsPage() {
   const [filterOpts, setFilterOpts] = useState<ActivityLogFilterOptions | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
 
   // Filters
   const [action, setAction] = useState("all");
@@ -112,9 +115,13 @@ export default function ActivityLogsPage() {
     [action, userId, siteId, range]
   );
 
+  if (showLoader) {
+    return <PageLoader />;
+  }
+
   return (
     <TooltipProvider delay={120}>
-      <div className="space-y-6">
+      <div className="page-content space-y-6">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-semibold">Activity Logs</h1>
@@ -125,9 +132,9 @@ export default function ActivityLogsPage() {
         </div>
 
         {/* Filter bar */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <Select value={action} onValueChange={(v) => { setAction(v ?? "all"); setPage(1); }}>
-            <SelectTrigger className="w-[200px]"><SelectValue placeholder="All actions" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[200px]"><SelectValue placeholder="All actions" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All actions</SelectItem>
               {filterOpts?.actions.map((a) => (
@@ -137,7 +144,7 @@ export default function ActivityLogsPage() {
           </Select>
 
           <Select value={userId} onValueChange={(v) => { setUserId(v ?? "all"); setPage(1); }}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="All users" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="All users" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All users</SelectItem>
               {filterOpts?.users.map((u) => (
@@ -147,7 +154,7 @@ export default function ActivityLogsPage() {
           </Select>
 
           <Select value={siteId} onValueChange={(v) => { setSiteId(v ?? "all"); setPage(1); }}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="All sites" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="All sites" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All sites</SelectItem>
               {sites.map((s) => (
@@ -157,7 +164,7 @@ export default function ActivityLogsPage() {
           </Select>
 
           <Select value={range} onValueChange={(v) => { setRange(v ?? "7d"); setPage(1); }}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {DATE_RANGES.map((r) => (
                 <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>

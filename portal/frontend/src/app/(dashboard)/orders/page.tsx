@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,7 @@ export default function OrdersPage() {
   const [mostActive, setMostActive] = useState<MostActiveSite[]>([]);
   const [filterOpts, setFilterOpts] = useState<OrderFilterOptions | null>(null);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Filters
@@ -93,8 +96,12 @@ export default function OrdersPage() {
 
   const hasFilters = siteId !== "all" || status !== "all" || payment !== "all" || range !== "7d";
 
+  if (showLoader) {
+    return <PageLoader />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -132,9 +139,9 @@ export default function OrdersPage() {
       )}
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Select value={siteId} onValueChange={(v) => { setSiteId(v ?? "all"); setPage(1); }}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All sites" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="All sites" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All sites</SelectItem>
             {filterOpts?.sites.map((s) => (
@@ -144,7 +151,7 @@ export default function OrdersPage() {
         </Select>
 
         <Select value={status} onValueChange={(v) => { setStatus(v ?? "all"); setPage(1); }}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
             {filterOpts?.statuses.map((s) => (
@@ -154,7 +161,7 @@ export default function OrdersPage() {
         </Select>
 
         <Select value={payment} onValueChange={(v) => { setPayment(v ?? "all"); setPage(1); }}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All payments" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="All payments" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All payments</SelectItem>
             {filterOpts?.payment_methods.map((p) => (
@@ -164,7 +171,7 @@ export default function OrdersPage() {
         </Select>
 
         <Select value={range} onValueChange={(v) => { setRange(v ?? "7d"); setPage(1); }}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {DATE_RANGES.map((r) => (
               <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
@@ -182,11 +189,11 @@ export default function OrdersPage() {
 
       {/* Pagination */}
       {meta && meta.last_page > 1 && (
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="text-muted-foreground">
             Showing {orders.length} of {meta.total} orders
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline" size="sm"
               disabled={meta.page <= 1}

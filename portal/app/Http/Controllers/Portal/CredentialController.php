@@ -518,6 +518,8 @@ class CredentialController extends Controller
                 'field_label' => $field->field_label,
                 'field_value' => $field->is_sensitive ? null : $field->field_value,
                 'is_sensitive' => $field->is_sensitive,
+                'has_value' => !empty($field->field_value),
+                'sort_order' => $field->sort_order,
             ])->values()->toArray(),
             'created_at' => $credential->created_at?->toISOString(),
             'updated_at' => $credential->updated_at?->toISOString(),

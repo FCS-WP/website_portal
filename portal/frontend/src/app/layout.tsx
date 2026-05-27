@@ -39,7 +39,12 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${manrope.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body
+        // Some browser extensions inject attributes into <body> before React
+        // hydrates in dev, which produces a noisy mismatch overlay.
+        suppressHydrationWarning
+        className="min-h-full flex flex-col"
+      >
         <ThemeProvider>
           {children}
           <Toaster />

@@ -29,26 +29,41 @@ class AgentAuthMiddleware
             ], 401);
         }
 
-        // Look up site by URL — try exact match first, then Docker networking alternatives
-        $normalizedUrl = rtrim($siteUrl, '/');
-        $site = Site::where('url', $normalizedUrl)->first();
+        // Look up site by URL. Older records may have been saved with a
+        // trailing slash, while the agent normalizes before sending.
+        $normalizedUrl = rtrim(trim($siteUrl), '/');
+        $urlCandidates = array_values(array_unique(array_filter([
+            trim($siteUrl),
+            $normalizedUrl,
+            $normalizedUrl . '/',
+        ])));
+
+        $site = Site::whereIn('url', $urlCandidates)->first();
 
         if (!$site) {
             // Try Docker networking alternatives
             $alternatives = [];
 
             // localhost ↔ host.docker.internal
-            if (str_contains($normalizedUrl, 'localhost')) {
-                $alternatives[] = str_replace('localhost', 'host.docker.internal', $normalizedUrl);
-            } elseif (str_contains($normalizedUrl, 'host.docker.internal')) {
-                $alternatives[] = str_replace('host.docker.internal', 'localhost', $normalizedUrl);
+            foreach ($urlCandidates as $candidate) {
+                if (str_contains($candidate, 'localhost')) {
+                    $alternatives[] = str_replace('localhost', 'host.docker.internal', $candidate);
+                } elseif (str_contains($candidate, 'host.docker.internal')) {
+                    $alternatives[] = str_replace('host.docker.internal', 'localhost', $candidate);
+                }
+
+                // Also try 127.0.0.1
+                if (str_contains($candidate, '127.0.0.1')) {
+                    $alternatives[] = str_replace('127.0.0.1', 'localhost', $candidate);
+                    $alternatives[] = str_replace('127.0.0.1', 'host.docker.internal', $candidate);
+                }
             }
 
-            // Also try 127.0.0.1
-            if (str_contains($normalizedUrl, '127.0.0.1')) {
-                $alternatives[] = str_replace('127.0.0.1', 'localhost', $normalizedUrl);
-                $alternatives[] = str_replace('127.0.0.1', 'host.docker.internal', $normalizedUrl);
-            }
+            $alternatives = collect($alternatives)
+                ->flatMap(fn ($url) => [rtrim($url, '/'), rtrim($url, '/') . '/'])
+                ->unique()
+                ->values()
+                ->all();
 
             if (!empty($alternatives)) {
                 $site = Site::whereIn('url', $alternatives)->first();

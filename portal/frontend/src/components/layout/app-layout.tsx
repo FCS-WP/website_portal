@@ -24,9 +24,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, isAuthenticated, router]);
 
-  // Route guard: once we know who the user is, redirect them off pages they
-  // can't see. Runs after the auth check so we don't ping /login → / loop.
-  // Uses the same rule table as the sidebar so the two can't disagree.
   useEffect(() => {
     if (isLoading || !isAuthenticated || !user) return;
     const role = user.role as Role;
@@ -53,11 +50,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex min-h-screen bg-background">
       <AppSidebar />
-      <div className="flex flex-col flex-1 lg:pl-64">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         <AppHeader />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

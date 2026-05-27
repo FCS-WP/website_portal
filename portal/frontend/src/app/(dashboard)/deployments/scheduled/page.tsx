@@ -5,7 +5,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,7 @@ const jobTypeConfig: Record<string, { label: string; className: string }> = {
 export default function ScheduledDeploymentsPage() {
   const [deployments, setDeployments] = useState<DeploymentJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -222,17 +224,12 @@ export default function ScheduledDeploymentsPage() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (showLoader) {
+    return <PageLoader />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Scheduled Deployments</h1>
         <p className="text-muted-foreground">

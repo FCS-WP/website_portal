@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const handleRefresh = () => fetchStats(true);
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Vault PIN Setup Banner — only show after confirming PIN is NOT set */}
       {!authLoading && user && user.has_vault_pin === false && <PinSetupBanner />}
 

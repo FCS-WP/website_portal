@@ -14,6 +14,7 @@ class CredentialShareLink extends Model
         'site_id',
         'token_hash',
         'credential_type_ids',
+        'credential_ids',
         'created_by',
         'expires_at',
         'max_views',
@@ -28,6 +29,7 @@ class CredentialShareLink extends Model
 
     protected $casts = [
         'credential_type_ids' => 'array',
+        'credential_ids' => 'array',
         'expires_at' => 'datetime',
         'is_password_protected' => 'boolean',
         'last_accessed_at' => 'datetime',

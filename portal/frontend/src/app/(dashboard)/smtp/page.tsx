@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -228,9 +229,8 @@ function PortalSmtpPanel() {
           </AlertDialogHeader>
 
           <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-muted/30">
-            <input
-              type="checkbox"
-              className="h-4 w-4 mt-0.5 rounded border-input"
+            <Checkbox
+              className="mt-0.5"
               checked={overwriteExisting}
               onChange={(e) => setOverwriteExisting(e.target.checked)}
             />

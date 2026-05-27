@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,10 +27,10 @@ import {
   Link as LinkIcon,
   Clock,
   Shield,
+  UserRound,
 } from "lucide-react";
-import { credentialService } from "@/lib/services/credentials";
 import { credentialShareService } from "@/lib/services/credential-shares";
-import { CredentialType } from "@/types";
+import { Credential } from "@/types";
 import { toast } from "sonner";
 
 interface ShareCredentialsDialogProps {
@@ -38,6 +38,8 @@ interface ShareCredentialsDialogProps {
   onClose: () => void;
   siteId: number | string;
   siteName: string;
+  selectedCredentials?: Credential[];
+  onShareComplete?: () => void;
 }
 
 const EXPIRY_OPTIONS = [
@@ -59,12 +61,10 @@ export function ShareCredentialsDialog({
   onClose,
   siteId,
   siteName,
+  selectedCredentials,
+  onShareComplete,
 }: ShareCredentialsDialogProps) {
-  const [credentialTypes, setCredentialTypes] = useState<CredentialType[]>([]);
-  const [loadingTypes, setLoadingTypes] = useState(true);
-
-  // Form state
-  const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>([]);
+  const shareCredentials = selectedCredentials ?? [];
   const [expiresHours, setExpiresHours] = useState("24");
   const [maxViews, setMaxViews] = useState("1");
   const [sharePassword, setSharePassword] = useState("");
@@ -79,44 +79,21 @@ export function ShareCredentialsDialog({
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchCredentialTypes();
-    }
-  }, [isOpen]);
-
-  const fetchCredentialTypes = async () => {
-    setLoadingTypes(true);
-    try {
-      const res = await credentialService.getTypes();
-      const types = res.data.data || [];
-      setCredentialTypes(types);
-      // Pre-select all types
-      setSelectedTypeIds(types.map((t) => t.id));
-    } catch {
-      toast.error("Failed to load credential types");
-    } finally {
-      setLoadingTypes(false);
-    }
-  };
-
-  const handleToggleType = (typeId: number) => {
-    setSelectedTypeIds((prev) =>
-      prev.includes(typeId)
-        ? prev.filter((id) => id !== typeId)
-        : [...prev, typeId]
-    );
-  };
-
   const handleGenerate = async () => {
-    if (selectedTypeIds.length === 0) {
-      toast.error("Please select at least one credential type");
+    if (shareCredentials.length === 0) {
+      toast.error("Please select at least one account");
       return;
     }
+
+    const selectedCredentialIds = shareCredentials.map((credential) => credential.id);
+    const selectedTypeIds = Array.from(
+      new Set(shareCredentials.map((credential) => credential.credential_type.id))
+    );
 
     setGenerating(true);
     try {
       const res = await credentialShareService.create(siteId, {
+        credential_ids: selectedCredentialIds,
         credential_type_ids: selectedTypeIds,
         expires_hours: parseInt(expiresHours),
         max_views: parseInt(maxViews),
@@ -130,8 +107,16 @@ export function ShareCredentialsDialog({
         expires_hours: parseInt(expiresHours),
         max_views: parseInt(maxViews),
       });
-    } catch {
-      toast.error("Failed to generate share link");
+      onShareComplete?.();
+    } catch (err: unknown) {
+      const error = err as {
+        response?: { data?: { message?: string; error?: string } };
+      };
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Failed to generate share link"
+      );
     } finally {
       setGenerating(false);
     }
@@ -149,7 +134,6 @@ export function ShareCredentialsDialog({
     // Reset state
     setGeneratedUrl(null);
     setGeneratedInfo(null);
-    setSelectedTypeIds([]);
     setExpiresHours("24");
     setMaxViews("1");
     setSharePassword("");
@@ -174,32 +158,38 @@ export function ShareCredentialsDialog({
 
         {!generatedUrl ? (
           <div className="space-y-5 py-2">
-            {/* Credential type selection */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">
-                Select credentials to share
-              </Label>
-              {loadingTypes ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading types...
+              <Label className="text-sm font-medium">Selected accounts</Label>
+              {shareCredentials.length === 0 ? (
+                <div className="rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                  Select one or more accounts from the credentials list first.
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {credentialTypes.map((type) => (
-                    <label
-                      key={type.id}
-                      className="flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer hover:bg-accent/50 transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedTypeIds.includes(type.id)}
-                        onChange={() => handleToggleType(type.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <span className="text-sm font-medium">{type.name}</span>
-                    </label>
-                  ))}
+                <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                  {shareCredentials.map((credential) => {
+                    const displayName = getCredentialDisplayName(credential);
+                    const username = getCredentialFieldValue(credential, ["username", "user"]);
+                    const email = getCredentialFieldValue(credential, ["email"]);
+
+                    return (
+                      <div
+                        key={credential.id}
+                        className="flex items-center gap-3 rounded-md border px-3 py-2.5"
+                      >
+                        <UserRound className="h-4 w-4 text-muted-foreground" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">
+                            {displayName}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {credential.credential_type.name}
+                            {username && username !== displayName ? ` · ${username}` : ""}
+                            {email ? ` · ${email}` : ""}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -271,7 +261,7 @@ export function ShareCredentialsDialog({
             {/* Generate button */}
             <Button
               onClick={handleGenerate}
-              disabled={generating || selectedTypeIds.length === 0}
+              disabled={generating || shareCredentials.length === 0}
               className="w-full"
             >
               {generating ? (
@@ -337,4 +327,16 @@ export function ShareCredentialsDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function getCredentialDisplayName(credential: Credential) {
+  return (
+    credential.label ||
+    getCredentialFieldValue(credential, ["display_name", "username", "user", "email"]) ||
+    credential.credential_type.name
+  );
+}
+
+function getCredentialFieldValue(credential: Credential, keys: string[]) {
+  return credential.fields.find((field) => keys.includes(field.field_key))?.field_value || "";
 }

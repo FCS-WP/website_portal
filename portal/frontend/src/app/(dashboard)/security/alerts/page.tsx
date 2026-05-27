@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { PageLoader } from "@/components/ui/page-loader";
+import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,6 +87,7 @@ export default function SecurityAlertsPage() {
     search: "",
   });
   const [loading, setLoading] = useState(true);
+  const showLoader = useDelayedLoading(loading);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
@@ -141,8 +144,12 @@ export default function SecurityAlertsPage() {
   const from = (pagination.current_page - 1) * pagination.per_page + 1;
   const to = Math.min(pagination.current_page * pagination.per_page, pagination.total);
 
+  if (showLoader) {
+    return <PageLoader />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -220,7 +227,7 @@ export default function SecurityAlertsPage() {
                 placeholder="Search site name…"
                 value={filters.search}
                 onChange={(e) => setFilter("search", e.target.value)}
-                className="pl-8 h-8 w-48"
+                className="h-10 w-48 pl-8"
               />
             </div>
           </div>
