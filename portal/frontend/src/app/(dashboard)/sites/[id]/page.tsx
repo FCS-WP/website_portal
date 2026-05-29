@@ -20,6 +20,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,12 +46,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { siteService } from "@/lib/services/sites";
+import { hostingService } from "@/lib/services/hostings";
 import { ordersService } from "@/lib/services/orders";
 import { useAuthStore } from "@/stores/auth-store";
-import { Site } from "@/types";
+import { Site, Hosting } from "@/types";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical, Shield, LayoutDashboard, Puzzle, ShoppingCart, Mail, Activity, MoreVertical, Loader2 } from "lucide-react";
+import { Globe, Server, Calendar, Code, Plug, KeyRound, Trash2, RefreshCw, ExternalLink, FlaskConical, Shield, LayoutDashboard, Puzzle, ShoppingCart, Mail, Activity, MoreVertical, Loader2, Pencil } from "lucide-react";
 import { SitePluginsTab } from "@/components/sites/site-plugins-tab";
 import { SiteActivityTab } from "@/components/sites/site-activity-tab";
 import { SiteCredentialsTab } from "@/components/sites/site-credentials-tab";
@@ -52,6 +71,9 @@ export default function SiteDetailPage() {
   const role = useAuthStore((s) => s.user?.role);
   const isMkt = role === "mkt";
   const isAdmin = role === "admin";
+  // Editing site metadata is admin/dev only — same gate the create flow uses
+  // on the sites list page. MKT can view but never mutate the record.
+  const canEdit = role === "admin" || role === "dev";
 
   const [site, setSite] = useState<Site | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +92,21 @@ export default function SiteDetailPage() {
   // just pushed. Without this the user has to navigate away and back to
   // see updated credentials.
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Edit dialog state. Hostings are loaded lazily on first open so we don't
+  // hit /api/hostings (admin-only) until the user actually wants to edit.
+  // Dev users will get an empty list, which mirrors the create flow on the
+  // sites index page.
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [hostings, setHostings] = useState<Hosting[]>([]);
+  const [hostingsLoaded, setHostingsLoaded] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    hosting_id: "",
+    description: "",
+    tags: "",
+  });
 
   useEffect(() => {
     async function fetchSite() {
@@ -181,6 +218,68 @@ export default function SiteDetailPage() {
     }
   };
 
+  /**
+   * Open the edit dialog: pre-fill the form from the live `site` and lazily
+   * fetch the hostings list (admin-only endpoint — dev users will silently
+   * get an empty dropdown, matching the create-site flow on /sites).
+   */
+  const handleOpenEdit = async () => {
+    if (!site) return;
+    setEditFormData({
+      name: site.name ?? "",
+      hosting_id: site.hosting_id ? String(site.hosting_id) : "",
+      description: site.description ?? "",
+      tags: site.tags && site.tags.length > 0 ? site.tags.join(", ") : "",
+    });
+    setEditDialogOpen(true);
+
+    if (!hostingsLoaded) {
+      try {
+        const res = await hostingService.list();
+        setHostings(res.data.data || []);
+      } catch {
+        // Non-blocking — dropdown just stays empty.
+      } finally {
+        setHostingsLoaded(true);
+      }
+    }
+  };
+
+  const handleEditSubmit = async () => {
+    if (!site) return;
+    const trimmedName = editFormData.name.trim();
+    if (!trimmedName) {
+      toast.error("Name is required");
+      return;
+    }
+    setEditing(true);
+    try {
+      const payload: Record<string, unknown> = {
+        name: trimmedName,
+        hosting_id: editFormData.hosting_id ? Number(editFormData.hosting_id) : null,
+        description: editFormData.description.trim() ? editFormData.description.trim() : null,
+        tags: editFormData.tags
+          ? editFormData.tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0)
+          : [],
+      };
+      await siteService.update(site.id, payload);
+      // Re-fetch from the server so we pick up canonical values (e.g. the
+      // hosting relation is hydrated server-side, not constructed here).
+      const res = await siteService.show(site.id);
+      setSite(res.data.data);
+      setEditDialogOpen(false);
+      toast.success("Site updated successfully");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e.response?.data?.message ?? "Failed to update site");
+    } finally {
+      setEditing(false);
+    }
+  };
+
   if (showLoader) {
     return (
       <PageLoader variant="detail" />
@@ -241,6 +340,19 @@ export default function SiteDetailPage() {
             )}
             {syncing ? "Syncing…" : "Sync now"}
           </Button>
+
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenEdit}
+              title="Edit site information"
+              className="w-full sm:w-auto"
+            >
+              <Pencil className="mr-1.5 h-4 w-4" />
+              Edit
+            </Button>
+          )}
 
           {/* Less-frequent / destructive actions live in this menu. Keeping them
               out of the main row prevents accidental clicks on Delete and reduces
@@ -320,6 +432,90 @@ export default function SiteDetailPage() {
         onOpenChange={setApiKeyDialogOpen}
         apiKey={newApiKey}
       />
+
+      {/* Edit Site Dialog — name/hosting/description/tags only. URL is shown
+          read-only because the agent's connection is keyed off it; changing
+          it would silently break sync until the agent is reconfigured. */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Site</DialogTitle>
+            <DialogDescription>
+              Update site information. The URL cannot be changed because the
+              WP agent connection depends on it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-site-name">Name</Label>
+              <Input
+                id="edit-site-name"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                placeholder="My Site"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-site-url">URL</Label>
+              <Input id="edit-site-url" value={site.url} readOnly disabled />
+              <p className="text-xs text-muted-foreground">
+                URL is fixed — it identifies the site to the WP agent.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-site-hosting">Hosting</Label>
+              <Select
+                value={editFormData.hosting_id}
+                onValueChange={(val) => setEditFormData({ ...editFormData, hosting_id: val ?? "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select hosting" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hostings.map((h) => (
+                    <SelectItem key={h.id} value={String(h.id)}>
+                      {h.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-site-desc">Description</Label>
+              <Textarea
+                id="edit-site-desc"
+                value={editFormData.description}
+                onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                placeholder="Optional description..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-site-tags">Tags (comma-separated)</Label>
+              <Input
+                id="edit-site-tags"
+                value={editFormData.tags}
+                onChange={(e) => setEditFormData({ ...editFormData, tags: e.target.value })}
+                placeholder="ecommerce, production, client-a"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={editing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSubmit}
+              disabled={editing || !editFormData.name.trim()}
+            >
+              {editing ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

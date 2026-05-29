@@ -24,6 +24,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
+import { User } from "@/types";
 import { cn } from "@/lib/utils";
 import { sidebarService, SidebarCounts } from "@/lib/services/sidebar";
 import { Button } from "@/components/ui/button";
@@ -202,7 +203,7 @@ function BrandBlock() {
   );
 }
 
-function UserFooter({ user }: { user: ReturnType<typeof useAuthStore>["user"] }) {
+function UserFooter({ user }: { user: User | null }) {
   if (!user) return null;
 
   return (
@@ -210,7 +211,7 @@ function UserFooter({ user }: { user: ReturnType<typeof useAuthStore>["user"] })
       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
         {user.name
           ?.split(" ")
-          .map((n) => n[0])
+          .map((n: string) => n[0])
           .join("")
           .toUpperCase()
           .slice(0, 2) || "U"}
