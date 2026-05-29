@@ -53,6 +53,12 @@ interface SiteCredentialsTabProps {
    * flag just hides the dead UI controls.
    */
   readOnly?: boolean;
+  /**
+   * External refresh signal. Whenever the parent increments this number
+   * (e.g. after a "Sync now" call) the tab re-fetches its credentials so
+   * the UI reflects values just pushed by the WP agent.
+   */
+  refreshKey?: number;
 }
 
 type PendingAction =
@@ -103,6 +109,7 @@ export function SiteCredentialsTab({
   siteName,
   siteUrl,
   readOnly = false,
+  refreshKey = 0,
 }: SiteCredentialsTabProps) {
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "admin";
@@ -164,7 +171,10 @@ export function SiteCredentialsTab({
 
   useEffect(() => {
     fetchCredentials();
-  }, [fetchCredentials]);
+    // refreshKey is included so parent-triggered refreshes (e.g. Sync now)
+    // re-pull credentials and the tab shows freshly-synced values without
+    // requiring the user to navigate away and back.
+  }, [fetchCredentials, refreshKey]);
 
   // Cleanup timers on unmount
   useEffect(() => {

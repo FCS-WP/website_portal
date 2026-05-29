@@ -16,6 +16,17 @@
 - [input.tsx](file://portal/frontend/src/components/ui/input.tsx)
 - [card.tsx](file://portal/frontend/src/components/ui/card.tsx)
 - [app-layout.tsx](file://portal/frontend/src/components/layout/app-layout.tsx)
+- [orders/page.tsx](file://portal/frontend/src/app/(dashboard)/orders/page.tsx)
+- [plugins/install/page.tsx](file://portal/frontend/src/app/(dashboard)/plugins/install/page.tsx)
+- [orders-table.tsx](file://portal/frontend/src/components/orders/orders-table.tsx)
+- [order-detail-panel.tsx](file://portal/frontend/src/components/orders/order-detail-panel.tsx)
+- [order-status-badge.tsx](file://portal/frontend/src/components/orders/order-status-badge.tsx)
+- [order-search-modal.tsx](file://portal/frontend/src/components/orders/order-search-modal.tsx)
+- [site-orders-tab.tsx](file://portal/frontend/src/components/orders/site-orders-tab.tsx)
+- [orders.ts](file://portal/frontend/src/lib/services/orders.ts)
+- [external-plugins.ts](file://portal/frontend/src/lib/services/external-plugins.ts)
+- [index.ts](file://portal/frontend/src/types/index.ts)
+- [external-plugins.ts](file://portal/frontend/src/types/external-plugins.ts)
 - [plugins/[id]/page.tsx](file://portal/frontend/src/app/(dashboard)/plugins/[id]/page.tsx)
 - [deployments/[id]/page.tsx](file://portal/frontend/src/app/(dashboard)/deployments/[id]/page.tsx)
 - [sites/[id]/page.tsx](file://portal/frontend/src/app/(dashboard)/sites/[id]/page.tsx)
@@ -23,11 +34,6 @@
 - [site-plugins-tab.tsx](file://portal/frontend/src/components/sites/site-plugins-tab.tsx)
 - [site-credentials-tab.tsx](file://portal/frontend/src/components/sites/site-credentials-tab.tsx)
 - [site-activity-tab.tsx](file://portal/frontend/src/components/sites/site-activity-tab.tsx)
-- [deployments.ts](file://portal/frontend/src/lib/services/deployments.ts)
-- [plugins.ts](file://portal/frontend/src/lib/services/plugins.ts)
-- [sites.ts](file://portal/frontend/src/lib/services/sites.ts)
-- [dashboard.ts](file://portal/frontend/src/lib/services/dashboard.ts)
-- [index.ts](file://portal/frontend/src/types/index.ts)
 - [credential-form-dialog.tsx](file://portal/frontend/src/components/vault/credential-form-dialog.tsx)
 - [pin-modal.tsx](file://portal/frontend/src/components/vault/pin-modal.tsx)
 - [pin-setup-dialog.tsx](file://portal/frontend/src/components/vault/pin-setup-dialog.tsx)
@@ -35,10 +41,6 @@
 - [share-credentials-dialog.tsx](file://portal/frontend/src/components/vault/share-credentials-dialog.tsx)
 - [active-share-links.tsx](file://portal/frontend/src/components/vault/active-share-links.tsx)
 - [vault-audit-log.tsx](file://portal/frontend/src/components/vault/vault-audit-log.tsx)
-- [credentials.ts](file://portal/frontend/src/lib/services/credentials.ts)
-- [credential-shares.ts](file://portal/frontend/src/lib/services/credential-shares.ts)
-- [vault-pin.ts](file://portal/frontend/src/lib/services/vault-pin.ts)
-- [vault-logs.ts](file://portal/frontend/src/lib/services/vault-logs.ts)
 - [security/[...]/page.tsx](file://portal/frontend/src/app/(dashboard)/security/page.tsx)
 - [security/2fa/page.tsx](file://portal/frontend/src/app/(dashboard)/security/2fa/page.tsx)
 - [security/alerts/page.tsx](file://portal/frontend/src/app/(dashboard)/security/alerts/page.tsx)
@@ -47,12 +49,11 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive credential vault management system with secure credential storage and access control
-- Implemented PIN protection system with modal dialogs, setup banners, and change functionality
-- Integrated credential sharing with secure link generation, password protection, and access monitoring
-- Added vault audit logging with filtering, pagination, and comprehensive event tracking
-- Enhanced site management with credential vault integration and security monitoring interfaces
-- Added new frontend components for credential forms, PIN management, share link management, and security monitoring
+- Added comprehensive order management system with global orders dashboard, per-site order tabs, and order search functionality
+- Implemented plugin installation interface for WordPress.org plugin deployment with search, install modal, and bulk operations
+- Enhanced frontend with new order status badges, order detail panels, and comprehensive order filtering
+- Integrated order synchronization with site-specific order management and real-time status updates
+- Added new React components for order detail panels, search modals, and site-specific order tabs
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -61,30 +62,34 @@
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Enhanced Service Layer](#enhanced-service-layer)
-7. [Plugin Management System](#plugin-management-system)
-8. [Deployment Monitoring](#deployment-monitoring)
-9. [Site Management Interfaces](#site-management-interfaces)
-10. [Vault Credential Management](#vault-credential-management)
-11. [Security-Focused UI Components](#security-focused-ui-components)
-12. [Credential Sharing System](#credential-sharing-system)
-13. [Vault Audit and Monitoring](#vault-audit-and-monitoring)
-14. [Dashboard and Analytics](#dashboard-and-analytics)
-15. [Dependency Analysis](#dependency-analysis)
-16. [Performance Considerations](#performance-considerations)
-17. [Troubleshooting Guide](#troubleshooting-guide)
-18. [Conclusion](#conclusion)
-19. [Appendices](#appendices)
+7. [Order Management System](#order-management-system)
+8. [Plugin Installation Interface](#plugin-installation-interface)
+9. [Plugin Management System](#plugin-management-system)
+10. [Deployment Monitoring](#deployment-monitoring)
+11. [Site Management Interfaces](#site-management-interfaces)
+12. [Vault Credential Management](#vault-credential-management)
+13. [Security-Focused UI Components](#security-focused-ui-components)
+14. [Credential Sharing System](#credential-sharing-system)
+15. [Vault Audit and Monitoring](#vault-audit-and-monitoring)
+16. [Dashboard and Analytics](#dashboard-and-analytics)
+17. [Dependency Analysis](#dependency-analysis)
+18. [Performance Considerations](#performance-considerations)
+19. [Troubleshooting Guide](#troubleshooting-guide)
+20. [Conclusion](#conclusion)
+21. [Appendices](#appendices)
 
 ## Introduction
 This document describes the frontend architecture of the Next.js application located under portal/frontend. It covers the app directory structure, routing model, component hierarchy, TypeScript integration, state management via custom stores, API integration layer, UI component organization, styling with Tailwind CSS, build configuration, environment handling, deployment considerations, responsive design patterns, accessibility, and performance strategies.
 
-**Updated** Enhanced with comprehensive credential vault management system featuring secure credential storage, PIN protection, credential sharing, and extensive audit logging. The architecture now supports advanced security features with PIN verification, secure credential sharing with time-based access control, comprehensive audit trails, and integrated security monitoring interfaces.
+**Updated** Enhanced with comprehensive order management system featuring global orders dashboard, per-site order tabs, order search functionality, and plugin installation interface for WordPress.org plugin deployment. The architecture now supports advanced order tracking with real-time status updates, comprehensive filtering, and seamless integration with the existing plugin management ecosystem.
 
 ## Project Structure
 The frontend is organized around Next.js App Router conventions with a clear separation of pages, components, stores, services, and shared utilities:
 - Pages and layouts live under src/app with route groups and nested layouts.
 - Reusable UI components are under src/components/ui.
 - Layout scaffolding is under src/components/layout.
+- Order-specific components are under src/components/orders for comprehensive order management.
+- Plugin installation interface is under src/app/(dashboard)/plugins/install for WordPress.org plugin deployment.
 - Vault-specific components are under src/components/vault for security-focused functionality.
 - Shared logic resides in src/lib (API client, utilities), src/stores (Zustand stores), and src/hooks (React hooks).
 - Global styles and theme tokens are defined in src/app/globals.css with Tailwind v4 configuration.
@@ -94,18 +99,23 @@ graph TB
 subgraph "App Router"
 PAGES["Pages under src/app"]
 LAYOUTS["Root and nested layouts"]
+ORDERS["Orders pages (/orders/*)"]
+PLUGINS["Plugin pages (/plugins/*)"]
 SECURITY["Security pages (/security/*)"]
 VAULTSHARE["Vault share pages (/vault/share/*)"]
 END
 subgraph "Components"
 UI["Reusable UI under src/components/ui"]
 LAYOUTCOMP["Layout components under src/components/layout"]
-VAULTCOMP["Vault components under src/components/vault"]
+ORDERSCOMP["Order components under src/components/orders"]
 PLUGINCOMP["Plugin-specific components under src/components/plugins"]
+VAULTCOMP["Vault components under src/components/vault"]
 SITECOMP["Site-specific components under src/components/sites"]
 END
 subgraph "Services"
 APISERVICE["API client under src/lib/api.ts"]
+ORDERSSERVICE["Orders service under src/lib/services/orders.ts"]
+EXTERNALPLUGINS["External plugins service under src/lib/services/external-plugins.ts"]
 DEPLOYMENTS["Deployments service under src/lib/services/deployments.ts"]
 PLUGINS["Plugins service under src/lib/services/plugins.ts"]
 SITES["Sites service under src/lib/services/sites.ts"]
@@ -119,13 +129,16 @@ subgraph "Stores"
 AUTHSTORE["Auth store under src/stores"]
 END
 subgraph "Types"
-TYPES["Type definitions under src/types"]
+ORDERTYPES["Order types under src/types/index.ts"]
+PLUGINSTYPES["External plugin types under src/types/external-plugins.ts"]
 END
 PAGES --> LAYOUTS
 LAYOUTS --> UI
 LAYOUTS --> LAYOUTCOMP
 LAYOUTCOMP --> AUTHSTORE
 AUTHSTORE --> APISERVICE
+APISERVICE --> ORDERSSERVICE
+APISERVICE --> EXTERNALPLUGINS
 APISERVICE --> DEPLOYMENTS
 APISERVICE --> PLUGINS
 APISERVICE --> SITES
@@ -134,13 +147,18 @@ APISERVICE --> VAULTPIN
 APISERVICE --> CREDENTIALSHARES
 APISERVICE --> VAULTLOGS
 APISERVICE --> CREDENTIALS
-UI --> TYPES
-LAYOUTCOMP --> TYPES
-PLUGINCOMP --> TYPES
-SITECOMP --> TYPES
-VAULTCOMP --> TYPES
+UI --> ORDERTYPES
+UI --> PLUGINSTYPES
+LAYOUTCOMP --> ORDERTYPES
+LAYOUTCOMP --> PLUGINSTYPES
+PLUGINCOMP --> ORDERTYPES
+PLUGINCOMP --> PLUGINSTYPES
+VAULTCOMP --> ORDERTYPES
+VAULTCOMP --> PLUGINSTYPES
 SECURITY --> VAULTCOMP
 VAULTSHARE --> VAULTCOMP
+ORDERS --> ORDERSCOMP
+PLUGINS --> PLUGINCOMP
 ```
 
 **Diagram sources**
@@ -148,10 +166,10 @@ VAULTSHARE --> VAULTCOMP
 - [globals.css:1-130](file://portal/frontend/src/app/globals.css#L1-L130)
 - [auth-store.ts:1-64](file://portal/frontend/src/stores/auth-store.ts#L1-L64)
 - [api.ts:1-37](file://portal/frontend/src/lib/api.ts#L1-L37)
-- [vault-pin.ts:1-13](file://portal/frontend/src/lib/services/vault-pin.ts#L1-L13)
-- [credential-shares.ts:1-78](file://portal/frontend/src/lib/services/credential-shares.ts#L1-L78)
-- [vault-logs.ts:1-36](file://portal/frontend/src/lib/services/vault-logs.ts#L1-L36)
-- [credentials.ts:1-38](file://portal/frontend/src/lib/services/credentials.ts#L1-L38)
+- [orders.ts:1-39](file://portal/frontend/src/lib/services/orders.ts#L1-L39)
+- [external-plugins.ts:1-56](file://portal/frontend/src/lib/services/external-plugins.ts#L1-L56)
+- [orders/page.tsx:1-211](file://portal/frontend/src/app/(dashboard)/orders/page.tsx#L1-L211)
+- [plugins/install/page.tsx:1-647](file://portal/frontend/src/app/(dashboard)/plugins/install/page.tsx#L1-L647)
 
 **Section sources**
 - [layout.tsx:1-38](file://portal/frontend/src/app/layout.tsx#L1-L38)
@@ -201,6 +219,8 @@ LAYOUTCOMP["App Layout Scaffold<br/>header, sidebar, main"]
 AUTHSTORE["Auth Store<br/>hydration, login, logout"]
 APICLIENT["API Client<br/>interceptors, base URL"]
 UI["UI Primitives<br/>button, input, card"]
+ORDERSCOMP["Order Components<br/>dashboard, search, status badges"]
+PLUGINCOMP["Plugin Components<br/>installation, search, modal"]
 VAULTCOMP["Vault Components<br/>credential forms, PIN, sharing"]
 SECURITYCOMP["Security Components<br/>audit logs, 2fa, alerts"]
 CLIENT --> NEXT
@@ -210,9 +230,13 @@ NEXT --> LAYOUTCOMP
 LAYOUTCOMP --> AUTHSTORE
 AUTHSTORE --> APICLIENT
 LAYOUTCOMP --> UI
+LAYOUTCOMP --> ORDERSCOMP
+LAYOUTCOMP --> PLUGINCOMP
 LAYOUTCOMP --> VAULTCOMP
 LAYOUTCOMP --> SECURITYCOMP
 APICLIENT --> UI
+APICLIENT --> ORDERSCOMP
+APICLIENT --> PLUGINCOMP
 APICLIENT --> VAULTCOMP
 APICLIENT --> SECURITYCOMP
 ```
@@ -388,6 +412,115 @@ Implementation references:
 - [input.tsx:1-21](file://portal/frontend/src/components/ui/input.tsx#L1-L21)
 
 ## Enhanced Service Layer
+
+### Order Management Service
+The order service provides comprehensive CRUD operations for order management with filtering, searching, and synchronization capabilities.
+
+```mermaid
+classDiagram
+class OrdersService {
++list(params) ApiResponse~OrderSummary[]~
++show(id) ApiResponse~Order~
++search(orderId, siteId?) ApiResponse~OrderSearchResponse~
++filterOptions() ApiResponse~OrderFilterOptions~
++mostActive(limit) ApiResponse~MostActiveSite[]~
++siteList(siteId, params) ApiResponse~OrderSummary[]~
++siteStats(siteId) ApiResponse~OrderSiteStats~
++syncSite(siteId) ApiResponse~void~
+}
+class Order {
++id : number
++site_id : number
++site_name : string
++site_url : string
++woo_order_id : number
++order_number : string
++status : OrderStatus
++total : string
++currency : string
++customer_name : string
++customer_email : string
++payment_method : string
++payment_method_title : string
++items_count : number
++order_date : string
++synced_at : string
++wp_admin_edit_url : string
+}
+class OrderSummary {
++line_items : OrderLineItem[]
++latest_note : string
++customer_phone : string
++billing_address : string
+}
+class OrderFilterOptions {
++sites : { id : number; name : string }[]
++statuses : string[]
++payment_methods : { slug : string; title : string }[]
+}
+```
+
+**Diagram sources**
+- [orders.ts:13-38](file://portal/frontend/src/lib/services/orders.ts#L13-L38)
+- [index.ts:246-271](file://portal/frontend/src/types/index.ts#L246-L271)
+- [index.ts:288-298](file://portal/frontend/src/types/index.ts#L288-L298)
+
+### External Plugin Service
+The external plugin service provides comprehensive WordPress.org plugin management with search, installation, and update capabilities.
+
+```mermaid
+classDiagram
+class ExternalPluginService {
++getUpdates(params?) ApiResponse~PluginUpdatesResponse~
++getUpdateSites(slug) ApiResponse~PluginSiteVersion[]~
++search(q, page) ApiResponse~WpOrgSearchResult[]~
++getPluginInfo(slug) ApiResponse~WpOrgPluginInfo~
++install(data) ApiResponse~void~
++update(data) ApiResponse~void~
++getSitePlugins(siteId) ApiResponse~SitePluginAll[]~
++activatePlugin(siteId, data) ApiResponse~void~
++deactivatePlugin(siteId, data) ApiResponse~void~
++uninstallPlugin(siteId, data) ApiResponse~void~
++updateAllOnSite(siteId) ApiResponse~void~
++refreshCache() ApiResponse~void~
++getCacheStatus() ApiResponse~ExternalPluginCacheStatus~
+}
+class WpOrgSearchResult {
++slug : string
++name : string
++short_description : string
++author : string
++rating : number
++num_ratings : number
++active_installs : number
++last_updated : string
++version : string
++download_link : string
++requires : string
++tested : string
++is_abandoned : boolean
++already_installed_count : number
+}
+class SitePluginAll {
++id : number
++site_id : number
++plugin_id : number
++plugin_slug : string
++plugin_name : string
++plugin_file : string
++plugin_type : 'internal' | 'wporg' | 'premium'
++installed_version : string
++latest_version : string
++is_active : boolean
++update_available : boolean
++last_synced_at : string
++external_plugin : ExternalPluginInfo
+}
+```
+
+**Diagram sources**
+- [external-plugins.ts:11-56](file://portal/frontend/src/lib/services/external-plugins.ts#L11-L56)
+- [external-plugins.ts:44-106](file://portal/frontend/src/types/external-plugins.ts#L44-L106)
 
 ### Plugin Management Service
 The plugin service provides comprehensive CRUD operations for plugin management with version control and file upload capabilities.
@@ -609,6 +742,8 @@ class VaultLog {
 - [index.ts:208-236](file://portal/frontend/src/types/index.ts#L208-L236)
 
 **Section sources**
+- [orders.ts:1-39](file://portal/frontend/src/lib/services/orders.ts#L1-L39)
+- [external-plugins.ts:1-56](file://portal/frontend/src/lib/services/external-plugins.ts#L1-L56)
 - [plugins.ts:1-29](file://portal/frontend/src/lib/services/plugins.ts#L1-L29)
 - [deployments.ts:1-22](file://portal/frontend/src/lib/services/deployments.ts#L1-L22)
 - [sites.ts:1-17](file://portal/frontend/src/lib/services/sites.ts#L1-L17)
@@ -617,6 +752,189 @@ class VaultLog {
 - [credential-shares.ts:1-78](file://portal/frontend/src/lib/services/credential-shares.ts#L1-L78)
 - [vault-pin.ts:1-13](file://portal/frontend/src/lib/services/vault-pin.ts#L1-L13)
 - [vault-logs.ts:1-36](file://portal/frontend/src/lib/services/vault-logs.ts#L1-L36)
+
+## Order Management System
+
+### Orders Dashboard
+The orders dashboard provides comprehensive order tracking across all sites with advanced filtering, search functionality, and real-time synchronization.
+
+**Key Features:**
+- Global order listing with pagination and filtering
+- Most active sites display showing order volume
+- Advanced filtering by site, status, payment method, and date range
+- Order search modal for quick lookup across cached orders
+- Real-time synchronization status and last synced indicator
+- Responsive table with expandable detail panels
+
+```mermaid
+stateDiagram-v2
+[*] --> Loading
+Loading --> FiltersLoaded : Filter options loaded
+FiltersLoaded --> OrdersLoaded : Orders fetched
+OrdersLoaded --> ViewingOrders : User interacts
+ViewingOrders --> Searching : Search button clicked
+Searching --> ResultsFound : Order found
+Searching --> FallbackSearch : Not found in cache
+ResultsFound --> ViewingOrders : Close results
+FallbackSearch --> ViewingOrders : Show fallback URLs
+ViewingOrders --> Filtering : Apply filters
+Filtering --> OrdersLoaded : Refetch orders
+ViewingOrders --> Syncing : Force sync
+Syncing --> OrdersLoaded : Refresh complete
+```
+
+**Diagram sources**
+- [orders/page.tsx:32-81](file://portal/frontend/src/app/(dashboard)/orders/page.tsx#L32-L81)
+
+**Section sources**
+- [orders/page.tsx:1-211](file://portal/frontend/src/app/(dashboard)/orders/page.tsx#L1-L211)
+
+### Order Status Badges
+The order status badge component provides consistent visual representation of order states with comprehensive color coding for both light and dark themes.
+
+**Supported Statuses:**
+- Pending/Pending payment: Gray pill with neutral styling
+- Processing: Blue pill indicating active processing
+- On hold: Amber pill for held orders
+- Completed: Green pill for successful orders
+- Cancelled: Red pill for cancelled orders
+- Refunded: Purple pill for refunded orders
+- Failed: Darker red pill for failed orders
+
+**Design Features:**
+- Light mode: bg-*-100 text-*-700 border-*-200
+- Dark mode: bg-*-500/10 text-*-300 border-*-500/30
+- Fallback to neutral gray for unknown statuses
+- Consistent padding and typography
+
+**Section sources**
+- [order-status-badge.tsx:1-39](file://portal/frontend/src/components/orders/order-status-badge.tsx#L1-L39)
+
+### Order Detail Panels
+The order detail panel provides expandable order information with lazy loading and caching for optimal performance.
+
+**Features:**
+- Lazy loading of full order details on first expansion
+- Local caching to avoid repeated API calls
+- Comprehensive order information display
+- Site information with navigation to site details
+- Payment method and total amount display
+- Order date formatting with locale-aware timestamps
+- Status badge integration with consistent styling
+
+**Section sources**
+- [order-detail-panel.tsx:1-74](file://portal/frontend/src/components/orders/order-detail-panel.tsx#L1-L74)
+
+### Order Search Modal
+The order search modal enables quick lookup of orders across cached data with intelligent fallback to WordPress admin search.
+
+**Search Capabilities:**
+- Order ID search with automatic # prefix stripping
+- Optional site filtering for targeted searches
+- Real-time search with debounced input handling
+- Results display with order information and status badges
+- Fallback URLs for orders not found in cache
+- Error handling with user-friendly messaging
+
+**Integration Features:**
+- WP Admin edit URL integration for direct access
+- Site dropdown populated from filter options
+- Loading states and error feedback
+- Keyboard navigation support (Enter key)
+
+**Section sources**
+- [order-search-modal.tsx:1-197](file://portal/frontend/src/components/orders/order-search-modal.tsx#L1-L197)
+
+### Orders Table Component
+The orders table provides a reusable interface for displaying order data with expandable rows and comprehensive filtering.
+
+**Table Features:**
+- Expandable rows for detailed order information
+- Customer information with email display
+- Payment method and total amount display
+- Status badges with consistent styling
+- WP Admin integration for direct editing
+- Pagination support with previous/next navigation
+- Loading states and empty state handling
+
+**Responsive Design:**
+- Collapsible columns for smaller screens
+- Hover states and click-to-expand interactions
+- Consistent spacing and typography
+- Accessible table structure with proper headers
+
+**Section sources**
+- [orders-table.tsx:1-148](file://portal/frontend/src/components/orders/orders-table.tsx#L1-L148)
+
+### Site Orders Tab
+The site orders tab provides per-site order management with site-specific filtering and synchronization capabilities.
+
+**Site-Specific Features:**
+- Site-specific order filtering and pagination
+- Mini statistics cards for orders today, processing now, and last order
+- Site-specific synchronization with force sync capability
+- WP Admin integration for direct order management
+- Site URL validation and fallback handling
+- Real-time sync status with loading indicators
+
+**Statistics Display:**
+- Orders today: Current day order volume
+- Processing now: Currently processing orders
+- Last order: Relative time since last order
+
+**Section sources**
+- [site-orders-tab.tsx:1-206](file://portal/frontend/src/components/orders/site-orders-tab.tsx#L1-L206)
+
+## Plugin Installation Interface
+
+### WordPress.org Plugin Search and Installation
+The plugin installation interface provides comprehensive WordPress.org plugin management with search, installation, and bulk operations.
+
+**Search Interface:**
+- Debounced search with 500ms delay for optimal performance
+- Pagination support with configurable page size
+- Rich plugin information display with ratings, installs, and metadata
+- Safety status indicators (actively maintained, aging, abandoned)
+- Installation modal with site selection and activation options
+
+**Installation Process:**
+- Multi-step installation workflow with progress tracking
+- Site selection with search and filtering capabilities
+- Activation preference with default enabled
+- Bulk installation support for multiple sites
+- Real-time installation status and error handling
+
+**Plugin Information Display:**
+- Plugin name, author, and description
+- Rating system with star visualization
+- Active installs count with K/M abbreviations
+- Last updated timestamp with human-readable format
+- Version information and download links
+- Abandonment status detection
+
+**Section sources**
+- [plugins/install/page.tsx:1-647](file://portal/frontend/src/app/(dashboard)/plugins/install/page.tsx#L1-L647)
+
+### External Plugin Operations
+The external plugin service supports comprehensive WordPress.org plugin operations including updates, activations, and bulk management.
+
+**Operations Supported:**
+- Plugin updates with version targeting
+- Individual plugin activation/deactivation
+- Bulk plugin operations across multiple sites
+- Plugin uninstallation with confirmation
+- Site-specific plugin management
+- Cache management for plugin metadata
+
+**Integration Features:**
+- Site plugin listing with unified plugin types
+- External plugin information with WordPress.org data
+- Operation logging with success/error tracking
+- Cache status monitoring and refresh capabilities
+
+**Section sources**
+- [external-plugins.ts:1-56](file://portal/frontend/src/lib/services/external-plugins.ts#L1-L56)
+- [external-plugins.ts:44-106](file://portal/frontend/src/types/external-plugins.ts#L44-L106)
 
 ## Plugin Management System
 
@@ -692,7 +1010,7 @@ The site management system provides dedicated tabs for different aspects of site
 **Available Tabs:**
 - Overview: Basic site information and status
 - Plugins: Plugin installation and update management
-- Orders: Order synchronization (future implementation)
+- Orders: Order synchronization (phase 7 implementation)
 - SMTP: Email configuration (future implementation)
 - Credentials: Secure credential vault with PIN protection
 - Activity: Audit trail and user activity logs
@@ -707,21 +1025,21 @@ The plugins tab displays installed plugins with version comparison and update st
 - Last synced timestamp
 - Direct navigation to plugin details
 
-### Site Credentials Tab
-The credentials tab provides secure credential management with PIN protection and sharing capabilities.
+### Site Orders Tab
+The orders tab provides comprehensive order management for individual sites with site-specific filtering and synchronization.
 
-**Security Features:**
-- PIN-protected credential reveal with timed visibility
-- Copy-to-clipboard functionality with visual feedback
-- Sensitive field masking with eye icon toggles
-- Admin-only credential deletion
-- Vault audit log integration
+**Features:**
+- Site-specific order filtering by status and payment method
+- Date range filtering with 24h, 7d, 30d, and all-time options
+- Mini statistics cards for orders today, processing now, and last order
+- Force synchronization with WP agent for real-time order updates
+- WP Admin integration for direct order management
+- Pagination support with previous/next navigation
 
 **Section sources**
 - [sites/[id]/page.tsx:1-400](file://portal/frontend/src/app/(dashboard)/sites/[id]/page.tsx#L1-L400)
 - [site-plugins-tab.tsx:1-152](file://portal/frontend/src/components/sites/site-plugins-tab.tsx#L1-L152)
-- [site-credentials-tab.tsx:1-704](file://portal/frontend/src/components/sites/site-credentials-tab.tsx#L1-L704)
-- [site-activity-tab.tsx:1-174](file://portal/frontend/src/components/sites/site-activity-tab.tsx#L1-L174)
+- [site-orders-tab.tsx:1-206](file://portal/frontend/src/components/orders/site-orders-tab.tsx#L1-L206)
 
 ## Vault Credential Management
 
@@ -1034,6 +1352,9 @@ PKG --> TS
 - **Updated** Use virtualized lists for large audit log tables to improve rendering performance.
 - **Updated** Cache credential types and share link data to minimize repeated API calls.
 - **Updated** Implement request deduplication for concurrent credential access operations.
+- **Updated** Use lazy loading for order detail panels to improve initial page load performance.
+- **Updated** Implement search debouncing for order and plugin search to reduce API calls.
+- **Updated** Cache order filter options and plugin search results to improve user experience.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -1049,6 +1370,10 @@ Common issues and resolutions:
 - **Updated** Audit log filtering problems: Check action filter values and pagination parameters.
 - **Updated** Credential form submission failures: Verify PIN verification before saving sensitive data.
 - **Updated** Credential reveal timeouts: Check PIN verification and ensure proper credential field selection.
+- **Updated** Order search failures: Verify order ID format and check WP Admin fallback URLs.
+- **Updated** Order synchronization issues: Check site connectivity and agent status for order sync.
+- **Updated** Plugin installation failures: Verify site availability and plugin compatibility requirements.
+- **Updated** Plugin search performance: Check WordPress.org API availability and implement proper caching.
 
 **Section sources**
 - [api.ts:22-34](file://portal/frontend/src/lib/api.ts#L22-L34)
@@ -1059,7 +1384,7 @@ Common issues and resolutions:
 ## Conclusion
 The frontend employs a clean, modular architecture with strong separation of concerns. App Router pages and nested layouts provide a scalable routing model. Zustand simplifies state management for authentication, while a centralized API client ensures consistent request/response handling. The UI component library leverages Tailwind CSS v4 and shadcn primitives for maintainable, accessible components. With responsive hooks, theme tokens, and performance-conscious patterns, the application is well-positioned for growth and maintenance.
 
-**Updated** The enhanced architecture now supports comprehensive credential vault management system featuring secure credential storage with PIN protection, sophisticated credential sharing with time-based access control, extensive audit logging with filtering and pagination, and integrated security monitoring interfaces. The expanded service layer provides robust APIs for all major functional areas, while the component architecture ensures maintainable and scalable user interfaces with strong security guarantees and comprehensive access control mechanisms.
+**Updated** The enhanced architecture now supports comprehensive order management system featuring global orders dashboard with advanced filtering and search, per-site order tabs with synchronization capabilities, and order detail panels with lazy loading. The plugin installation interface provides seamless WordPress.org plugin deployment with search, installation, and bulk operations. The expanded service layer provides robust APIs for all major functional areas, while the component architecture ensures maintainable and scalable user interfaces with strong security guarantees and comprehensive access control mechanisms.
 
 ## Appendices
 
@@ -1090,6 +1415,8 @@ The frontend employs a clean, modular architecture with strong separation of con
 - **Updated** Implement rate limiting for PIN verification and credential access endpoints.
 - **Updated** Cache frequently accessed credential types and share link data to improve performance.
 - **Updated** Implement graceful error handling for network failures in credential operations.
+- **Updated** Use proper error boundaries for order and plugin components to prevent UI crashes.
+- **Updated** Implement loading skeletons and progressive enhancement for better perceived performance.
 
 **Section sources**
 - [next.config.ts:4-11](file://portal/frontend/next.config.ts#L4-L11)

@@ -6,7 +6,79 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+// Wrap Base UI's Select.Root so that the displayed value (in <SelectValue />)
+// resolves to the *label* of the chosen <SelectItem> instead of falling back
+// to a stringified raw value (e.g. an ID like "3" instead of "HostGator").
+//
+// Base UI's <Select.Value> only resolves to a label when the root receives an
+// `items` prop mapping value → label. Adding that prop manually at every call
+// site is invasive, so we walk the children tree and build it automatically
+// from `<SelectItem value=... >Label</SelectItem>` declarations.
+//
+// We identify SelectItem elements via a static marker (`__isSelectItem`) on
+// the component function rather than reference equality (`node.type === SelectItem`).
+// The reference-equality approach is fragile: it breaks under React.memo /
+// forwardRef wrapping, re-exports, HMR, or when the component is referenced
+// before its declaration is initialized. A stable marker is bundler-agnostic
+// and survives any wrapping that preserves hoisted properties.
+type SelectItemComponent = React.FunctionComponent<SelectPrimitive.Item.Props> & {
+  __isSelectItem?: true
+  displayName?: string
+}
+
+function isSelectItemElement(node: React.ReactElement): boolean {
+  const type = node.type as SelectItemComponent | string | undefined
+  if (typeof type === "string" || type == null) return false
+  return type.__isSelectItem === true || type.displayName === "SelectItem"
+}
+
+function collectItems(
+  nodes: React.ReactNode,
+  acc: Array<{ value: unknown; label: React.ReactNode }>
+) {
+  React.Children.forEach(nodes, (node) => {
+    if (!React.isValidElement(node)) return
+
+    if (isSelectItemElement(node)) {
+      const { value, children, label } = node.props as {
+        value?: unknown
+        children?: React.ReactNode
+        label?: React.ReactNode
+      }
+      if (value !== undefined) {
+        acc.push({ value, label: label ?? children })
+      }
+      return
+    }
+
+    const childChildren = (node.props as { children?: React.ReactNode })
+      ?.children
+    if (childChildren !== undefined) {
+      collectItems(childChildren, acc)
+    }
+  })
+}
+
+function Select<Value, Multiple extends boolean | undefined = false>(
+  props: SelectPrimitive.Root.Props<Value, Multiple>
+) {
+  const { children, items } = props
+  const derivedItems = React.useMemo(() => {
+    if (items !== undefined) return items
+    const collected: Array<{ value: unknown; label: React.ReactNode }> = []
+    collectItems(children, collected)
+    return collected.length > 0 ? collected : undefined
+  }, [children, items])
+
+  return (
+    <SelectPrimitive.Root
+      {...props}
+      items={
+        derivedItems as SelectPrimitive.Root.Props<Value, Multiple>["items"]
+      }
+    />
+  )
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
@@ -135,6 +207,11 @@ function SelectItem({
     </SelectPrimitive.Item>
   )
 }
+// Static marker + displayName so the parent <Select> wrapper can reliably
+// detect <SelectItem> elements (including dynamically rendered ones from
+// `.map()` calls) without relying on fragile reference equality.
+;(SelectItem as SelectItemComponent).__isSelectItem = true
+SelectItem.displayName = "SelectItem"
 
 function SelectSeparator({
   className,

@@ -252,11 +252,27 @@ class Epos_Agent_Api {
             ], 500);
         }
 
+        // Also push the full admin-credential set so the Portal vault stays
+        // in sync (login_url, username, email, etc.). The ping above only
+        // covers plugins/orders; without this call, hook-driven credential
+        // changes (e.g. /epos-login URL migration) never propagate on a
+        // manual "Sync Now".
+        $admin_sync_result = null;
+        try {
+            $admin_sync_result = Epos_Agent_Admin_Sync::manual_sync();
+        } catch (\Throwable $e) {
+            $admin_sync_result = [
+                'success' => false,
+                'message' => 'Admin sync failed: ' . $e->getMessage(),
+            ];
+        }
+
         return new \WP_REST_Response([
             'success' => true,
             'message' => 'Sync triggered.',
             'connection_status' => get_option('epos_agent_connection_status', 'unknown'),
             'orders_last_sync_at' => (int) get_option('epos_agent_orders_last_sync', 0),
+            'admin_sync' => $admin_sync_result,
         ], 200);
     }
 

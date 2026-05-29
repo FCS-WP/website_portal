@@ -345,6 +345,7 @@ class AgentController extends Controller
             'credentials.*.password' => 'nullable|string',
             'credentials.*.display_name' => 'nullable|string',
             'credentials.*.role' => 'nullable|string',
+            'credentials.*.login_url' => 'nullable|string|max:500',
             'sync_reason' => 'required|string|in:user_register,password_change,profile_update,manual_push,role_change',
         ]);
 
@@ -373,7 +374,7 @@ class AgentController extends Controller
 
             if ($existingCredential) {
                 // Update existing credential fields
-                $this->updateCredentialFields($existingCredential, $credData, $encryptionService);
+                $this->updateCredentialFields($existingCredential, $credData, $encryptionService, $site);
                 $updated++;
             } else {
                 // Create new credential
@@ -385,7 +386,11 @@ class AgentController extends Controller
                     'updated_by' => null,
                 ]);
 
-                $adminUrl = rtrim($site->url, '/') . '/wp-admin';
+                // Prefer the login URL provided by the agent (the agent knows
+                // whether the /epos-login customizer is active and emits the
+                // appropriate URL). Fall back to {site_url}/epos-login when
+                // the agent didn't include it (older plugin versions).
+                $adminUrl = $this->resolveAdminLoginUrl($site, $credData['login_url'] ?? null);
 
                 $fields = [
                     ['field_key' => 'wp_user_id', 'field_label' => 'WP User ID', 'field_value' => (string) $credData['wp_user_id'], 'is_sensitive' => false, 'sort_order' => 0],
@@ -521,7 +526,7 @@ class AgentController extends Controller
     /**
      * Update credential fields for an existing synced credential.
      */
-    private function updateCredentialFields(SiteCredential $credential, array $credData, CredentialEncryptionService $encryptionService): void
+    private function updateCredentialFields(SiteCredential $credential, array $credData, CredentialEncryptionService $encryptionService, $site = null): void
     {
         // Update username
         $credential->fields()->where('field_key', 'username')->update(['field_value' => $credData['username']]);
@@ -536,10 +541,48 @@ class AgentController extends Controller
             ]);
         }
 
+        // Refresh the Admin URL so older credentials migrate from the legacy
+        // /wp-admin value to the agent-supplied /epos-login URL on next sync.
+        if ($site !== null) {
+            $adminUrl = $this->resolveAdminLoginUrl($site, $credData['login_url'] ?? null);
+            $urlField = $credential->fields()->where('field_key', 'url')->first();
+            if ($urlField) {
+                $urlField->update(['field_value' => $adminUrl]);
+            } else {
+                $credential->fields()->create([
+                    'field_key' => 'url',
+                    'field_label' => 'Admin URL',
+                    'field_value' => $adminUrl,
+                    'is_sensitive' => false,
+                    'sort_order' => 4,
+                ]);
+            }
+        }
+
         // Update label
         $credential->update([
             'label' => 'WP Admin - ' . $credData['username'],
             'updated_by' => null,
         ]);
+    }
+
+    /**
+     * Resolve the admin login URL for a synced WordPress credential.
+     *
+     * Preference order:
+     *   1. The login URL provided by the agent plugin (it knows whether the
+     *      /epos-login customizer is enabled and what the canonical URL is,
+     *      including any host.docker.internal rewriting baked into get_site_url()).
+     *   2. {site->url}/epos-login as a sensible default — every site running
+     *      this agent ships the customizer enabled by default.
+     */
+    private function resolveAdminLoginUrl($site, ?string $agentSuppliedUrl): string
+    {
+        $candidate = is_string($agentSuppliedUrl) ? trim($agentSuppliedUrl) : '';
+        if ($candidate !== '') {
+            return $candidate;
+        }
+
+        return rtrim($site->url, '/') . '/epos-login';
     }
 }

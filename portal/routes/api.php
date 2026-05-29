@@ -145,6 +145,19 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/sites/{site}/smtp', [\App\Http\Controllers\Portal\SmtpController::class, 'showSite']);
         Route::put('/sites/{site}/smtp', [\App\Http\Controllers\Portal\SmtpController::class, 'updateSite']);
         Route::post('/sites/{site}/smtp/test', [\App\Http\Controllers\Portal\SmtpController::class, 'testSite']);
+
+        // Queue management (admin/dev only — not mkt)
+        Route::prefix('queue')->group(function () {
+            Route::get('stats', [\App\Http\Controllers\Portal\QueueController::class, 'stats']);
+            // Static routes must come BEFORE the {uuid} routes so they are not
+            // captured by the wildcard segment.
+            Route::post('failed-jobs/retry-all', [\App\Http\Controllers\Portal\QueueController::class, 'retryAll']);
+            Route::delete('failed-jobs/flush', [\App\Http\Controllers\Portal\QueueController::class, 'flush']);
+            Route::get('failed-jobs', [\App\Http\Controllers\Portal\QueueController::class, 'index']);
+            Route::get('failed-jobs/{uuid}', [\App\Http\Controllers\Portal\QueueController::class, 'show']);
+            Route::post('failed-jobs/{uuid}/retry', [\App\Http\Controllers\Portal\QueueController::class, 'retry']);
+            Route::delete('failed-jobs/{uuid}', [\App\Http\Controllers\Portal\QueueController::class, 'destroy']);
+        });
     });
 
     // All authenticated users (admin, dev, mkt)

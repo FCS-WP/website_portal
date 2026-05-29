@@ -65,6 +65,11 @@ export default function SiteDetailPage() {
   const [newApiKey, setNewApiKey] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [togglingBeta, setTogglingBeta] = useState(false);
+  // Bumped after a successful "Sync now" so child tabs (credentials,
+  // plugins, etc.) re-fetch their data and reflect the values the WP agent
+  // just pushed. Without this the user has to navigate away and back to
+  // see updated credentials.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     async function fetchSite() {
@@ -129,10 +134,12 @@ export default function SiteDetailPage() {
     setSyncing(true);
     try {
       await ordersService.syncSite(site.id);
-      toast.success("Sync complete.");
-      // Refresh the displayed site so badges/timestamps update.
+      // Refresh the displayed site so badges/timestamps update, and bump
+      // refreshKey so child tabs (credentials, etc.) re-fetch as well.
       const res = await siteService.show(site.id);
       setSite(res.data.data);
+      setRefreshKey((k) => k + 1);
+      toast.success("Sync complete.");
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e.response?.data?.message ?? "Sync failed.");
@@ -547,6 +554,7 @@ export default function SiteDetailPage() {
             siteName={site.name}
             siteUrl={site.url}
             readOnly={isMkt}
+            refreshKey={refreshKey}
           />
         </TabsContent>
 

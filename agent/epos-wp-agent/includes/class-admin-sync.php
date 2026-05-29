@@ -168,6 +168,7 @@ class Epos_Agent_Admin_Sync {
      */
     public function get_admin_users() {
         $admins = get_users(['role' => 'administrator']);
+        $login_url = self::get_login_url();
         $result = [];
 
         foreach ($admins as $admin) {
@@ -178,6 +179,7 @@ class Epos_Agent_Admin_Sync {
                 'display_name' => $admin->display_name,
                 'role' => 'administrator',
                 'password' => null, // Can't read existing hashed passwords
+                'login_url' => $login_url,
             ];
         }
 
@@ -195,9 +197,30 @@ class Epos_Agent_Admin_Sync {
             'display_name' => $user->display_name,
             'role' => 'administrator',
             'password' => $password,
+            'login_url' => self::get_login_url(),
         ]];
 
         $this->sync_to_portal($credentials, $reason);
+    }
+
+    /**
+     * Resolve the admin login URL the Portal should display.
+     *
+     * When the /epos-login customizer is active, the plugin's site_url
+     * filter has already rewritten wp_login_url() output, so the value we
+     * return here naturally points at /epos-login. When disabled, we fall
+     * back to whatever wp_login_url() returns (typically /wp-login.php),
+     * which is still the correct URL for that site.
+     */
+    private static function get_login_url() {
+        if (
+            class_exists('Epos_Agent_Login_Customizer')
+            && Epos_Agent_Login_Customizer::is_enabled()
+        ) {
+            return home_url('/' . Epos_Agent_Login_Customizer::LOGIN_SLUG);
+        }
+
+        return wp_login_url();
     }
 
     /**

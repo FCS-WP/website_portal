@@ -329,3 +329,31 @@ export interface ActivityLogFilterOptions {
   actions: string[];
   users: { id: number; name: string; role: string }[];
 }
+
+export interface FailedJob {
+  id: number;
+  uuid: string;
+  connection: string;
+  queue: string;
+  payload: string;
+  exception: string;
+  failed_at: string;
+  job_class?: string;
+  error_summary?: string;
+}
+
+export interface FailedJobDetail extends FailedJob {
+  parsed_payload?: {
+    displayName?: string;
+    job?: string;
+    maxTries?: number;
+    attempts?: number;
+    data?: Record<string, unknown>;
+  };
+}
+
+export interface QueueStats {
+  failed_count: number;
+  pending_count: number;
+  last_failure_at: string | null;
+}

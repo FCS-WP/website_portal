@@ -112,11 +112,27 @@ function epos_agent_settings_page() {
                 </div>
 
                 <!-- Portal credentials card -->
-                <div class="epos-card">
-                    <div class="epos-card-header">
+                <?php
+                $creds_collapsed = ($status === 'connected') && !empty($portal_url) && !empty($api_key);
+                ?>
+                <div class="epos-card epos-credentials-card<?php echo $creds_collapsed ? ' is-collapsed' : ''; ?>" id="epos-credentials-card">
+                    <div class="epos-card-header epos-card-header--split">
                         <h2><span class="dashicons dashicons-admin-network"></span> Portal Credentials</h2>
+                        <button type="button" class="epos-toggle-credentials" id="epos-toggle-credentials"
+                                aria-controls="epos-credentials-body" aria-expanded="<?php echo $creds_collapsed ? 'false' : 'true'; ?>">
+                            <span class="epos-toggle-text"><?php echo $creds_collapsed ? 'Edit' : 'Hide'; ?></span>
+                            <span class="dashicons dashicons-arrow-down-alt2 epos-toggle-icon"></span>
+                        </button>
                     </div>
-                    <div class="epos-card-body">
+
+                    <div class="epos-card-summary" id="epos-credentials-summary">
+                        <span class="dashicons dashicons-yes-alt"></span>
+                        <span class="epos-summary-text">
+                            Connected to <code id="epos-credentials-summary-url"><?php echo esc_html($portal_url); ?></code>
+                        </span>
+                    </div>
+
+                    <div class="epos-card-body" id="epos-credentials-body">
                         <form id="epos-agent-form" onsubmit="return false;">
                             <?php wp_nonce_field('epos_agent_nonce', 'epos_agent_nonce'); ?>
 
@@ -273,7 +289,34 @@ function epos_agent_settings_page() {
         .epos-card-header { padding:14px 18px; border-bottom:1px solid #f0f0f1; background:#fafafa; }
         .epos-card-header h2 { margin:0; font-size:14px; font-weight:600; color:#1d2327; display:flex; align-items:center; gap:8px; }
         .epos-card-header .dashicons { color:#2271b1; }
+        .epos-card-header--split { display:flex; align-items:center; justify-content:space-between; gap:12px; }
         .epos-card-body { padding:18px; }
+
+        /* Collapsible Portal Credentials card */
+        .epos-toggle-credentials {
+            background:transparent; border:1px solid transparent; cursor:pointer;
+            color:#2271b1; font-size:13px; font-weight:500;
+            display:inline-flex; align-items:center; gap:4px;
+            padding:4px 8px; border-radius:4px; line-height:1;
+        }
+        .epos-toggle-credentials:hover { background:#f0f6fc; color:#135e96; }
+        .epos-toggle-credentials:focus { outline:none; box-shadow:0 0 0 1px #2271b1; }
+        .epos-toggle-credentials .dashicons { font-size:16px; width:16px; height:16px; transition:transform .15s ease; color:inherit; }
+        .epos-credentials-card.is-collapsed .epos-toggle-icon { transform:rotate(0deg); }
+        .epos-credentials-card:not(.is-collapsed) .epos-toggle-icon { transform:rotate(180deg); }
+
+        .epos-card-summary {
+            display:none; align-items:center; gap:8px;
+            padding:14px 18px; font-size:13px; color:#1d2327;
+            background:#f6fbf7;
+        }
+        .epos-card-summary .dashicons { color:#00a32a; flex-shrink:0; }
+        .epos-card-summary code {
+            background:#fff; border:1px solid #e0e0e0; padding:2px 6px;
+            border-radius:3px; font-size:12px; word-break:break-all;
+        }
+        .epos-credentials-card.is-collapsed .epos-card-summary { display:flex; }
+        .epos-credentials-card.is-collapsed .epos-card-body { display:none; }
 
         .epos-pill {
             display:inline-flex; align-items:center; gap:6px;
@@ -345,6 +388,21 @@ function epos_agent_settings_page() {
             var $spinner    = $('#epos-action-spinner');
             var $statusPill = $('#epos-status-pill');
             var $snapshot   = $('#epos-portal-snapshot');
+            var $credCard   = $('#epos-credentials-card');
+            var $credToggle = $('#epos-toggle-credentials');
+            var $credSummaryUrl = $('#epos-credentials-summary-url');
+            var userToggledCreds = false;
+
+            function setCredentialsCollapsed(collapsed) {
+                $credCard.toggleClass('is-collapsed', !!collapsed);
+                $credToggle.attr('aria-expanded', collapsed ? 'false' : 'true');
+                $credToggle.find('.epos-toggle-text').text(collapsed ? 'Edit' : 'Hide');
+            }
+
+            $credToggle.on('click', function() {
+                userToggledCreds = true;
+                setCredentialsCollapsed(!$credCard.hasClass('is-collapsed'));
+            });
 
             function showToast(type, msg) {
                 $toast.removeClass('success error info').addClass(type).html(msg).fadeIn(120);
@@ -410,6 +468,19 @@ function epos_agent_settings_page() {
             function applyResult(res) {
                 if (res && res.connection_status) {
                     updateStatusPill(res.connection_status);
+
+                    // Auto manage credentials collapse based on connection state.
+                    // The user's manual choice (during this page session) is respected,
+                    // except an error always re-expands so they can fix it.
+                    if (res.connection_status === 'connected') {
+                        var portalUrlVal = $('#epos_agent_portal_url').val() || '';
+                        if (portalUrlVal) { $credSummaryUrl.text(portalUrlVal); }
+                        if (!userToggledCreds) {
+                            setCredentialsCollapsed(true);
+                        }
+                    } else if (res.connection_status === 'error' || res.connection_status === 'disconnected') {
+                        setCredentialsCollapsed(false);
+                    }
                 }
                 if (res && res.site) {
                     renderSnapshot(res.site, res.site_url_sent);

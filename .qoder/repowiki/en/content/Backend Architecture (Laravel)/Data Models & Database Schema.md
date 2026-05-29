@@ -31,6 +31,10 @@
 - [SiteSecurityScore.php](file://portal/app/Models/SiteSecurityScore.php)
 - [VulnerabilityDefinition.php](file://portal/app/Models/VulnerabilityDefinition.php)
 - [VulnerabilitySyncLog.php](file://portal/app/Models/VulnerabilitySyncLog.php)
+- [Order.php](file://portal/app/Models/Order.php)
+- [OrderSpikeAlert.php](file://portal/app/Models/OrderSpikeAlert.php)
+- [ExternalPluginCache.php](file://portal/app/Models/ExternalPluginCache.php)
+- [PluginOperationLog.php](file://portal/app/Models/PluginOperationLog.php)
 - [create_users_table.php](file://portal/database/migrations/0001_01_01_000000_create_users_table.php)
 - [create_hostings_table.php](file://portal/database/migrations/2026_05_15_070001_create_hostings_table.php)
 - [create_sites_table.php](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php)
@@ -54,6 +58,9 @@
 - [add_rollback_and_schedule_fields.php](file://portal/database/migrations/2026_05_17_000001_add_rollback_and_schedule_fields.php)
 - [add_beta_testing_fields.php](file://portal/database/migrations/2026_05_17_000002_add_beta_testing_fields.php)
 - [add_api_key_encrypted_to_sites.php](file://portal/database/migrations/2026_05_17_000003_add_api_key_encrypted_to_sites.php)
+- [create_orders_table.php](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php)
+- [create_order_spike_alerts_table.php](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php)
+- [phase6_external_plugin_management.php](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php)
 - [create_security_tables.php](file://portal/database/migrations/2026_05_18_000001_create_security_tables.php)
 - [create_permission_tables.php](file://portal/database/migrations/2026_05_15_061634_create_permission_tables.php)
 - [permission.php](file://portal/config/permission.php)
@@ -61,13 +68,12 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive security monitoring data model documentation covering seven new migration files
-- Documented SecurityAlert, SecurityScanRun, FileIntegrityBaseline, FileIntegrityFinding, LoginEvent, KnownLoginIp, SiteVulnerability, SiteAdminUser, Site2faSetting, SiteSecurityScore, VulnerabilityDefinition, and VulnerabilitySyncLog models
-- Added credential management data model documentation covering four new migration files including CredentialType, SiteCredential, SiteCredentialField, VaultAccessLog, and CredentialShareLink
-- Enhanced deployment tracking with rollback capabilities, scheduling, and health checks
-- Updated entity relationship diagrams to include security infrastructure and credential vault
-- Added detailed field definitions, relationships, and constraints for security monitoring and credential management systems
-- Enhanced dependency analysis with comprehensive foreign key relationships for security and credential systems
+- Added comprehensive e-commerce order management data model documentation with new orders and order spike alerts tables
+- Documented external plugin management system including extended site_plugins table, external plugin cache, and plugin operation logs
+- Enhanced plugin ecosystem with support for WordPress.org plugins, premium plugins, and external plugin operations
+- Updated entity relationship diagrams to include e-commerce monitoring and external plugin management infrastructure
+- Added detailed field definitions, relationships, and constraints for order processing and plugin management systems
+- Enhanced dependency analysis with comprehensive foreign key relationships for e-commerce and external plugin systems
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -75,23 +81,25 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Plugin Ecosystem Components](#plugin-ecosystem-components)
-7. [Security Monitoring Components](#security-monitoring-components)
-8. [Credential Management Components](#credential-management-components)
-9. [Enhanced Deployment Tracking](#enhanced-deployment-tracking)
-10. [Dependency Analysis](#dependency-analysis)
-11. [Performance Considerations](#performance-considerations)
-12. [Troubleshooting Guide](#troubleshooting-guide)
-13. [Conclusion](#conclusion)
-14. [Appendices](#appendices)
+6. [E-commerce Order Management](#e-commerce-order-management)
+7. [External Plugin Management](#external-plugin-management)
+8. [Plugin Ecosystem Components](#plugin-ecosystem-components)
+9. [Security Monitoring Components](#security-monitoring-components)
+10. [Credential Management Components](#credential-management-components)
+11. [Enhanced Deployment Tracking](#enhanced-deployment-tracking)
+12. [Dependency Analysis](#dependency-analysis)
+13. [Performance Considerations](#performance-considerations)
+14. [Troubleshooting Guide](#troubleshooting-guide)
+15. [Conclusion](#conclusion)
+16. [Appendices](#appendices)
 
 ## Introduction
 This document provides comprehensive data model documentation for the Eloquent models and database schema used in the application. It details entity relationships, field definitions, data types, primary and foreign keys, indexes, and constraints. It also explains model relationships such as hasMany, belongsToMany, and morphTo, documents migration patterns and schema evolution strategies, and outlines validation, accessors/mutators, and model events. Practical examples of complex queries, relationship loading, and data manipulation patterns are included, along with performance considerations and optimization techniques.
 
-**Updated** Added extensive documentation for the security monitoring foundation, credential management infrastructure, and enhanced deployment tracking capabilities. The expanded schema now includes comprehensive security tables for vulnerability management, file integrity monitoring, login event tracking, and two-factor authentication enforcement, alongside a complete credential vault system with encryption, sharing, and audit capabilities.
+**Updated** Added extensive documentation for e-commerce order management, external plugin management, and enhanced plugin ecosystem capabilities. The expanded schema now includes comprehensive order processing infrastructure for WooCommerce integration, external plugin management for WordPress.org and premium plugins, and advanced plugin operation logging for audit and compliance tracking.
 
 ## Project Structure
-The data model layer consists of Eloquent models under the application namespace and a set of migrations under the database directory. Models define attributes, casts, hidden fields, and relationships. Migrations define the canonical schema, including primary keys, foreign keys, indexes, and constraints. The expanded schema now includes three major subsystems: security monitoring, credential management, and enhanced deployment tracking.
+The data model layer consists of Eloquent models under the application namespace and a set of migrations under the database directory. Models define attributes, casts, hidden fields, and relationships. Migrations define the canonical schema, including primary keys, foreign keys, indexes, and constraints. The expanded schema now includes four major subsystems: e-commerce order management, external plugin management, security monitoring, and credential management.
 
 ```mermaid
 graph TB
@@ -101,6 +109,14 @@ H["Hosting"]
 S["Site"]
 AL["ActivityLog"]
 PS["PortalSetting"]
+end
+subgraph "E-commerce Models"
+O["Order"]
+OSA["OrderSpikeAlert"]
+end
+subgraph "External Plugin Management"
+EPC["ExternalPluginCache"]
+POL["PluginOperationLog"]
 end
 subgraph "Plugin Ecosystem Models"
 P["Plugin"]
@@ -140,6 +156,13 @@ MSU["create_site_users_table.php"]
 MAL["create_activity_logs_table.php"]
 MPS["create_portal_settings_table.php"]
 end
+subgraph "E-commerce Migrations"
+MO["create_orders_table.php"]
+MOSA["create_order_spike_alerts_table.php"]
+end
+subgraph "External Plugin Migrations"
+MEPC["phase6_external_plugin_management.php"]
+end
 subgraph "Plugin Migrations"
 MPL["create_plugins_table.php"]
 MPV["create_plugin_versions_table.php"]
@@ -165,6 +188,10 @@ S --- MS
 S --- MSU
 AL --- MAL
 PS --- MPS
+O --- MO
+OSA --- MOSA
+EPC --- MEPC
+POL --- MEPC
 P --- MPL
 PV --- MPV
 PC --- MPC
@@ -197,6 +224,10 @@ ALT --- MALT
 - [Site.php:1-86](file://portal/app/Models/Site.php#L1-L86)
 - [ActivityLog.php:1-37](file://portal/app/Models/ActivityLog.php#L1-L37)
 - [PortalSetting.php:1-11](file://portal/app/Models/PortalSetting.php#L1-L11)
+- [Order.php:1-46](file://portal/app/Models/Order.php#L1-L46)
+- [OrderSpikeAlert.php:1-30](file://portal/app/Models/OrderSpikeAlert.php#L1-L30)
+- [ExternalPluginCache.php:1-50](file://portal/app/Models/ExternalPluginCache.php#L1-L50)
+- [PluginOperationLog.php:1-30](file://portal/app/Models/PluginOperationLog.php#L1-L30)
 - [Plugin.php:1-35](file://portal/app/Models/Plugin.php#L1-L35)
 - [PluginVersion.php:1-39](file://portal/app/Models/PluginVersion.php#L1-L39)
 - [PluginChangelog.php:1-21](file://portal/app/Models/PluginChangelog.php#L1-L21)
@@ -227,12 +258,9 @@ ALT --- MALT
 - [create_site_users_table.php:1-25](file://portal/database/migrations/2026_05_15_070003_create_site_users_table.php#L1-L25)
 - [create_activity_logs_table.php:1-32](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L1-L32)
 - [create_portal_settings_table.php:1-24](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L1-L24)
-- [create_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L1-L28)
-- [create_plugin_versions_table.php:1-31](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L1-L31)
-- [create_plugin_changelogs_table.php:1-25](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L1-L25)
-- [create_site_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L1-L28)
-- [create_deployment_jobs_table.php:1-31](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L1-L31)
-- [create_deployment_job_sites_table.php:1-27](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L1-L27)
+- [create_orders_table.php:1-59](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L1-L59)
+- [create_order_spike_alerts_table.php:1-37](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php#L1-L37)
+- [phase6_external_plugin_management.php:1-169](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L1-L169)
 - [create_security_tables.php:1-212](file://portal/database/migrations/2026_05_18_000001_create_security_tables.php#L1-L212)
 - [create_credential_types_table.php:1-26](file://portal/database/migrations/2026_05_16_090001_create_credential_types_table.php#L1-L26)
 - [create_site_credentials_table.php:1-28](file://portal/database/migrations/2026_05_16_090002_create_site_credentials_table.php#L1-L28)
@@ -247,6 +275,10 @@ ALT --- MALT
 - [Site.php:1-86](file://portal/app/Models/Site.php#L1-L86)
 - [ActivityLog.php:1-37](file://portal/app/Models/ActivityLog.php#L1-L37)
 - [PortalSetting.php:1-11](file://portal/app/Models/PortalSetting.php#L1-L11)
+- [Order.php:1-46](file://portal/app/Models/Order.php#L1-L46)
+- [OrderSpikeAlert.php:1-30](file://portal/app/Models/OrderSpikeAlert.php#L1-L30)
+- [ExternalPluginCache.php:1-50](file://portal/app/Models/ExternalPluginCache.php#L1-L50)
+- [PluginOperationLog.php:1-30](file://portal/app/Models/PluginOperationLog.php#L1-L30)
 - [Plugin.php:1-35](file://portal/app/Models/Plugin.php#L1-L35)
 - [PluginVersion.php:1-39](file://portal/app/Models/PluginVersion.php#L1-L39)
 - [PluginChangelog.php:1-21](file://portal/app/Models/PluginChangelog.php#L1-L21)
@@ -277,12 +309,9 @@ ALT --- MALT
 - [create_site_users_table.php:1-25](file://portal/database/migrations/2026_05_15_070003_create_site_users_table.php#L1-L25)
 - [create_activity_logs_table.php:1-32](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L1-L32)
 - [create_portal_settings_table.php:1-24](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L1-L24)
-- [create_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L1-L28)
-- [create_plugin_versions_table.php:1-31](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L1-L31)
-- [create_plugin_changelogs_table.php:1-25](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L1-L25)
-- [create_site_plugins_table.php:1-28](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L1-L28)
-- [create_deployment_jobs_table.php:1-31](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L1-L31)
-- [create_deployment_job_sites_table.php:1-27](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L1-L27)
+- [create_orders_table.php:1-59](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L1-L59)
+- [create_order_spike_alerts_table.php:1-37](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php#L1-L37)
+- [phase6_external_plugin_management.php:1-169](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L1-L169)
 - [create_security_tables.php:1-212](file://portal/database/migrations/2026_05_18_000001_create_security_tables.php#L1-L212)
 - [create_credential_types_table.php:1-26](file://portal/database/migrations/2026_05_16_090001_create_credential_types_table.php#L1-L26)
 - [create_site_credentials_table.php:1-28](file://portal/database/migrations/2026_05_16_090002_create_site_credentials_table.php#L1-L28)
@@ -299,7 +328,7 @@ This section summarizes the core models and their responsibilities, attributes, 
   - Fillable fields: name, email, password, role, telegram_chat_id, is_active, vault_pin_hash.
   - Hidden fields: password, remember_token.
   - Casts: email_verified_at to datetime, password to hashed, is_active to boolean, vault_pin_hash to string.
-  - Relationships: roles via Spatie Permission package; belongsTo creator for Hosting; belongsTo creator for Site; hasMany vaultAccessLogs.
+  - Relationships: roles via Spatie Permission package; belongsTo creator for Hosting; belongsTo creator for Site; hasMany vaultAccessLogs; hasMany pluginOperationLogs.
   - Accessors/Mutators: none declared; relies on casts for serialization.
   - Events: handled by traits for Sanctum and Spatie roles.
 
@@ -311,13 +340,13 @@ This section summarizes the core models and their responsibilities, attributes, 
   - **Updated** Enhanced with encrypted credential storage for hosting accounts.
 
 - Site
-  - Purpose: Represents customer websites managed by the portal with enhanced security and deployment features.
+  - Purpose: Represents customer websites managed by the portal with enhanced security, deployment, and e-commerce features.
   - Fillable fields: hosting_id, name, url, description, api_secret_key, api_key_encrypted, status, wp_version, php_version, woo_active, is_beta_tester, last_ping_at, tags, created_by.
   - Hidden fields: api_key_encrypted, api_secret_key.
   - Casts: woo_active to boolean, is_beta_tester to boolean, last_ping_at to datetime, tags to array.
-  - Relationships: belongsTo hosting; belongsTo user (creator); belongsToMany users (site_users pivot); hasMany activityLogs (polymorphic subject filter); hasMany sitePlugins; hasMany deploymentJobSites; hasMany securityAlerts; hasMany fileIntegrityFindings; hasMany loginEvents; hasMany siteCredentials.
+  - Relationships: belongsTo hosting; belongsTo user (creator); belongsToMany users (site_users pivot); hasMany activityLogs (polymorphic subject filter); hasMany sitePlugins; hasMany deploymentJobSites; hasMany securityAlerts; hasMany fileIntegrityFindings; hasMany loginEvents; hasMany siteCredentials; hasMany orders; hasMany orderSpikeAlerts.
   - Scopes: accessibleBy for role-based filtering.
-  - **Updated** Enhanced with beta testing capabilities, API key encryption, and comprehensive security integrations.
+  - **Updated** Enhanced with beta testing capabilities, API key encryption, comprehensive security integrations, and e-commerce order management.
 
 - ActivityLog
   - Purpose: Audit trail for user actions against polymorphic subjects.
@@ -337,7 +366,7 @@ This section summarizes the core models and their responsibilities, attributes, 
 - [PortalSetting.php:7-10](file://portal/app/Models/PortalSetting.php#L7-L10)
 
 ## Architecture Overview
-The data model architecture centers around Users, Hostings, Sites, and ActivityLogs. Users are linked to Hostings and Sites via created_by foreign keys. Sites maintain a many-to-many relationship with Users through a dedicated pivot table. ActivityLogs record user actions against polymorphic subjects, enabling auditability across entities. The plugin ecosystem adds a hierarchical structure with Plugins containing Versions, Changelogs, and SitePlugin installations, orchestrated by DeploymentJobs and DeploymentJobSites. The expanded security monitoring system provides comprehensive threat detection, vulnerability management, and compliance tracking. The credential management system offers secure vault storage, sharing capabilities, and detailed audit trails.
+The data model architecture centers around Users, Hostings, Sites, and ActivityLogs. Users are linked to Hostings and Sites via created_by foreign keys. Sites maintain a many-to-many relationship with Users through a dedicated pivot table. ActivityLogs record user actions against polymorphic subjects, enabling auditability across entities. The plugin ecosystem adds a hierarchical structure with Plugins containing Versions, Changelogs, and SitePlugin installations, orchestrated by DeploymentJobs and DeploymentJobSites. The expanded security monitoring system provides comprehensive threat detection, vulnerability management, and compliance tracking. The credential management system offers secure vault storage, sharing capabilities, and detailed audit trails. The e-commerce order management system handles WooCommerce order processing with spike detection and alerting. The external plugin management system supports WordPress.org plugins, premium plugins, and external plugin operations with caching and operation logging.
 
 ```mermaid
 classDiagram
@@ -404,6 +433,70 @@ class ActivityLog {
 +string ip_address
 +datetime created_at
 }
+class Order {
++int id
++int site_id
++bigint woo_order_id
++string order_number
++string status
++decimal total
++string currency
++string customer_name
++string customer_email
++string customer_phone
++text billing_address
++string payment_method
++string payment_method_title
++array line_items
++int items_count
++text latest_note
++datetime order_date
++datetime synced_at
++datetime created_at
++datetime updated_at
+}
+class OrderSpikeAlert {
++int id
++int site_id
++string alert_type
++int order_count
++int threshold
++int window_minutes
++bool telegram_sent
++datetime telegram_sent_at
++datetime created_at
++datetime updated_at
+}
+class ExternalPluginCache {
++int id
++string slug
++string name
++string author
++string latest_version
++string download_url
++string latest_file_hash
++string requires_wp
++string tested_up_to
++decimal rating
++string active_installs
++datetime last_updated_wporg
++bool is_on_wporg
++bool is_abandoned
++datetime last_synced_at
++datetime created_at
++datetime updated_at
+}
+class PluginOperationLog {
++int id
++int site_id
++string plugin_slug
++string plugin_name
++string operation
++string status
++text error_message
++int performed_by
++datetime performed_at
+}
 class Plugin {
 +int id
 +string name
@@ -440,9 +533,14 @@ class SitePlugin {
 +int id
 +int site_id
 +int plugin_id
++string plugin_slug
++string plugin_name
++string plugin_file
++string plugin_type
 +string installed_version
 +string latest_version
 +bool is_active
++bool update_available
 +datetime last_synced_at
 }
 class DeploymentJob {
@@ -451,6 +549,11 @@ class DeploymentJob {
 +int initiated_by
 +string status
 +string job_type
++string plugin_slug
++string plugin_name
++string target_version
++string download_url
++string file_hash
 +datetime scheduled_at
 +int total_sites
 +int success_count
@@ -467,7 +570,7 @@ class DeploymentJobSite {
 +string status
 +string rollback_version
 +text rollback_reason
-+json health_check_results
++text health_check_results
 +datetime rolled_back_at
 +text error_message
 +int attempt_count
@@ -684,15 +787,14 @@ class AutologinToken {
 }
 User "1" -- "many" Hosting : "created_by"
 User "1" -- "many" Site : "created_by"
+User "1" -- "many" ActivityLog : "user_id"
+User "1" -- "many" PluginOperationLog : "performed_by"
 Site "1" -- "many" SiteUser : "site_id"
 User "many" -- "many" Site : "site_users"
-User "1" -- "many" ActivityLog : "user_id"
 Site "1" -- "many" ActivityLog : "subject_type=Site"
-Plugin "1" -- "many" PluginVersion : "plugin_id"
-PluginVersion "1" -- "one" PluginChangelog : "plugin_version_id"
+Site "1" -- "many" Orders : "site_id"
+Site "1" -- "many" OrderSpikeAlerts : "site_id"
 Site "1" -- "many" SitePlugin : "site_id"
-Plugin "1" -- "many" SitePlugin : "plugin_id"
-DeploymentJob "1" -- "many" DeploymentJobSite : "deployment_job_id"
 Site "1" -- "many" DeploymentJobSite : "site_id"
 Site "1" -- "many" SecurityAlert : "site_id"
 Site "1" -- "many" SecurityScanRun : "site_id"
@@ -704,16 +806,34 @@ Site "1" -- "many" SiteVulnerability : "site_id"
 Site "1" -- "many" SiteAdminUser : "site_id"
 Site "1" -- "many" Site2faSetting : "site_id"
 Site "1" -- "many" SiteSecurityScore : "site_id"
-VulnerabilityDefinition "1" -- "many" SiteVulnerability : "vulnerability_id"
-CredentialType "1" -- "many" SiteCredential : "credential_type_id"
 Site "1" -- "many" SiteCredential : "site_id"
-SiteCredential "1" -- "many" SiteCredentialField : "site_credential_id"
-SiteCredential "1" -- "many" VaultAccessLog : "site_credential_id"
+Site "1" -- "many" VaultAccessLog : "site_id"
 Site "1" -- "many" CredentialShareLink : "site_id"
 Site "1" -- "many" AutologinToken : "site_id"
-User "1" -- "many" VaultAccessLog : "user_id"
-User "1" -- "many" CredentialShareLink : "created_by"
-User "1" -- "many" AutologinToken : "user_id"
+Plugin "1" -- "many" PluginVersion : "plugin_id"
+PluginVersion "1" -- "one" PluginChangelog : "plugin_version_id"
+Plugin "1" -- "many" SitePlugin : "plugin_id"
+Plugin "many" -- "many" SitePlugin : "site_id"
+DeploymentJob "1" -- "many" DeploymentJobSite : "deployment_job_id"
+PluginOperationLog "1" -- "many" Site : "site_id"
+PluginOperationLog "1" -- "many" User : "performed_by"
+ExternalPluginCache "1" -- "many" SitePlugin : "slug=plugin_slug"
+SecurityAlert "1" -- "many" Site : "site_id"
+SecurityScanRun "1" -- "many" Site : "site_id"
+FileIntegrityBaseline "1" -- "many" Site : "site_id"
+FileIntegrityFinding "1" -- "many" Site : "site_id"
+LoginEvent "1" -- "many" Site : "site_id"
+KnownLoginIp "1" -- "many" Site : "site_id"
+SiteVulnerability "1" -- "many" Site : "site_id"
+SiteAdminUser "1" -- "many" Site : "site_id"
+Site2faSetting "1" -- "many" Site : "site_id"
+SiteSecurityScore "1" -- "many" Site : "site_id"
+VulnerabilityDefinition "1" -- "many" SiteVulnerability : "vulnerability_id"
+CredentialType "1" -- "many" SiteCredential : "credential_type_id"
+SiteCredential "1" -- "many" SiteCredentialField : "site_credential_id"
+SiteCredential "1" -- "many" VaultAccessLog : "site_credential_id"
+CredentialShareLink "1" -- "many" Site : "site_id"
+AutologinToken "1" -- "many" Site : "site_id"
 ```
 
 **Diagram sources**
@@ -721,11 +841,15 @@ User "1" -- "many" AutologinToken : "user_id"
 - [Hosting.php:10-30](file://portal/app/Models/Hosting.php#L10-L30)
 - [Site.php:12-85](file://portal/app/Models/Site.php#L12-L85)
 - [ActivityLog.php:9-36](file://portal/app/Models/ActivityLog.php#L9-L36)
+- [Order.php:13-44](file://portal/app/Models/Order.php#L13-L44)
+- [OrderSpikeAlert.php:10-28](file://portal/app/Models/OrderSpikeAlert.php#L10-L28)
+- [ExternalPluginCache.php:11-30](file://portal/app/Models/ExternalPluginCache.php#L11-L30)
+- [PluginOperationLog.php:11-28](file://portal/app/Models/PluginOperationLog.php#L11-L28)
 - [Plugin.php:15-33](file://portal/app/Models/Plugin.php#L15-L33)
 - [PluginVersion.php:19-37](file://portal/app/Models/PluginVersion.php#L19-L37)
 - [PluginChangelog.php:16-19](file://portal/app/Models/PluginChangelog.php#L16-L19)
-- [SitePlugin.php:19-27](file://portal/app/Models/SitePlugin.php#L19-L27)
-- [DeploymentJob.php:21-34](file://portal/app/Models/DeploymentJob.php#L21-L34)
+- [SitePlugin.php:19-35](file://portal/app/Models/SitePlugin.php#L19-L35)
+- [DeploymentJob.php:21-77](file://portal/app/Models/DeploymentJob.php#L21-L77)
 - [DeploymentJobSite.php:16-24](file://portal/app/Models/DeploymentJobSite.php#L16-L24)
 - [SecurityAlert.php:13-51](file://portal/app/Models/SecurityAlert.php#L13-L51)
 - [SecurityScanRun.php:15-30](file://portal/app/Models/SecurityScanRun.php#L15-L30)
@@ -750,6 +874,9 @@ User "1" -- "many" AutologinToken : "user_id"
 - [create_hostings_table.php:11-19](file://portal/database/migrations/2026_05_15_070001_create_hostings_table.php#L11-L19)
 - [create_sites_table.php:11-27](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php#L11-L27)
 - [create_activity_logs_table.php:11-24](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L11-L24)
+- [create_orders_table.php:18-51](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L18-L51)
+- [create_order_spike_alerts_table.php:17-29](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php#L17-L29)
+- [phase6_external_plugin_management.php:12-117](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L12-L117)
 
 ## Detailed Component Analysis
 
@@ -773,6 +900,7 @@ User "1" -- "many" AutologinToken : "user_id"
   - Creator of CredentialShareLink entries.
   - Creator of AutologinToken entries.
   - Creator of VaultAccessLog entries.
+  - Creator of PluginOperationLog entries.
 - Validation and events
   - Validation handled by requests/controllers; model casts handle serialization.
   - Sanctum and Spatie traits manage API tokens and roles.
@@ -837,11 +965,13 @@ User "1" -- "many" AutologinToken : "user_id"
   - hasMany fileIntegrityFindings (not shown here)
   - hasMany loginEvents (not shown here)
   - hasMany siteCredentials (not shown here)
+  - hasMany orders (not shown here)
+  - hasMany orderSpikeAlerts (not shown here)
 - Scopes
   - accessibleBy: admin bypass; otherwise filters by user assignment via pivot.
 - Indexes and constraints
   - hosting_id nullable with nullOnDelete; created_by constrained to users; unique constraints on url and api_secret_key.
-- **Updated** Enhanced with beta testing capabilities, API key encryption, and comprehensive security integrations including vulnerability management, file integrity monitoring, and login event tracking.
+- **Updated** Enhanced with beta testing capabilities, API key encryption, comprehensive security integrations, and e-commerce order management including order spike alerts.
 
 ```mermaid
 sequenceDiagram
@@ -903,6 +1033,63 @@ DB-->>C : "filtered Site collection"
 - [PortalSetting.php:9-10](file://portal/app/Models/PortalSetting.php#L9-L10)
 - [create_portal_settings_table.php:11-16](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L11-L16)
 
+## E-commerce Order Management
+
+### Order Model
+- Purpose: Represents WooCommerce orders with comprehensive order data and customer information.
+- Fillable fields: site_id, woo_order_id, order_number, status, total, currency, customer_name, customer_email, customer_phone, billing_address, payment_method, payment_method_title, line_items, items_count, latest_note, order_date, synced_at.
+- Casts: total to decimal with 2 places, line_items to array, items_count to integer, order_date and synced_at to datetime.
+- Relationships: belongsTo site.
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+- **New** Comprehensive order management with support for up to 200 most recent orders per site, pruned after each sync for performance optimization.
+
+**Section sources**
+- [Order.php:13-44](file://portal/app/Models/Order.php#L13-L44)
+- [create_orders_table.php:18-51](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L18-L51)
+
+### OrderSpikeAlert Model
+- Purpose: Monitors and alerts on unusual order volume patterns to prevent fraud and manage server load.
+- Fillable fields: site_id, alert_type, order_count, threshold, window_minutes, telegram_sent, telegram_sent_at.
+- Casts: telegram_sent to boolean, telegram_sent_at to datetime.
+- Relationships: belongsTo site.
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+- **New** Order spike detection with 60-minute cooldown to prevent alert flooding during sustained traffic spikes.
+
+**Section sources**
+- [OrderSpikeAlert.php:10-28](file://portal/app/Models/OrderSpikeAlert.php#L10-L28)
+- [create_order_spike_alerts_table.php:17-29](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php#L17-L29)
+
+## External Plugin Management
+
+### ExternalPluginCache Model
+- Purpose: Caches external plugin metadata from WordPress.org and other sources for performance and offline access.
+- Fillable fields: slug, name, author, latest_version, download_url, latest_file_hash, requires_wp, tested_up_to, rating, active_installs, last_updated_wporg, is_on_wporg, is_abandoned, last_synced_at.
+- Casts: rating to decimal with 2 places, is_on_wporg and is_abandoned to boolean, last_updated_wporg and last_synced_at to datetime.
+- Relationships: hasMany sitePlugins via plugin_slug relationship.
+- Scopes: onWporg() for plugins actually on WordPress.org; abandoned() for plugins that haven't been updated in 730+ days.
+- Accessors: getIsAbandonedAttribute() for computed abandonment status.
+- Validation and events: handled by controllers; model casts manage serialization.
+- **New** Comprehensive external plugin metadata caching with abandonment detection and WP.org verification.
+
+**Section sources**
+- [ExternalPluginCache.php:11-49](file://portal/app/Models/ExternalPluginCache.php#L11-L49)
+- [phase6_external_plugin_management.php:79-101](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L79-L101)
+
+### PluginOperationLog Model
+- Purpose: Logs all plugin operations including activation, deactivation, and external plugin management actions for audit and compliance.
+- Fillable fields: site_id, plugin_slug, plugin_name, operation, status, error_message, performed_by, performed_at.
+- Casts: performed_at to datetime.
+- Relationships: belongsTo site; belongsTo user (performed_by).
+- Validation and events: handled by controllers; model casts manage serialization.
+- Accessors/mutators: none declared; uses standard Eloquent relationships.
+- **New** Comprehensive plugin operation audit trail with detailed error reporting and user attribution.
+
+**Section sources**
+- [PluginOperationLog.php:11-28](file://portal/app/Models/PluginOperationLog.php#L11-L28)
+- [phase6_external_plugin_management.php:103-117](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L103-L117)
+
 ## Plugin Ecosystem Components
 
 ### Plugin Model
@@ -943,39 +1130,42 @@ DB-->>C : "filtered Site collection"
 - [create_plugin_changelogs_table.php:11-16](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L11-L16)
 
 ### SitePlugin Model
-- Purpose: Tracks plugin installation state per site with version management.
-- Fillable fields: site_id, plugin_id, installed_version, latest_version, is_active, last_synced_at.
-- Casts: is_active to boolean, last_synced_at to datetime.
-- Relationships: belongsTo site; belongsTo plugin.
+- Purpose: Tracks plugin installation state per site with version management and enhanced external plugin support.
+- Fillable fields: site_id, plugin_id, plugin_slug, plugin_name, plugin_file, plugin_type, installed_version, latest_version, is_active, update_available, last_synced_at.
+- Casts: is_active to boolean, update_available to boolean, last_synced_at to datetime.
+- Relationships: belongsTo site; belongsTo plugin; belongsToMany externalPluginCache via plugin_slug.
 - Methods: isOutdated() compares installed vs latest versions using semantic versioning.
 - Validation and events: handled by controllers; model casts manage serialization.
 - Accessors/mutators: none declared; uses standard Eloquent relationships.
+- **Updated** Enhanced with external plugin support including WordPress.org plugins, premium plugins, and plugin type categorization.
 
 **Section sources**
 - [SitePlugin.php:12-35](file://portal/app/Models/SitePlugin.php#L12-L35)
 - [create_site_plugins_table.php:11-19](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L11-L19)
+- [phase6_external_plugin_management.php:12-53](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L12-L53)
 
 ### DeploymentJob Model
-- Purpose: Orchestrates plugin deployment across multiple sites with status tracking and enhanced features.
-- Fillable fields: plugin_version_id, initiated_by, status, job_type, scheduled_at, total_sites, success_count, failed_count, note, created_at, started_at, finished_at.
+- Purpose: Orchestrates plugin deployment across multiple sites with status tracking, enhanced features, and external plugin support.
+- Fillable fields: plugin_version_id, initiated_by, status, job_type, plugin_slug, plugin_name, target_version, download_url, file_hash, scheduled_at, total_sites, success_count, failed_count, note, created_at, started_at, finished_at.
 - Casts: created_at, started_at, finished_at to datetime.
 - Relationships: belongsTo pluginVersion; belongsTo user (initiated_by); hasMany deploymentJobSites.
 - Validation and events: handled by controllers; model casts manage serialization.
 - Accessors/mutators: none declared; uses standard Eloquent relationships.
-- **Updated** Enhanced with scheduling capabilities, job type tracking, and rollback functionality for deployment operations.
+- **Updated** Enhanced with external plugin deployment support including WordPress.org downloads, premium plugin installations, and file hash verification.
 
 **Section sources**
 - [DeploymentJob.php:13-34](file://portal/app/Models/DeploymentJob.php#L13-L34)
 - [create_deployment_jobs_table.php:11-22](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L11-L22)
+- [phase6_external_plugin_management.php:55-77](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L55-L77)
 
 ### DeploymentJobSite Model
-- Purpose: Tracks individual site deployment status within a deployment job with enhanced tracking.
+- Purpose: Tracks individual site deployment status within a deployment job with enhanced tracking and external plugin support.
 - Fillable fields: deployment_job_id, site_id, status, rollback_version, rollback_reason, health_check_results, rolled_back_at, error_message, attempt_count, deployed_at.
 - Casts: deployed_at to datetime.
 - Relationships: belongsTo deploymentJob; belongsTo site.
 - Validation and events: handled by controllers; model casts manage serialization.
 - Accessors/mutators: none declared; uses standard Eloquent relationships.
-- **Updated** Enhanced with rollback tracking, health check results, and detailed deployment status reporting.
+- **Updated** Enhanced with rollback tracking, health check results, and detailed deployment status reporting for external plugin operations.
 
 **Section sources**
 - [DeploymentJobSite.php:12-24](file://portal/app/Models/DeploymentJobSite.php#L12-L24)
@@ -1240,17 +1430,19 @@ DB-->>C : "filtered Site collection"
 ## Enhanced Deployment Tracking
 
 ### Deployment Job Enhancements
-The deployment system has been significantly enhanced with rollback capabilities, scheduling, and health checks:
+The deployment system has been significantly enhanced with rollback capabilities, scheduling, health checks, and external plugin support:
 
 - **Rollback Support**: DeploymentJobSite now tracks rollback_version, rollback_reason, health_check_results, and rolled_back_at fields for comprehensive deployment recovery.
 - **Scheduling**: DeploymentJob includes job_type and scheduled_at fields for planned deployment operations.
 - **Status Expansion**: Enhanced status tracking with healthy and rolled_back states for improved deployment visibility.
 - **Health Monitoring**: Health check results storage enables automated deployment validation and rollback triggers.
+- **External Plugin Support**: DeploymentJob now supports external plugin deployments with download_url, file_hash, and target_version fields for WordPress.org and premium plugins.
 
 **Section sources**
 - [add_rollback_and_schedule_fields.php:12-30](file://portal/database/migrations/2026_05_17_000001_add_rollback_and_schedule_fields.php#L12-L30)
 - [DeploymentJob.php:21-34](file://portal/app/Models/DeploymentJob.php#L21-L34)
 - [DeploymentJobSite.php:16-24](file://portal/app/Models/DeploymentJobSite.php#L16-L24)
+- [phase6_external_plugin_management.php:55-77](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L55-L77)
 
 ### Beta Testing Integration
 The system now supports beta testing capabilities:
@@ -1269,14 +1461,27 @@ Sites now include comprehensive security-related enhancements:
 
 - **API Key Encryption**: api_key_encrypted field provides secure storage of API keys alongside existing api_secret_key.
 - **Beta Tester Flag**: is_beta_tester field enables selective beta program participation.
-- **Enhanced Security Integrations**: Integration points for security monitoring, vulnerability management, and compliance tracking.
+- **Enhanced Security Integrations**: Integration points for security monitoring, vulnerability management, compliance tracking, and e-commerce order management.
 
 **Section sources**
 - [add_api_key_encrypted_to_sites.php:11-12](file://portal/database/migrations/2026_05_17_000003_add_api_key_encrypted_to_sites.php#L11-L12)
 - [Site.php:31-39](file://portal/app/Models/Site.php#L31-L39)
 
+### External Plugin Management Enhancements
+The site_plugins table has been enhanced to support external plugin management:
+
+- **Nullable Plugin References**: plugin_id is now nullable to support external plugins beyond internal plugin catalog.
+- **External Plugin Fields**: plugin_slug, plugin_name, plugin_file, plugin_type, and update_available fields for external plugin tracking.
+- **Plugin Type Categorization**: Enum support for internal, WordPress.org, and premium plugin types.
+- **Unique Constraint Update**: Changed unique constraint from (site_id, plugin_id) to (site_id, plugin_slug) for external plugin support.
+- **External Plugin Cache Integration**: SitePlugin now relates to ExternalPluginCache via plugin_slug for metadata enrichment.
+
+**Section sources**
+- [phase6_external_plugin_management.php:12-53](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L12-L53)
+- [SitePlugin.php:19-35](file://portal/app/Models/SitePlugin.php#L19-L35)
+
 ## Dependency Analysis
-This section maps model dependencies and foreign key relationships derived from migrations, including the new security monitoring, credential management, and enhanced deployment tracking components.
+This section maps model dependencies and foreign key relationships derived from migrations, including the new e-commerce order management, external plugin management, security monitoring, and credential management components.
 
 ```mermaid
 erDiagram
@@ -1350,6 +1555,70 @@ text value
 timestamp created_at
 timestamp updated_at
 }
+ORDERS {
+int id PK
+int site_id FK
+bigint woo_order_id
+string order_number
+enum status
+decimal total
+string currency
+string customer_name
+string customer_email
+string customer_phone
+text billing_address
+string payment_method
+string payment_method_title
+json line_items
+int items_count
+text latest_note
+timestamp order_date
+timestamp synced_at
+timestamp created_at
+timestamp updated_at
+}
+ORDER_SPIKE_ALERTS {
+int id PK
+int site_id FK
+enum alert_type
+int order_count
+int threshold
+int window_minutes
+bool telegram_sent
+timestamp telegram_sent_at
+timestamp created_at
+timestamp updated_at
+}
+EXTERNAL_PLUGIN_CACHE {
+int id PK
+string slug UK
+string name
+string author
+string latest_version
+string download_url
+string latest_file_hash
+string requires_wp
+string tested_up_to
+decimal rating
+string active_installs
+timestamp last_updated_wporg
+bool is_on_wporg
+bool is_abandoned
+timestamp last_synced_at
+timestamp created_at
+timestamp updated_at
+}
+PLUGIN_OPERATION_LOGS {
+int id PK
+int site_id FK
+string plugin_slug
+string plugin_name
+enum operation
+enum status
+text error_message
+int performed_by FK
+timestamp performed_at
+}
 PLUGINS {
 int id PK
 string name
@@ -1386,9 +1655,14 @@ SITE_PLUGINS {
 int id PK
 int site_id FK
 int plugin_id FK
+string plugin_slug
+string plugin_name
+string plugin_file
+enum plugin_type
 string installed_version
 string latest_version
 bool is_active
+bool update_available
 timestamp last_synced_at
 }
 DEPLOYMENT_JOBS {
@@ -1396,7 +1670,12 @@ int id PK
 int plugin_version_id FK
 int initiated_by FK
 enum status
-string job_type
+varchar job_type
+string plugin_slug
+string plugin_name
+string target_version
+string download_url
+string file_hash
 timestamp scheduled_at
 int total_sites
 int success_count
@@ -1643,8 +1922,11 @@ USERS ||--o{ SITE_CREDENTIALS : "updated_by"
 USERS ||--o{ CREDENTIAL_SHARE_LINKS : "created_by"
 USERS ||--o{ CREDENTIAL_SHARE_LINKS : "revoked_by"
 USERS ||--o{ AUTOLOGIN_TOKENS : "user_id"
+USERS ||--o{ PLUGIN_OPERATION_LOGS : "performed_by"
 SITES ||--o{ SITE_USERS : "site_id"
 SITES ||--o{ ACTIVITY_LOGS : "subject_type=Site"
+SITES ||--o{ ORDERS : "site_id"
+SITES ||--o{ ORDER_SPIKE_ALERTS : "site_id"
 SITES ||--o{ SITE_PLUGINS : "site_id"
 SITES ||--o{ DEPLOYMENT_JOBS : "site_id"
 SITES ||--o{ DEPLOYMENT_JOB_SITES : "site_id"
@@ -1661,15 +1943,19 @@ SITES ||--o{ SITE_SECURITY_SCORES : "site_id"
 SITES ||--o{ SITE_CREDENTIALS : "site_id"
 SITES ||--o{ CREDENTIAL_SHARE_LINKS : "site_id"
 SITES ||--o{ AUTOLOGIN_TOKENS : "site_id"
-PLUGINS ||--o{ PLUGIN_VERSIONS : "plugin_id"
-PLUGIN_VERSIONS ||--|| PLUGIN_CHANGELOGS : "plugin_version_id"
+ORDERS ||--|| SITES : "site_id"
+ORDER_SPIKE_ALERTS ||--|| SITES : "site_id"
+EXTERNAL_PLUGIN_CACHE ||--o{ SITE_PLUGINS : "slug=plugin_slug"
 SITE_PLUGINS ||--|| PLUGINS : "plugin_id"
+SITE_PLUGINS ||--|| EXTERNAL_PLUGIN_CACHE : "plugin_slug"
 DEPLOYMENT_JOBS ||--|| PLUGIN_VERSIONS : "plugin_version_id"
 DEPLOYMENT_JOB_SITES ||--|| DEPLOYMENT_JOBS : "deployment_job_id"
 SITE_VULNERABILITIES ||--|| VULNERABILITY_DEFINITIONS : "vulnerability_id"
 SITE_CREDENTIALS ||--|| CREDENTIAL_TYPES : "credential_type_id"
 SITE_CREDENTIAL_FIELDS ||--|| SITE_CREDENTIALS : "site_credential_id"
 VAULT_ACCESS_LOGS ||--|| SITE_CREDENTIALS : "site_credential_id"
+PLUGIN_OPERATION_LOGS ||--|| SITES : "site_id"
+PLUGIN_OPERATION_LOGS ||--|| USERS : "performed_by"
 ```
 
 **Diagram sources**
@@ -1679,12 +1965,9 @@ VAULT_ACCESS_LOGS ||--|| SITE_CREDENTIALS : "site_credential_id"
 - [create_site_users_table.php:11-17](file://portal/database/migrations/2026_05_15_070003_create_site_users_table.php#L11-L17)
 - [create_activity_logs_table.php:11-24](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L11-L24)
 - [create_portal_settings_table.php:11-16](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L11-L16)
-- [create_plugins_table.php:11-18](file://portal/database/migrations/2026_05_15_080001_create_plugins_table.php#L11-L18)
-- [create_plugin_versions_table.php:11-22](file://portal/database/migrations/2026_05_15_080002_create_plugin_versions_table.php#L11-L22)
-- [create_plugin_changelogs_table.php:11-16](file://portal/database/migrations/2026_05_15_080003_create_plugin_changelogs_table.php#L11-L16)
-- [create_site_plugins_table.php:11-19](file://portal/database/migrations/2026_05_15_080004_create_site_plugins_table.php#L11-L19)
-- [create_deployment_jobs_table.php:11-22](file://portal/database/migrations/2026_05_15_080005_create_deployment_jobs_table.php#L11-L22)
-- [create_deployment_job_sites_table.php:11-18](file://portal/database/migrations/2026_05_15_080006_create_deployment_job_sites_table.php#L11-L18)
+- [create_orders_table.php:18-51](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L18-L51)
+- [create_order_spike_alerts_table.php:17-29](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php#L17-L29)
+- [phase6_external_plugin_management.php:79-117](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L79-L117)
 - [create_security_tables.php:11-212](file://portal/database/migrations/2026_05_18_000001_create_security_tables.php#L11-L212)
 - [create_credential_types_table.php:11-18](file://portal/database/migrations/2026_05_16_090001_create_credential_types_table.php#L11-L18)
 - [create_site_credentials_table.php:11-20](file://portal/database/migrations/2026_05_16_090002_create_site_credentials_table.php#L11-L20)
@@ -1699,31 +1982,38 @@ VAULT_ACCESS_LOGS ||--|| SITE_CREDENTIALS : "site_credential_id"
   - Separate indexes on action and user_id improve filtering and auditing performance.
   - Unique indexes on url and api_secret_key in sites prevent duplicates and speed up lookups.
   - Unique composite index on (site_id, user_id) in site_users ensures efficient membership checks.
+  - **Updated** E-commerce indexing: Unique composite index on (site_id, woo_order_id) for order deduplication; indexes on order_date, status, and customer fields for order search and filtering; indexes on alert_type and created_at for spike alert monitoring.
+  - **Updated** External plugin indexing: Unique index on external_plugin_cache.slug for fast plugin lookup; indexes on is_on_wporg and is_abandoned for plugin filtering; indexes on plugin_slug in site_plugins for external plugin relationships.
   - **Updated** Security monitoring indexing: Composite indexes on (site_id, status) for vulnerabilities and findings; indexes on (site_id, severity) for alerts; unique indexes on (site_id, wp_user_id) for admin users; indexes on (site_id, ip_address, occurred_at) for login events.
   - **Updated** Credential management indexing: Unique indexes on (site_id, credential_type_id) for credential organization; indexes on token_hash for secure sharing; indexes on created_by for audit trail performance.
-  - **Updated** Enhanced deployment indexing: Indexes on deployment_job_id and site_id for job-site relationships; indexes on status for deployment tracking; indexes on scheduled_at for scheduling queries.
+  - **Updated** Enhanced deployment indexing: Indexes on deployment_job_id and site_id for job-site relationships; indexes on status for deployment tracking; indexes on scheduled_at for scheduling queries; indexes on plugin_type and plugin_slug for external plugin filtering.
 - Query optimization techniques
-  - Use eager loading for relationships to avoid N+1 queries (e.g., with users, hosting, activityLogs, plugin versions, security components).
+  - Use eager loading for relationships to avoid N+1 queries (e.g., with users, hosting, activityLogs, plugin versions, security components, e-commerce components).
   - Apply scopes like accessibleBy to limit dataset size early.
-  - Prefer JSON fields for tags, metadata, and security breakdowns to reduce joins; ensure appropriate queries on JSON columns.
-  - **Updated** Optimize security queries using where clauses on severity, status, and date ranges for vulnerability and alert management.
-  - **Updated** Implement pagination for credential lists, security findings, and audit logs to manage large datasets efficiently.
-  - **Updated** Use specialized scopes for credential sharing (active/expired) and deployment job filtering (scheduled/running/completed).
+  - Prefer JSON fields for tags, metadata, security breakdowns, and order line items to reduce joins; ensure appropriate queries on JSON columns.
+  - **Updated** Optimize e-commerce queries using where clauses on order_date ranges, status filters, and customer searches for order management and spike detection.
+  - **Updated** Implement pagination for order lists, spike alerts, external plugin caches, and plugin operation logs to manage large datasets efficiently.
+  - **Updated** Use specialized scopes for external plugin filtering (onWporg, abandoned), order spike detection (recent alerts), and deployment job filtering (scheduled/running/completed).
+  - **Updated** Cache external plugin metadata to reduce database load for plugin operations and deployment decisions.
 - Soft deletes
   - Soft deletes on hostings and sites require careful querying; ensure queries account for deleted_at when necessary.
 - Casts and serialization
   - Array and datetime casts minimize manual conversion overhead and improve consistency.
   - **Updated** Encrypted casts for sensitive credential data ensure security while maintaining query performance.
-- **Updated** Security and credential performance considerations
-  - Use hasOne/hasMany relationships judiciously; consider lazy loading for security components and credential fields.
-  - Implement caching for frequently accessed security definitions and credential types.
-  - Optimize bulk operations for security scans and vulnerability synchronization using batch processing.
+  - **Updated** Decimal casts for order totals and plugin ratings ensure precise financial and scoring calculations.
+- **Updated** E-commerce and external plugin performance considerations
+  - Use hasOne/hasMany relationships judiciously; consider lazy loading for order components and external plugin metadata.
+  - Implement caching strategies for external plugin metadata and order statistics.
+  - Optimize bulk operations for order ingestion, plugin cache updates, and operation logging using batch processing.
+  - Use database partitioning strategies for order tables to manage the 200-order limit per site efficiently.
 
 ## Troubleshooting Guide
 - Common issues
   - Unique constraint violations on url or api_secret_key in sites.
   - Foreign key constraint failures when deleting users or sites without proper cascade/null behavior.
   - Missing indexes causing slow audits or polymorphic lookups.
+  - **Updated** E-commerce issues: Order duplication with unique (site_id, woo_order_id) constraint, order pruning conflicts, spike alert cooldown violations, external plugin slug mismatches.
+  - **Updated** External plugin management issues: Nullable plugin_id constraints, unique (site_id, plugin_slug) conflicts, external plugin cache synchronization failures, plugin operation log audit trail gaps.
   - **Updated** Security monitoring issues: Missing indexes on security-related composite fields, insufficient storage for JSON security data, deployment job status conflicts, credential access log overflow.
   - **Updated** Credential management issues: Encrypted field corruption, token hash collisions, sharing link expiration problems, vault access log audit trail gaps.
   - **Updated** Enhanced deployment issues: Rollback failures, health check timeouts, scheduled deployment conflicts, beta testing version mismatches.
@@ -1731,6 +2021,8 @@ VAULT_ACCESS_LOGS ||--|| SITE_CREDENTIALS : "site_credential_id"
   - Verify indexes exist on subject_type/subject_id, action, and user_id in activity_logs.
   - Confirm unique constraints on key fields in portal_settings and site_users.
   - Check soft delete behavior and nullOnDelete configurations for dependent records.
+  - **Updated** Verify e-commerce indexes on site_id with order_date/status combinations and unique order constraints for optimal query performance.
+  - **Updated** Check external plugin indexing on slug fields and plugin_type filtering for efficient external plugin operations.
   - **Updated** Verify security indexes on site_id with status/severity combinations for optimal query performance.
   - **Updated** Check credential encryption configuration and token hash uniqueness for secure sharing functionality.
   - **Updated** Validate deployment job status enums and rollback field constraints for reliable deployment operations.
@@ -1738,16 +2030,19 @@ VAULT_ACCESS_LOGS ||--|| SITE_CREDENTIALS : "site_credential_id"
   - Add missing indexes via new migrations.
   - Adjust foreign key constraints or cascades to match intended behavior.
   - Use scopes and eager loading to avoid accidental heavy queries.
-  - **Updated** Implement proper error handling for security scan failures, credential decryption errors, and deployment rollback scenarios.
-  - **Updated** Configure appropriate storage limits for security JSON data and implement cleanup procedures for audit logs.
+  - **Updated** Implement proper error handling for order ingestion failures, external plugin cache updates, and plugin operation logging.
+  - **Updated** Configure appropriate storage limits for e-commerce JSON data and implement cleanup procedures for order history and audit logs.
+  - **Updated** Handle external plugin slug conflicts by normalizing plugin identifiers and implementing conflict resolution strategies.
 
 **Section sources**
 - [create_sites_table.php:15-17](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php#L15-L17)
 - [create_site_users_table.php:16-16](file://portal/database/migrations/2026_05_15_070003_create_site_users_table.php#L16-L16)
 - [create_activity_logs_table.php:21-23](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L21-L23)
+- [create_orders_table.php:47-51](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L47-L51)
+- [phase6_external_plugin_management.php:14-53](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L14-L53)
 
 ## Conclusion
-The data model layer is designed around clear entity boundaries with explicit relationships and constraints. Users drive creation of Hostings and Sites, Sites maintain many-to-many relationships with Users, and ActivityLogs capture auditable events against polymorphic subjects. The newly added security monitoring system provides comprehensive threat detection, vulnerability management, file integrity monitoring, and compliance tracking capabilities. The credential management system offers secure vault storage, sharing mechanisms, and detailed audit trails. The enhanced deployment tracking system includes rollback capabilities, scheduling, and health monitoring. The expanded plugin ecosystem provides comprehensive plugin management capabilities with version control, changelogs, site installations, and deployment orchestration. Migrations encode primary keys, foreign keys, indexes, and constraints, while model scopes and casts streamline common operations. Following the recommended indexing and query strategies will help maintain performance as the system scales with both core functionality and the extensive security and credential management capabilities.
+The data model layer is designed around clear entity boundaries with explicit relationships and constraints. Users drive creation of Hostings and Sites, Sites maintain many-to-many relationships with Users, and ActivityLogs capture auditable events against polymorphic subjects. The newly added e-commerce order management system provides comprehensive WooCommerce integration with order processing, spike detection, and alerting capabilities. The external plugin management system enables WordPress.org plugin support, premium plugin integration, and external plugin operations with caching and audit logging. The enhanced plugin ecosystem provides comprehensive plugin management capabilities with version control, changelogs, site installations, and deployment orchestration. The expanded security monitoring system provides comprehensive threat detection, vulnerability management, file integrity monitoring, and compliance tracking capabilities. The credential management system offers secure vault storage, sharing mechanisms, and detailed audit trails. Migrations encode primary keys, foreign keys, indexes, and constraints, while model scopes and casts streamline common operations. Following the recommended indexing and query strategies will help maintain performance as the system scales with both core functionality and the extensive e-commerce, external plugin, security, and credential management capabilities.
 
 ## Appendices
 
@@ -1757,16 +2052,21 @@ The data model layer is designed around clear entity boundaries with explicit re
 - Pattern: Add indexes for frequently queried columns (e.g., polymorphic subject_type/subject_id, action, user_id).
 - Pattern: Use unique constraints for fields requiring uniqueness (e.g., email, url, api_secret_key, slug, key, token_hash).
 - Pattern: Employ soft deletes for entities requiring historical tracking (hostings, sites).
-- Pattern: Use JSON columns for flexible metadata (tags, metadata, security breakdowns) and ensure appropriate queries.
+- Pattern: Use JSON columns for flexible metadata (tags, metadata, security breakdowns, order line items) and ensure appropriate queries.
+- **Updated** E-commerce patterns: Cascade deletes for order relationships, unique constraints on (site_id, woo_order_id) for order deduplication, composite indexes for order filtering, enum constraints for order statuses and alert types.
+- **Updated** External plugin patterns: Nullable foreign keys for external plugin support, unique constraints on (site_id, plugin_slug) for plugin identification, indexes on plugin_type and slug for filtering, data migration strategies for schema evolution.
 - **Updated** Security monitoring patterns: Cascade deletes for dependent security records, composite indexes for status tracking, enum constraints for security states, JSON storage for vulnerability definitions and security metrics.
 - **Updated** Credential management patterns: Encrypted field handling, token-based access control, audit trail requirements, and secure sharing mechanisms.
-- **Updated** Enhanced deployment patterns: Status enum expansion, rollback tracking, health check integration, and scheduling support.
+- **Updated** Enhanced deployment patterns: Status enum expansion, rollback tracking, health check integration, scheduling support, and external plugin deployment capabilities.
 
 **Section sources**
 - [create_users_table.php:14-25](file://portal/database/migrations/0001_01_01_000000_create_users_table.php#L14-L25)
 - [create_sites_table.php:15-23](file://portal/database/migrations/2026_05_15_070002_create_sites_table.php#L15-L23)
 - [create_activity_logs_table.php:21-23](file://portal/database/migrations/2026_05_15_070004_create_activity_logs_table.php#L21-L23)
 - [create_portal_settings_table.php:13-13](file://portal/database/migrations/2026_05_15_070005_create_portal_settings_table.php#L13-L13)
+- [create_orders_table.php:18-51](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L18-L51)
+- [create_order_spike_alerts_table.php:17-29](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php#L17-L29)
+- [phase6_external_plugin_management.php:12-167](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L12-L167)
 - [create_security_tables.php:11-212](file://portal/database/migrations/2026_05_18_000001_create_security_tables.php#L11-L212)
 - [create_credential_types_table.php:11-18](file://portal/database/migrations/2026_05_16_090001_create_credential_types_table.php#L11-L18)
 - [create_site_credentials_table.php:11-20](file://portal/database/migrations/2026_05_16_090002_create_site_credentials_table.php#L11-L20)
@@ -1784,6 +2084,14 @@ The data model layer is designed around clear entity boundaries with explicit re
   - Filter by subject_type and subject_id to retrieve logs for a specific Site.
 - JSON column queries:
   - Query tags using JSON operators to filter by tag presence or values.
+- **Updated** E-commerce queries:
+  - Get recent orders: Use Order->where('site_id', $siteId)->whereBetween('order_date', [$start, $end])->orderBy('order_date', 'desc')->limit(200)->get().
+  - Monitor order spikes: Use OrderSpikeAlert->where('site_id', $siteId)->where('created_at', '>', now()->subMinutes(60))->first() for cooldown checking.
+  - Search orders by status: Use Order->where('site_id', $siteId)->where('status', 'completed')->get() with pagination.
+- **Updated** External plugin queries:
+  - Get external plugins: Use ExternalPluginCache->onWporg()->where('is_abandoned', false)->get() with pagination.
+  - Check plugin availability: Use ExternalPluginCache->where('slug', $slug)->first() for plugin metadata lookup.
+  - Audit plugin operations: Use PluginOperationLog->where('site_id', $siteId)->orderBy('performed_at', 'desc')->limit(100)->get().
 - **Updated** Security monitoring queries:
   - Get critical security alerts: Use SecurityAlert->where('severity', 'critical')->get() with site_id filtering.
   - Monitor vulnerability status: Use SiteVulnerability->where('status', 'open')->with('vulnerabilityDefinition')->get().
@@ -1801,6 +2109,10 @@ The data model layer is designed around clear entity boundaries with explicit re
 **Section sources**
 - [Site.php:75-84](file://portal/app/Models/Site.php#L75-L84)
 - [ActivityLog.php:56-60](file://portal/app/Models/ActivityLog.php#L56-L60)
+- [Order.php:13-44](file://portal/app/Models/Order.php#L13-L44)
+- [OrderSpikeAlert.php:10-28](file://portal/app/Models/OrderSpikeAlert.php#L10-L28)
+- [ExternalPluginCache.php:32-48](file://portal/app/Models/ExternalPluginCache.php#L32-L48)
+- [PluginOperationLog.php:11-28](file://portal/app/Models/PluginOperationLog.php#L11-L28)
 - [SecurityAlert.php:13-51](file://portal/app/Models/SecurityAlert.php#L13-L51)
 - [SiteVulnerability.php:15-47](file://portal/app/Models/SiteVulnerability.php#L15-L47)
 - [FileIntegrityFinding.php:15-30](file://portal/app/Models/FileIntegrityFinding.php#L15-L30)
@@ -1817,9 +2129,18 @@ The data model layer is designed around clear entity boundaries with explicit re
 - Accessors and mutators
   - No custom accessors/mutators are defined; password hashing and date casting are handled via model casts.
   - **Updated** Credential encryption handled automatically via encrypted cast for sensitive fields.
+  - **Updated** Decimal casting for order totals and plugin ratings ensures precision in financial and scoring calculations.
 - Model events
   - Sanctum and Spatie Permission traits manage API token lifecycle and role/permission synchronization.
-  - **Updated** Automatic timestamp management for created_at fields in security and credential models.
+  - **Updated** Automatic timestamp management for created_at fields in security, credential, e-commerce, and external plugin models.
+- **Updated** E-commerce-specific behaviors
+  - Order deduplication with unique (site_id, woo_order_id) constraint.
+  - Spike alert cooldown enforcement with 60-minute restriction.
+  - Order pruning to maintain 200 most recent orders per site.
+- **Updated** External plugin-specific behaviors
+  - Nullable plugin_id support for external plugin installations.
+  - Plugin type categorization (internal, wporg, premium) for deployment targeting.
+  - External plugin cache synchronization for metadata enrichment.
 - **Updated** Security-specific behaviors
   - Severity-based filtering for security alerts and findings.
   - Status tracking for vulnerability lifecycle management.
@@ -1832,6 +2153,8 @@ The data model layer is designed around clear entity boundaries with explicit re
 **Section sources**
 - [User.php:29-36](file://portal/app/Models/User.php#L29-L36)
 - [Site.php:31-39](file://portal/app/Models/Site.php#L31-L39)
+- [Order.php:33-39](file://portal/app/Models/Order.php#L33-L39)
+- [ExternalPluginCache.php:18-24](file://portal/app/Models/ExternalPluginCache.php#L18-L24)
 - [SiteCredential.php:18-53](file://portal/app/Models/SiteCredential.php#L18-L53)
 - [VaultAccessLog.php:23-50](file://portal/app/Models/VaultAccessLog.php#L23-L50)
 - [CredentialShareLink.php:27-76](file://portal/app/Models/CredentialShareLink.php#L27-L76)
@@ -1846,6 +2169,55 @@ The data model layer is designed around clear entity boundaries with explicit re
 **Section sources**
 - [create_permission_tables.php:53-134](file://portal/database/migrations/2026_05_15_061634_create_permission_tables.php#L53-L134)
 - [permission.php:43-76](file://portal/config/permission.php#L43-L76)
+
+### E-commerce Order Management Implementation Details
+- **Order Processing System**
+  - Up to 200 most recent orders per site with automatic pruning to maintain performance.
+  - Comprehensive order metadata including customer information, payment details, and line items stored as JSON.
+  - Unique constraint on (site_id, woo_order_id) prevents order duplication across sync operations.
+  - Order indexing on order_date, status, and customer fields for efficient searching and filtering.
+- **Order Spike Detection**
+  - Real-time monitoring of order volume patterns with configurable thresholds and time windows.
+  - 60-minute cooldown period prevents alert flooding during sustained traffic spikes.
+  - Support for hourly_spike and burst alert types with Telegram integration for critical alerts.
+  - Indexing on site_id with created_at for efficient spike detection queries.
+- **Integration Benefits**
+  - Seamless integration with WooCommerce for real-time order synchronization.
+  - Support for order-based analytics and customer service workflows.
+  - Scalable architecture that maintains performance with high-volume order processing.
+
+**Section sources**
+- [Order.php:13-44](file://portal/app/Models/Order.php#L13-L44)
+- [OrderSpikeAlert.php:10-28](file://portal/app/Models/OrderSpikeAlert.php#L10-L28)
+- [create_orders_table.php:18-51](file://portal/database/migrations/2026_05_18_000001_create_orders_table.php#L18-L51)
+- [create_order_spike_alerts_table.php:17-29](file://portal/database/migrations/2026_05_18_000002_create_order_spike_alerts_table.php#L17-L29)
+
+### External Plugin Management Implementation Details
+- **External Plugin Support**
+  - Enhanced site_plugins table with nullable plugin_id to support external plugins beyond internal catalog.
+  - New plugin_slug, plugin_name, plugin_file, plugin_type, and update_available fields for external plugin tracking.
+  - Plugin type enumeration supporting internal, WordPress.org, and premium plugin categorization.
+  - Unique constraint on (site_id, plugin_slug) replacing previous (site_id, plugin_id) for external plugin support.
+- **External Plugin Cache**
+  - Comprehensive caching of WordPress.org plugin metadata including version information, ratings, and download URLs.
+  - Abandonment detection with 730-day threshold for plugin maintenance tracking.
+  - Indexing on is_on_wporg and is_abandoned for efficient plugin filtering and discovery.
+  - Data migration strategy to populate plugin_slug from existing internal plugin relationships.
+- **Plugin Operation Logging**
+  - Comprehensive audit trail for all plugin operations including activation, deactivation, and external plugin installations.
+  - User attribution for plugin operations with performed_by foreign key relationship.
+  - Error reporting and status tracking for failed plugin operations.
+  - Indexing on site_id and plugin_slug for efficient operation log queries.
+- **Deployment Integration**
+  - Extended deployment_jobs table with external plugin support including download_url, file_hash, and target_version fields.
+  - Job type expansion to support external plugin deployment operations.
+  - Health check integration for external plugin installations and updates.
+
+**Section sources**
+- [SitePlugin.php:19-35](file://portal/app/Models/SitePlugin.php#L19-L35)
+- [ExternalPluginCache.php:11-49](file://portal/app/Models/ExternalPluginCache.php#L11-L49)
+- [PluginOperationLog.php:11-28](file://portal/app/Models/PluginOperationLog.php#L11-L28)
+- [phase6_external_plugin_management.php:12-167](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L12-L167)
 
 ### Security Monitoring Implementation Details
 - **Security Alert Management**
@@ -1913,7 +2285,7 @@ The data model layer is designed around clear entity boundaries with explicit re
   - Detailed rollback audit trail with timestamped rollback events.
 - **Scheduling and Planning**
   - Advanced deployment scheduling with temporal planning and resource allocation.
-  - Job type differentiation for various deployment scenarios (standard, rollback, maintenance).
+  - Job type differentiation for various deployment scenarios (standard, rollback, maintenance, external plugin).
   - Conflict resolution for overlapping scheduled deployments.
 - **Health Monitoring and Quality Assurance**
   - Integrated health check systems for deployment validation and quality assurance.
@@ -1923,9 +2295,14 @@ The data model layer is designed around clear entity boundaries with explicit re
   - Segmented deployment targeting for beta testers versus production environments.
   - Version track management supporting stable and beta release channels.
   - Controlled rollout strategies with gradual adoption and feedback collection.
+- **External Plugin Deployment**
+  - Direct WordPress.org plugin downloads with file hash verification.
+  - Premium plugin installation support with authentication and licensing validation.
+  - External plugin metadata caching for improved deployment performance.
 
 **Section sources**
 - [DeploymentJob.php:21-34](file://portal/app/Models/DeploymentJob.php#L21-L34)
 - [DeploymentJobSite.php:16-24](file://portal/app/Models/DeploymentJobSite.php#L16-L24)
 - [add_rollback_and_schedule_fields.php:12-30](file://portal/database/migrations/2026_05_17_000001_add_rollback_and_schedule_fields.php#L12-L30)
 - [add_beta_testing_fields.php:11-17](file://portal/database/migrations/2026_05_17_000002_add_beta_testing_fields.php#L11-L17)
+- [phase6_external_plugin_management.php:55-117](file://portal/database/migrations/2026_05_19_000001_phase6_external_plugin_management.php#L55-L117)

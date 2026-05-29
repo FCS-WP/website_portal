@@ -9,7 +9,22 @@
 - [class-activator.php](file://agent/epos-wp-agent/includes/class-activator.php)
 - [mail.php](file://portal/config/mail.php)
 - [queue.php](file://portal/config/queue.php)
+- [SmtpController.php](file://portal/app/Http/Controllers/Portal/SmtpController.php)
+- [PortalMailConfigService.php](file://portal/app/Services/PortalMailConfigService.php)
+- [SiteSmtpSetting.php](file://portal/app/Models/SiteSmtpSetting.php)
+- [PushSmtpToSite.php](file://portal/app/Jobs/PushSmtpToSite.php)
+- [SiteSmtpSeederService.php](file://portal/app/Services/SiteSmtpSeederService.php)
+- [smtp-form.tsx](file://portal/frontend/src/components/smtp/smtp-form.tsx)
+- [site-smtp-tab.tsx](file://portal/frontend/src/components/sites/site-smtp-tab.tsx)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive portal-side SMTP configuration system with new controller and services
+- Integrated per-site SMTP settings with encrypted credential storage
+- Implemented automated SMTP configuration push to WordPress agents
+- Added frontend components for SMTP dashboard and configuration interfaces
+- Enhanced security with encrypted password handling throughout the pipeline
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -23,12 +38,13 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the SMTP configuration system within the WordPress agent. It covers how the Portal remotely configures the WordPress site’s SMTP transport, how the agent applies those settings to WordPress’s mailer, and how test emails are validated. It also documents supported connection parameters, encryption options, and security settings. Where applicable, it outlines delivery tracking and retry mechanisms present in the broader portal infrastructure.
+This document explains the comprehensive SMTP configuration system within the WordPress agent and portal integration. The system now includes both portal-wide SMTP configuration and per-site SMTP settings with encrypted credential storage. It covers how the Portal remotely configures WordPress site SMTP transport, how encrypted credentials are securely handled, and how the agent applies those settings to WordPress's mailer. The system includes automated configuration push, real-time validation, and comprehensive frontend interfaces for both portal administrators and site owners.
 
 ## Project Structure
-The SMTP configuration spans two parts:
-- WordPress Agent (plugin): Receives SMTP settings from the Portal, persists them, and configures WordPress’s mailer to use them.
-- Portal (Laravel application): Provides mailer configuration and queue infrastructure for asynchronous tasks.
+The SMTP configuration system spans three main components:
+- WordPress Agent (plugin): Receives SMTP settings from the Portal, persists them, and configures WordPress's mailer
+- Portal (Laravel application): Provides comprehensive SMTP configuration management with encrypted credential storage and automated push system
+- Frontend (Next.js): Offers intuitive dashboards and configuration interfaces for both portal-wide and per-site SMTP management
 
 ```mermaid
 graph TB
@@ -38,235 +54,348 @@ B["includes/class-api.php"]
 C["includes/class-smtp-config.php"]
 D["admin/settings-page.php"]
 end
-subgraph "Portal"
-E["config/mail.php"]
-F["config/queue.php"]
+subgraph "Portal Backend"
+E["app/Http/Controllers/Portal/SmtpController.php"]
+F["app/Services/PortalMailConfigService.php"]
+G["app/Services/SiteSmtpSeederService.php"]
+H["app/Models/SiteSmtpSetting.php"]
+I["app/Jobs/PushSmtpToSite.php"]
 end
-A --> B
-B --> C
-D --> C
-C --> |"wp_mail"| G["PHPMailer"]
-E --> |"Mailer config (other services)"| H["Portal mailers"]
-F --> |"Queue/backoff (other jobs)"| I["Async processing"]
+subgraph "Frontend"
+J["frontend/src/components/smtp/smtp-form.tsx"]
+K["frontend/src/components/sites/site-smtp-tab.tsx"]
+L["frontend/src/app/smtp/page.tsx"]
+end
+subgraph "Configuration"
+M["config/mail.php"]
+N["config/queue.php"]
+O["database/migrations/*_create_site_smtp_settings_table.php"]
+end
+E --> F
+E --> G
+E --> H
+E --> I
+I --> A
+J --> E
+K --> E
+L --> J
+F --> M
+G --> O
 ```
 
 **Diagram sources**
-- [epos-wp-agent.php:26-34](file://agent/epos-wp-agent/epos-wp-agent.php#L26-L34)
-- [class-api.php:8-45](file://agent/epos-wp-agent/includes/class-api.php#L8-L45)
-- [class-smtp-config.php:13-41](file://agent/epos-wp-agent/includes/class-smtp-config.php#L13-L41)
-- [settings-page.php:115-117](file://agent/epos-wp-agent/admin/settings-page.php#L115-L117)
-- [mail.php:38-100](file://portal/config/mail.php#L38-L100)
-- [queue.php:32-92](file://portal/config/queue.php#L32-L92)
+- [SmtpController.php:25-288](file://portal/app/Http/Controllers/Portal/SmtpController.php#L25-L288)
+- [PortalMailConfigService.php:24-77](file://portal/app/Services/PortalMailConfigService.php#L24-L77)
+- [SiteSmtpSeederService.php:23-134](file://portal/app/Services/SiteSmtpSeederService.php#L23-L134)
+- [SiteSmtpSetting.php:8-44](file://portal/app/Models/SiteSmtpSetting.php#L8-L44)
+- [PushSmtpToSite.php:23-89](file://portal/app/Jobs/PushSmtpToSite.php#L23-L89)
+- [smtp-form.tsx:1-271](file://portal/frontend/src/components/smtp/smtp-form.tsx#L1-L271)
+- [site-smtp-tab.tsx:21-104](file://portal/frontend/src/components/sites/site-smtp-tab.tsx#L21-L104)
 
 **Section sources**
-- [epos-wp-agent.php:26-34](file://agent/epos-wp-agent/epos-wp-agent.php#L26-L34)
-- [class-api.php:8-45](file://agent/epos-wp-agent/includes/class-api.php#L8-L45)
-- [class-smtp-config.php:13-41](file://agent/epos-wp-agent/includes/class-smtp-config.php#L13-L41)
-- [settings-page.php:115-117](file://agent/epos-wp-agent/admin/settings-page.php#L115-L117)
-- [mail.php:38-100](file://portal/config/mail.php#L38-L100)
-- [queue.php:32-92](file://portal/config/queue.php#L32-L92)
+- [SmtpController.php:25-288](file://portal/app/Http/Controllers/Portal/SmtpController.php#L25-L288)
+- [PortalMailConfigService.php:24-77](file://portal/app/Services/PortalMailConfigService.php#L24-L77)
+- [SiteSmtpSetting.php:8-44](file://portal/app/Models/SiteSmtpSetting.php#L8-L44)
+- [PushSmtpToSite.php:23-89](file://portal/app/Jobs/PushSmtpToSite.php#L23-L89)
+- [SiteSmtpSeederService.php:23-134](file://portal/app/Services/SiteSmtpSeederService.php#L23-L134)
 
 ## Core Components
-- REST API endpoints for SMTP configuration and testing, secured by an agent key.
-- SMTP configuration handler that persists settings and configures PHPMailer.
-- WordPress admin settings page for general agent configuration (not SMTP-specific).
-- Portal mailer configuration and queue configuration for asynchronous processing.
+The system now includes comprehensive components for both portal-wide and per-site SMTP management:
 
-Key responsibilities:
-- Receive and validate SMTP settings from the Portal.
-- Persist settings to WordPress options.
-- Apply SMTP settings to PHPMailer for all outgoing emails.
-- Send a test email and report success/failure.
+### Portal-Side Components
+- **SmtpController**: Main controller managing both portal-wide and per-site SMTP configuration endpoints
+- **PortalMailConfigService**: Applies portal-wide SMTP settings to Laravel's mail configuration at runtime
+- **SiteSmtpSetting**: Model for per-site SMTP configuration with encrypted password storage
+- **PushSmtpToSite Job**: Handles automated pushing of SMTP settings to WordPress agents
+- **SiteSmtpSeederService**: Manages bulk seeding of SMTP defaults to all sites
+
+### Frontend Components
+- **SmtpForm**: Reusable form component for SMTP configuration with validation and password masking
+- **SiteSmtpTab**: Per-site SMTP configuration interface with real-time status indicators
+- **Portal SMTP Dashboard**: Centralized interface for managing SMTP settings across all sites
+
+### WordPress Agent Components (Legacy)
+- REST API endpoints for SMTP configuration and testing, secured by an agent key
+- SMTP configuration handler that persists settings and configures PHPMailer
+- WordPress admin settings page for general agent configuration
 
 **Section sources**
-- [class-api.php:25-37](file://agent/epos-wp-agent/includes/class-api.php#L25-L37)
-- [class-smtp-config.php:13-41](file://agent/epos-wp-agent/includes/class-smtp-config.php#L13-L41)
-- [class-smtp-config.php:49-78](file://agent/epos-wp-agent/includes/class-smtp-config.php#L49-L78)
-- [class-smtp-config.php:83-103](file://agent/epos-wp-agent/includes/class-smtp-config.php#L83-L103)
-- [settings-page.php:10-18](file://agent/epos-wp-agent/admin/settings-page.php#L10-L18)
+- [SmtpController.php:25-288](file://portal/app/Http/Controllers/Portal/SmtpController.php#L25-L288)
+- [PortalMailConfigService.php:24-77](file://portal/app/Services/PortalMailConfigService.php#L24-L77)
+- [SiteSmtpSetting.php:8-44](file://portal/app/Models/SiteSmtpSetting.php#L8-L44)
+- [PushSmtpToSite.php:23-89](file://portal/app/Jobs/PushSmtpToSite.php#L23-L89)
+- [SiteSmtpSeederService.php:23-134](file://portal/app/Services/SiteSmtpSeederService.php#L23-L134)
 
 ## Architecture Overview
-The Portal initiates SMTP configuration via REST API calls to the WordPress Agent. The Agent validates the request using an agent key, persists the settings, and configures PHPMailer to route all subsequent emails through the provided SMTP server. A dedicated test endpoint sends a verification email.
+The enhanced SMTP configuration system provides a comprehensive solution for managing SMTP settings across multiple WordPress sites. The architecture separates concerns between portal-wide configuration and per-site customization while ensuring secure credential handling.
 
 ```mermaid
 sequenceDiagram
-participant Portal as "Portal"
-participant API as "Epos_Agent_Api"
-participant SMTP as "Epos_Agent_Smtp_Config"
-participant WP as "WordPress Options"
-participant PM as "PHPMailer"
-Portal->>API : "POST /epos-agent/v1/smtp/update"<br/>Headers : X-Agent-Key
-API->>API : "verify_agent_key()"
-API->>SMTP : "update(request)"
-SMTP->>WP : "update_option(...)"
-SMTP->>WP : "update_option('epos_smtp_enabled', true)"
-API-->>Portal : "200 OK"
-Note over Portal,PM : "All future emails use SMTP"
-API->>SMTP : "test(request)"
-SMTP->>PM : "configure_phpmailer()"
-SMTP->>PM : "wp_mail(to, subject, message)"
-PM-->>SMTP : "true/false"
-API-->>Portal : "200/500"
+participant Admin as "Portal Administrator"
+participant Portal as "Portal SMTP Controller"
+participant Seeder as "SiteSmtpSeederService"
+participant DB as "Database"
+participant Queue as "PushSmtpToSite Job"
+participant Agent as "WordPress Agent"
+Admin->>Portal : "Configure Portal SMTP"
+Portal->>DB : "Store encrypted credentials"
+Admin->>Portal : "Apply to All Sites"
+Portal->>Seeder : "Seed defaults to sites"
+Seeder->>DB : "Create SiteSmtpSetting rows"
+Seeder->>Queue : "Dispatch push jobs"
+Queue->>Agent : "HTTP POST /smtp/update"
+Agent->>DB : "Update WordPress options"
+Agent->>Agent : "Configure PHPMailer"
+Admin->>Portal : "Configure Per-Site SMTP"
+Portal->>DB : "Update SiteSmtpSetting"
+Portal->>Queue : "Dispatch push job"
+Queue->>Agent : "Push updated settings"
 ```
 
 **Diagram sources**
-- [class-api.php:25-37](file://agent/epos-wp-agent/includes/class-api.php#L25-L37)
-- [class-api.php:50-71](file://agent/epos-wp-agent/includes/class-api.php#L50-L71)
-- [class-api.php:84-94](file://agent/epos-wp-agent/includes/class-api.php#L84-L94)
-- [class-smtp-config.php:13-41](file://agent/epos-wp-agent/includes/class-smtp-config.php#L13-L41)
-- [class-smtp-config.php:49-78](file://agent/epos-wp-agent/includes/class-smtp-config.php#L49-L78)
-- [class-smtp-config.php:83-103](file://agent/epos-wp-agent/includes/class-smtp-config.php#L83-L103)
+- [SmtpController.php:107-137](file://portal/app/Http/Controllers/Portal/SmtpController.php#L107-L137)
+- [SiteSmtpSeederService.php:70-93](file://portal/app/Services/SiteSmtpSeederService.php#L70-L93)
+- [PushSmtpToSite.php:35-87](file://portal/app/Jobs/PushSmtpToSite.php#L35-L87)
 
 ## Detailed Component Analysis
 
-### SMTP Configuration Handler
-Responsibilities:
-- Accept SMTP settings from the Portal.
-- Sanitize and persist settings to WordPress options.
-- Configure PHPMailer for all outgoing emails.
-- Send a test email and return a structured response.
+### Portal SMTP Controller
+The SmtpController serves as the central management interface for both portal-wide and per-site SMTP configuration. It handles validation, persistence, and automated deployment of SMTP settings.
 
-```mermaid
-classDiagram
-class Epos_Agent_Smtp_Config {
-+update(request) WP_REST_Response
-+test(request) WP_REST_Response
-+configure_phpmailer(phpmailer) void
-}
-```
+**Portal-Wide Configuration Features:**
+- Complete SMTP configuration management with validation
+- Encrypted password storage using CredentialEncryptionService
+- Bulk application to all sites with overwrite options
+- Real-time test email functionality
+- Automatic portal mailer configuration application
 
-**Diagram sources**
-- [class-smtp-config.php:5-103](file://agent/epos-wp-agent/includes/class-smtp-config.php#L5-L103)
+**Per-Site Configuration Features:**
+- Individual site SMTP customization
+- Encrypted credential storage per site
+- Direct agent testing via HTTP requests
+- Push notification tracking with timestamps
+- User audit trail for configuration changes
 
 **Section sources**
-- [class-smtp-config.php:13-41](file://agent/epos-wp-agent/includes/class-smtp-config.php#L13-L41)
-- [class-smtp-config.php:49-78](file://agent/epos-wp-agent/includes/class-smtp-config.php#L49-L78)
-- [class-smtp-config.php:83-103](file://agent/epos-wp-agent/includes/class-smtp-config.php#L83-L103)
+- [SmtpController.php:25-288](file://portal/app/Http/Controllers/Portal/SmtpController.php#L25-L288)
 
-### REST API Endpoints for SMTP
-Endpoints:
-- POST /epos-agent/v1/smtp/update: Applies SMTP settings.
-- POST /epos-agent/v1/smtp/test: Sends a test email using current settings.
-- GET /epos-agent/v1/status: Returns site status (not SMTP-specific).
+### PortalMailConfigService
+This service dynamically applies portal-wide SMTP settings to Laravel's mail configuration at runtime, allowing administrators to override environment-based settings without restarting the application.
 
-Security:
-- Requires a valid agent key via the X-Agent-Key header.
-
-```mermaid
-flowchart TD
-Start(["Incoming Request"]) --> Route["Route Match"]
-Route --> Verify["verify_agent_key()"]
-Verify --> |Valid| Handler["Endpoint Handler"]
-Verify --> |Invalid| Unauthorized["401 Unauthorized"]
-Handler --> Update["update() / test()"]
-Update --> Persist["Persist settings / Send test email"]
-Persist --> Done(["Return JSON Response"])
-Unauthorized --> Done
-```
-
-**Diagram sources**
-- [class-api.php:15-45](file://agent/epos-wp-agent/includes/class-api.php#L15-L45)
-- [class-api.php:50-71](file://agent/epos-wp-agent/includes/class-api.php#L50-L71)
-- [class-api.php:84-94](file://agent/epos-wp-agent/includes/class-api.php#L84-L94)
+**Key Features:**
+- Runtime configuration application via Config facade
+- Automatic decryption of stored passwords
+- Support for TLS, SSL, and no-encryption modes
+- Global sender identity configuration
+- Graceful fallback when database is unavailable
 
 **Section sources**
-- [class-api.php:25-37](file://agent/epos-wp-agent/includes/class-api.php#L25-L37)
-- [class-api.php:32-37](file://agent/epos-wp-agent/includes/class-api.php#L32-L37)
-- [class-api.php:50-71](file://agent/epos-wp-agent/includes/class-api.php#L50-L71)
+- [PortalMailConfigService.php:24-77](file://portal/app/Services/PortalMailConfigService.php#L24-L77)
 
-### WordPress Admin Settings Page
-Purpose:
-- Provides a general settings UI for the agent (Portal URL and API key).
-- Does not manage SMTP settings; SMTP configuration is controlled remotely by the Portal.
+### SiteSmtpSetting Model
+The SiteSmtpSetting model provides encrypted storage for per-site SMTP credentials with comprehensive validation and relationship management.
 
-Integration:
-- Hooks into phpmailer_init to apply SMTP settings for all outgoing emails.
-
-**Section sources**
-- [settings-page.php:10-18](file://agent/epos-wp-agent/admin/settings-page.php#L10-L18)
-- [settings-page.php:115-117](file://agent/epos-wp-agent/admin/settings-page.php#L115-L117)
-
-### Portal Mailer Configuration
-The Portal defines multiple mailers and global sender settings. While the WordPress Agent does not use these mailers directly, understanding the Portal’s configuration helps explain how email delivery is managed in the broader system.
-
-Supported mailers include smtp, ses, postmark, resend, sendmail, log, array, failover, and roundrobin.
-
-Global “From” address can be configured for all emails.
+**Security Features:**
+- Encrypted password storage using Vault Master Key
+- Hidden encrypted password field in API responses
+- Automatic timestamp tracking for configuration changes
+- User audit trail with updated_by foreign key
+- Strict attribute casting for data integrity
 
 **Section sources**
-- [mail.php:38-100](file://portal/config/mail.php#L38-L100)
-- [mail.php:113-116](file://portal/config/mail.php#L113-L116)
+- [SiteSmtpSetting.php:8-44](file://portal/app/Models/SiteSmtpSetting.php#L8-L44)
 
-### Portal Queue Configuration
-The Portal configures queue backends (database, beanstalkd, redis, etc.) and supports retry policies. While the WordPress Agent’s SMTP test uses WordPress’s wp_mail (synchronous), the Portal’s queue system demonstrates how asynchronous retries and backoff are implemented elsewhere in the platform.
+### PushSmtpToSite Job
+The PushSmtpToSite job handles the automated deployment of SMTP settings from the portal to individual WordPress agents, implementing robust error handling and retry logic.
+
+**Job Characteristics:**
+- Queue-based processing on 'deployments' queue
+- Built-in retry mechanism (3 attempts) with timeout protection
+- Secure credential decryption before transmission
+- Comprehensive error logging and reporting
+- Automatic last_pushed_at timestamp updates
 
 **Section sources**
-- [queue.php:32-92](file://portal/config/queue.php#L32-L92)
+- [PushSmtpToSite.php:23-89](file://portal/app/Jobs/PushSmtpToSite.php#L23-L89)
+
+### SiteSmtpSeederService
+This service manages the bulk seeding of portal SMTP defaults to all sites, providing flexible overwrite options and comprehensive reporting.
+
+**Bulk Operations:**
+- Portal-wide SMTP default extraction
+- Conditional site seeding based on existing configurations
+- Overwrite control for existing site settings
+- Detailed operation tally for administrative feedback
+- API key validation to prevent failed pushes
+
+**Section sources**
+- [SiteSmtpSeederService.php:23-134](file://portal/app/Services/SiteSmtpSeederService.php#L23-L134)
+
+### Frontend SMTP Components
+The frontend provides intuitive interfaces for managing SMTP settings across different scopes.
+
+**SmtpForm Component:**
+- Comprehensive form validation with real-time feedback
+- Password masking with show/hide toggle functionality
+- Dynamic enable/disable state management
+- Test email recipient validation
+- Loading states and user feedback integration
+
+**SiteSmtpTab Component:**
+- Per-site configuration interface with agent status indicators
+- Automated credential push notifications
+- Last push timestamp display for verification
+- Error handling with user-friendly messaging
+- Integration with portal-wide SMTP defaults
+
+**Section sources**
+- [smtp-form.tsx:1-271](file://portal/frontend/src/components/smtp/smtp-form.tsx#L1-L271)
+- [site-smtp-tab.tsx:21-104](file://portal/frontend/src/components/sites/site-smtp-tab.tsx#L21-L104)
 
 ## Dependency Analysis
-- WordPress Agent depends on WordPress hooks and options to persist and apply SMTP settings.
-- PHPMailer is configured dynamically when phpmailer_init fires.
-- REST API endpoints depend on the agent key stored in WordPress options.
-- Portal mailer and queue configurations are separate from the WordPress Agent but inform the broader email delivery strategy.
+The enhanced SMTP system introduces several new dependencies and relationships:
 
 ```mermaid
 graph LR
-API["Epos_Agent_Api"] --> SMTP["Epos_Agent_Smtp_Config"]
-SMTP --> OPT["WordPress Options"]
-SMTP --> PM["PHPMailer"]
-ACT["Epos_Agent_Activator"] --> |"Handshake to Portal"| Portal["Portal"]
-Portal --> MailCfg["Portal mail.php"]
-Portal --> QCfg["Portal queue.php"]
+subgraph "Portal Dependencies"
+Controller["SmtpController"] --> Service["PortalMailConfigService"]
+Controller --> Seeder["SiteSmtpSeederService"]
+Controller --> Model["SiteSmtpSetting"]
+Controller --> Job["PushSmtpToSite"]
+Seeder --> Model
+Seeder --> Job
+Job --> Agent["WordPress Agent"]
+Service --> Config["Laravel Config"]
+Model --> DB["Database"]
+Job --> Queue["Queue System"]
+Controller --> Frontend["Frontend Components"]
+end
+subgraph "Security Dependencies"
+Encryption["CredentialEncryptionService"] --> Model
+Encryption --> Job
+Encryption --> Service
+end
+subgraph "WordPress Agent Dependencies"
+Agent --> WP["WordPress Options"]
+Agent --> PHPMailer["PHPMailer"]
+Agent --> API["REST API"]
+end
 ```
 
 **Diagram sources**
-- [class-api.php:84-94](file://agent/epos-wp-agent/includes/class-api.php#L84-L94)
-- [class-smtp-config.php:24-35](file://agent/epos-wp-agent/includes/class-smtp-config.php#L24-L35)
-- [class-activator.php:35-76](file://agent/epos-wp-agent/includes/class-activator.php#L35-L76)
-- [mail.php:38-100](file://portal/config/mail.php#L38-L100)
-- [queue.php:32-92](file://portal/config/queue.php#L32-L92)
+- [SmtpController.php:6-16](file://portal/app/Http/Controllers/Portal/SmtpController.php#L6-L16)
+- [SiteSmtpSeederService.php:5-8](file://portal/app/Services/SiteSmtpSeederService.php#L5-L8)
+- [PushSmtpToSite.php:5-13](file://portal/app/Jobs/PushSmtpToSite.php#L5-L13)
+- [PortalMailConfigService.php:5-6](file://portal/app/Services/PortalMailConfigService.php#L5-L6)
 
 **Section sources**
-- [class-api.php:84-94](file://agent/epos-wp-agent/includes/class-api.php#L84-L94)
-- [class-smtp-config.php:24-35](file://agent/epos-wp-agent/includes/class-smtp-config.php#L24-L35)
-- [class-activator.php:35-76](file://agent/epos-wp-agent/includes/class-activator.php#L35-L76)
+- [SmtpController.php:6-16](file://portal/app/Http/Controllers/Portal/SmtpController.php#L6-L16)
+- [SiteSmtpSeederService.php:5-8](file://portal/app/Services/SiteSmtpSeederService.php#L5-L8)
+- [PushSmtpToSite.php:5-13](file://portal/app/Jobs/PushSmtpToSite.php#L5-L13)
+- [PortalMailConfigService.php:5-6](file://portal/app/Services/PortalMailConfigService.php#L5-L6)
 
 ## Performance Considerations
-- SMTP test uses WordPress’s wp_mail, which is synchronous. For high-volume scenarios, consider offloading email sending to the Portal’s queue and triggering agent-side actions via webhook or scheduled tasks.
-- PHPMailer configuration is applied on each email via the phpmailer_init hook. Keep settings minimal and avoid unnecessary reconfiguration.
-- Network timeouts and TLS negotiation can impact latency; ensure the SMTP host and port align with provider recommendations.
+The enhanced system introduces several performance optimizations and considerations:
 
-[No sources needed since this section provides general guidance]
+**Queue-Based Processing:**
+- PushSmtpToSite jobs utilize the 'deployments' queue for scalable processing
+- Built-in retry mechanism prevents transient failures from blocking deployments
+- Timeout protection (45-second limit) ensures responsive job processing
+- Parallel processing capability for bulk site deployments
+
+**Database Optimization:**
+- Efficient batch operations for site seeding and bulk updates
+- Minimal query overhead through optimized model relationships
+- Encrypted field handling reduces unnecessary decryption cycles
+- Audit trail tracking maintains performance while providing accountability
+
+**Frontend Performance:**
+- Client-side form validation reduces server requests
+- Loading states and optimistic UI updates improve perceived performance
+- Real-time status indicators eliminate polling overhead
+- Password masking prevents unnecessary data transmission
+
+**Security Considerations:**
+- Encrypted credential storage prevents plaintext exposure
+- Secure transmission via HTTPS and API key authentication
+- Minimal credential exposure in logs and error messages
+- Automatic cleanup of temporary decrypted values
 
 ## Troubleshooting Guide
 
-Common issues and resolutions:
-- Authentication failures
-  - Verify the username and password stored in WordPress options.
-  - Confirm the agent key used by the Portal matches the stored key.
-  - Ensure the SMTP server allows authentication with the provided credentials.
-  - Reference: [class-smtp-config.php:27-28](file://agent/epos-wp-agent/includes/class-smtp-config.php#L27-L28), [class-api.php:50-71](file://agent/epos-wp-agent/includes/class-api.php#L50-L71)
+### Portal-Side Issues
 
-- Connection timeouts
-  - Validate host and port settings.
-  - Check network connectivity from the WordPress server to the SMTP host.
-  - Confirm firewall and outbound port allowances.
-  - Reference: [class-smtp-config.php:92](file://agent/epos-wp-agent/includes/class-smtp-config.php#L92)
+**Portal SMTP Configuration Failures**
+- Verify portal SMTP is properly configured before applying to sites
+- Check that portal SMTP host and from_email are set before bulk operations
+- Ensure portal SMTP password is encrypted using CredentialEncryptionService
+- Monitor PushSmtpToSite job queue for retry failures
 
-- SSL/TLS configuration problems
-  - Choose encryption mode that matches the provider (e.g., tls or ssl).
-  - If the provider requires no encryption, set encryption to none.
-  - Reference: [class-smtp-config.php:99-102](file://agent/epos-wp-agent/includes/class-smtp-config.php#L99-L102)
+**Per-Site SMTP Configuration Issues**
+- Confirm site has agent API key configured in the portal
+- Verify site is connected and accessible to the portal system
+- Check SiteSmtpSetting model for proper encryption of credentials
+- Review PushSmtpToSite job logs for detailed error information
 
-- Test email delivery failures
-  - Use the SMTP test endpoint to validate configuration.
-  - Review the response payload for failure reasons.
-  - Reference: [class-smtp-config.php:49-78](file://agent/epos-wp-agent/includes/class-smtp-config.php#L49-L78)
+**Bulk Application Problems**
+- Use overwrite parameter judiciously to avoid unintentional configuration changes
+- Monitor seedMany operation results for sites without API keys
+- Verify database constraints for encrypted password fields
+- Check queue worker availability for job processing
 
-- Delivery tracking and retries
-  - WordPress Agent’s SMTP test is synchronous; there is no built-in delivery confirmation in this module.
-  - The Portal’s queue system supports retries and backoff for other asynchronous jobs; consider integrating email sending through the Portal for advanced retry and tracking.
-  - Reference: [queue.php:32-92](file://portal/config/queue.php#L32-L92)
+### Agent-Side Issues
+
+**Authentication Failures**
+- Verify username and password stored in SiteSmtpSetting are correct
+- Confirm agent API key matches the WordPress site configuration
+- Check SMTP server allows authentication with provided credentials
+- Validate encryption/decryption process for stored passwords
+
+**Connection Timeouts**
+- Validate host and port settings match SMTP provider requirements
+- Check network connectivity from portal server to WordPress site
+- Confirm firewall allows outbound connections on specified ports
+- Verify SSL/TLS configuration matches provider requirements
+
+**SSL/TLS Configuration Problems**
+- Choose encryption mode that matches SMTP provider specifications
+- Use 'ssl' for SMTPS connections, 'tls' for STARTTLS, 'none' for unencrypted
+- Ensure certificate validation is properly configured for SSL connections
+- Test connection using provider-specific connection utilities
+
+### Frontend Interface Issues
+
+**Form Validation Errors**
+- Ensure required fields are properly filled when SMTP is enabled
+- Verify email addresses use valid formats in from_email and test fields
+- Check password field behavior for 'keep existing' functionality
+- Validate port numbers are within acceptable ranges (1-65535)
+
+**Push Status Confusion**
+- Monitor last_pushed_at timestamp for successful agent updates
+- Check job queue status for pending or failed push operations
+- Verify agent connectivity using test email functionality
+- Review error messages for specific failure reasons
+
+**Security and Privacy Concerns**
+- Password fields are automatically cleared after successful saves
+- Encrypted credentials are never transmitted in plaintext
+- Audit trails provide visibility into configuration changes
+- Secure credential storage prevents unauthorized access
+
+**Section sources**
+- [SmtpController.php:121-136](file://portal/app/Http/Controllers/Portal/SmtpController.php#L121-L136)
+- [PushSmtpToSite.php:38-47](file://portal/app/Jobs/PushSmtpToSite.php#L38-L47)
+- [SiteSmtpSeederService.php:116-132](file://portal/app/Services/SiteSmtpSeederService.php#L116-L132)
 
 ## Conclusion
-The WordPress Agent’s SMTP configuration system provides a secure, remote-controlled mechanism to configure and validate SMTP settings. Settings are persisted and applied to PHPMailer for all outgoing emails, with a dedicated test endpoint to verify connectivity. While the Agent itself does not implement queue-based retries or delivery confirmations, the broader Portal offers robust queue and retry capabilities that can be leveraged for advanced email delivery workflows.
+The enhanced SMTP configuration system provides a comprehensive, secure, and scalable solution for managing email delivery across multiple WordPress sites. The integration of portal-wide configuration with per-site customization, combined with encrypted credential storage and automated deployment, creates a robust foundation for enterprise-grade email management.
+
+Key improvements include:
+- **Enhanced Security**: Encrypted credential storage throughout the entire pipeline
+- **Automated Management**: Queue-based deployment eliminates manual configuration
+- **Comprehensive Monitoring**: Real-time status tracking and detailed error reporting
+- **Flexible Configuration**: Support for both global defaults and individual site overrides
+- **User-Friendly Interfaces**: Intuitive frontend components for seamless administration
+
+The system successfully bridges the gap between centralized portal management and distributed WordPress agent configuration, providing administrators with powerful tools to ensure reliable email delivery across their entire WordPress ecosystem.

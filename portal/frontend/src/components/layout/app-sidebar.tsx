@@ -20,6 +20,7 @@ import {
   Lock,
   RefreshCw,
   Download,
+  ListChecks,
   Menu,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
@@ -155,6 +156,7 @@ function getNavGroups(counts: SidebarCounts | null): NavGroup[] {
         { name: "Orders", href: "/orders", icon: ShoppingCart },
         { name: "SMTP", href: "/smtp", icon: Mail, roles: ["admin", "dev"] },
         { name: "Activity Logs", href: "/activity-logs", icon: FileText, roles: ["admin", "dev"] },
+        { name: "Queue", href: "/queue", icon: ListChecks, roles: ["admin", "dev"] },
       ],
     },
     {
