@@ -184,7 +184,8 @@ class Epos_Agent_Api {
         $result = Epos_Agent_External_Plugin_Manager::update_plugin(
             $params['slug'] ?? '',
             $params['download_url'] ?? '',
-            $params['file_hash'] ?? null
+            $params['file_hash'] ?? null,
+            $params['activate'] ?? true
         );
         return new \WP_REST_Response($result, $result['success'] ? 200 : 400);
     }

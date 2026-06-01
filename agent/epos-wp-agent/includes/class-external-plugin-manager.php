@@ -66,8 +66,16 @@ class Epos_Agent_External_Plugin_Manager {
 
     /**
      * Update a single plugin
+     *
+     * @param string      $slug
+     * @param string      $download_url
+     * @param string|null $file_hash
+     * @param bool        $activate Whether to (re)activate the plugin after a
+     *                              successful update. Defaults to true because
+     *                              WordPress can deactivate a plugin during a
+     *                              filesystem update.
      */
-    public static function update_plugin($slug, $download_url, $file_hash) {
+    public static function update_plugin($slug, $download_url, $file_hash, $activate = true) {
         set_time_limit(300);
 
         if (!str_starts_with($download_url, 'https://downloads.wordpress.org/')) {
@@ -115,12 +123,37 @@ class Epos_Agent_External_Plugin_Manager {
             return ['success' => false, 'error' => 'Update failed'];
         }
 
-        // Re-activate if was active
-        if ($was_active) {
-            activate_plugin($plugin_file);
+        // WordPress can deactivate a plugin during the upgrade. If the caller
+        // requested activation (default) or the plugin was previously active,
+        // (re)activate it so the deployment is not reported as failed.
+        $should_activate = $activate || $was_active;
+        $activated       = false;
+        $activation_warning = null;
+
+        if ($should_activate) {
+            // Only activate if it isn't already active to avoid noisy errors.
+            if (!is_plugin_active($plugin_file)) {
+                $activation_result = activate_plugin($plugin_file);
+                if (is_wp_error($activation_result)) {
+                    $activation_warning = 'Updated but activation failed: ' . $activation_result->get_error_message();
+                }
+            }
+            $activated = is_plugin_active($plugin_file);
         }
 
-        return ['success' => true, 'previous_backup_path' => $backup_path];
+        $response = [
+            'success'              => true,
+            'file'                 => $plugin_file,
+            'activated'            => $activated,
+            'was_active'           => $was_active,
+            'previous_backup_path' => $backup_path,
+        ];
+
+        if ($activation_warning !== null) {
+            $response['warning'] = $activation_warning;
+        }
+
+        return $response;
     }
 
     /**
@@ -134,7 +167,8 @@ class Epos_Agent_External_Plugin_Manager {
                 'result' => self::update_plugin(
                     $plugin['slug'],
                     $plugin['download_url'],
-                    $plugin['file_hash'] ?? null
+                    $plugin['file_hash'] ?? null,
+                    $plugin['activate'] ?? true
                 ),
             ];
         }

@@ -69,6 +69,7 @@ class WpOrgPluginJob implements ShouldQueue
                         'slug' => $this->pluginSlug,
                         'download_url' => $this->downloadUrl,
                         'file_hash' => $this->fileHash,
+                        'activate' => $this->activate,
                     ]),
                 'wporg_uninstall' => Http::timeout(300)->withHeaders($headers)
                     ->post("{$agentUrl}/wp-json/epos-agent/v1/plugins/external/uninstall", [
@@ -79,13 +80,38 @@ class WpOrgPluginJob implements ShouldQueue
             };
 
             if ($response->successful() && ($response->json('success') ?? false)) {
+                $responseData = $response->json() ?? [];
+
+                // For updates, the agent re-activates the plugin after a
+                // filesystem upgrade (WordPress can deactivate it during the
+                // upgrade). If the agent explicitly reports the plugin is
+                // still inactive when we asked it to be active, surface that
+                // as a job-level warning so it is visible in the deployment
+                // record / Telegram notification.
+                $agentWarning = $responseData['warning'] ?? null;
+                if (
+                    $this->jobType === 'wporg_update'
+                    && $this->activate
+                    && array_key_exists('activated', $responseData)
+                    && $responseData['activated'] === false
+                ) {
+                    $agentWarning = $agentWarning
+                        ?? 'Plugin updated but could not be re-activated on the site.';
+                    Log::warning('WpOrgPluginJob update completed without activation', [
+                        'site_id' => $this->siteId,
+                        'plugin'  => $this->pluginSlug,
+                        'warning' => $agentWarning,
+                    ]);
+                }
+
                 $deploymentJobSite->update([
                     'status' => 'success',
                     'deployed_at' => now(),
+                    'error_message' => $agentWarning ? substr($agentWarning, 0, 500) : null,
                 ]);
 
                 // Update site_plugins record
-                $this->updateSitePlugin($site, $response->json());
+                $this->updateSitePlugin($site, $responseData);
             } else {
                 $error = $response->json('error') ?? $response->json('message') ?? 'Unknown error';
                 $deploymentJobSite->update([
@@ -129,11 +155,22 @@ class WpOrgPluginJob implements ShouldQueue
                 ]
             );
         } elseif ($this->jobType === 'wporg_update') {
-            $sitePlugin?->update([
+            $updates = [
                 'installed_version' => $this->targetVersion,
                 'update_available' => false,
                 'last_synced_at' => now(),
-            ]);
+            ];
+
+            // Reflect actual activation state reported by the agent, falling
+            // back to the requested $activate flag when the agent did not
+            // report one (older agent versions).
+            if (array_key_exists('activated', $agentResponse)) {
+                $updates['is_active'] = (bool) $agentResponse['activated'];
+            } elseif ($this->activate) {
+                $updates['is_active'] = true;
+            }
+
+            $sitePlugin?->update($updates);
         }
     }
 
