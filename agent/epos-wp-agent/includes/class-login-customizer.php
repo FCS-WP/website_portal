@@ -177,7 +177,6 @@ class Epos_Agent_Login_Customizer {
               </div>
               <div class="epos-form-wrap">
                 <h1 id="epos-login-title">Admin sign in</h1>
-                <p class="epos-intro">A cleaner login experience with the form separated on the left and a calm branded banner on the right.</p>
                 <div class="epos-form-pane__form">
         <?php
     }

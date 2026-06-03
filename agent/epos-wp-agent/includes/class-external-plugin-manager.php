@@ -115,28 +115,52 @@ class Epos_Agent_External_Plugin_Manager {
 
         // Use upgrader
         $upgrader = new Plugin_Upgrader(new Automatic_Upgrader_Skin());
-        // Set the plugin to update
         $upgrader->skin->plugin = $plugin_file;
         $result = $upgrader->upgrade($plugin_file);
 
-        if (is_wp_error($result) || $result === false) {
-            return ['success' => false, 'error' => 'Update failed'];
+        if (is_wp_error($result)) {
+            return ['success' => false, 'error' => 'Update failed: ' . $result->get_error_message()];
         }
 
-        // WordPress can deactivate a plugin during the upgrade. If the caller
-        // requested activation (default) or the plugin was previously active,
-        // (re)activate it so the deployment is not reported as failed.
+        // upgrade() returns false on several non-fatal conditions — most
+        // notably "plugin is at the latest version", which we want to treat
+        // as success (the requested version is already installed or newer).
+        // Pull the actual reason from the skin's upgrade-messages buffer.
+        if ($result === false) {
+            $skin_messages = is_callable([$upgrader->skin, 'get_upgrade_messages'])
+                ? $upgrader->skin->get_upgrade_messages()
+                : [];
+            $reason = !empty($skin_messages) ? end($skin_messages) : 'unknown reason';
+
+            $already_latest = stripos($reason, 'latest version') !== false;
+            if (!$already_latest) {
+                return ['success' => false, 'error' => 'Update failed: ' . $reason];
+            }
+            // Fall through to (re)activation — the install is already at
+            // the requested version, so the caller's intent (have this
+            // plugin active at version X) can still be satisfied.
+        }
+
+        // WordPress writes `active_plugins` during the upgrade but the
+        // in-process options cache can stay warm with the pre-upgrade value,
+        // so a stale is_plugin_active() can report `true` and we skip the
+        // re-activation that we actually need. Bust the cache before checking.
+        wp_cache_delete('alloptions', 'options');
+        wp_cache_delete('active_plugins', 'options');
+
         $should_activate = $activate || $was_active;
         $activated       = false;
         $activation_warning = null;
 
         if ($should_activate) {
-            // Only activate if it isn't already active to avoid noisy errors.
             if (!is_plugin_active($plugin_file)) {
                 $activation_result = activate_plugin($plugin_file);
                 if (is_wp_error($activation_result)) {
                     $activation_warning = 'Updated but activation failed: ' . $activation_result->get_error_message();
                 }
+                // Re-check after activate_plugin — same cache concern.
+                wp_cache_delete('alloptions', 'options');
+                wp_cache_delete('active_plugins', 'options');
             }
             $activated = is_plugin_active($plugin_file);
         }

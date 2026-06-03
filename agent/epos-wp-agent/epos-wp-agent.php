@@ -3,7 +3,7 @@
  * Plugin Name: EPOS WP Agent
  * Plugin URI: https://portal.epos.com
  * Description: Communication bridge between this WordPress site and the EPOS Central Control Portal.
- * Version: 1.1.2
+ * Version: 1.1.4
  * Author: EPOS Team
  * Author URI: https://epos.com
  * License: GPL-2.0+
@@ -18,7 +18,7 @@ if (!defined('WPINC')) {
     die;
 }
 
-define('EPOS_AGENT_VERSION', '1.1.2');
+define('EPOS_AGENT_VERSION', '1.1.4');
 define('EPOS_AGENT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('EPOS_AGENT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('EPOS_AGENT_PLUGIN_BASENAME', plugin_basename(__FILE__));

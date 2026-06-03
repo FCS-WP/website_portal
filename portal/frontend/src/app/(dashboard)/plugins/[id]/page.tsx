@@ -161,8 +161,8 @@ export default function PluginDetailPage() {
   };
 
   const handleUpload = async () => {
-    if (!uploadFile || !uploadVersion) {
-      toast.error("Please provide a file and version number");
+    if (!uploadFile || !uploadVersion || !uploadChangelog.trim()) {
+      toast.error("Please provide a file, version number, and changelog");
       return;
     }
 
@@ -193,8 +193,15 @@ export default function PluginDetailPage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       fetchVersions();
       fetchPlugin();
-    } catch {
-      toast.error("Failed to upload version");
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ?? (err as any)?.message
+        ?? "Failed to upload version";
+      toast.error(message);
+      console.error("uploadVersion failed:", err);
     } finally {
       setUploading(false);
     }
@@ -568,12 +575,15 @@ export default function PluginDetailPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="version-number">Version</Label>
+                  <Label htmlFor="version-number">
+                    Version <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="version-number"
                     value={uploadVersion}
                     onChange={(e) => setUploadVersion(e.target.value)}
                     placeholder="1.0.0"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -594,13 +604,16 @@ export default function PluginDetailPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="version-changelog">Changelog</Label>
+                <Label htmlFor="version-changelog">
+                  Changelog <span className="text-destructive">*</span>
+                </Label>
                 <Textarea
                   id="version-changelog"
                   value={uploadChangelog}
                   onChange={(e) => setUploadChangelog(e.target.value)}
                   placeholder="Describe the changes in this version..."
                   rows={4}
+                  required
                 />
               </div>
 
@@ -667,7 +680,7 @@ export default function PluginDetailPage() {
 
               <Button
                 onClick={handleUpload}
-                disabled={uploading || !uploadFile || !uploadVersion}
+                disabled={uploading || !uploadFile || !uploadVersion || !uploadChangelog.trim()}
               >
                 <Upload className="mr-2 h-4 w-4" />
                 {uploading ? "Uploading..." : "Upload Version"}
