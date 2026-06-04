@@ -26,3 +26,7 @@ portal/frontend/node_modules/
 
 # Agent plugin build artifacts (manually-uploaded zips)
 agent/*.zip
+
+# Database + storage backups (written by `make backup`)
+backups/
+portal/backups/

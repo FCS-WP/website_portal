@@ -3,7 +3,7 @@
        prod-setup use-prod-env use-dev-env \
        migrate migrate-fresh seed tinker artisan composer clear \
        dev build lint typecheck fe-install \
-       db-shell \
+       db-shell backup restore backup-list \
        queue queue-stop queue-restart schedule schedule-run \
        workers-up workers-down workers-logs \
        ping \
@@ -189,6 +189,34 @@ workers-logs: ## Tail queue + scheduler logs
 
 db-shell: ## Open psql shell inside DB container
 	$(DC) exec postgres psql -U $${DB_USERNAME:-epos} -d $${DB_DATABASE:-epos_portal}
+
+backup: ## Dump DB + private storage to portal/backups/<date>/ (also runs daily via scheduler)
+	$(EXEC) php artisan db:backup
+	@ls -la portal/backups/ 2>/dev/null | tail -5 || true
+
+restore: ## Restore from a backup: make restore DATE=2026-06-04
+	@if [ -z "$(DATE)" ]; then echo "Usage: make restore DATE=YYYY-MM-DD"; exit 1; fi
+	@if [ ! -d "portal/backups/$(DATE)" ]; then echo "No backup at portal/backups/$(DATE)"; ls portal/backups/ 2>/dev/null; exit 1; fi
+	@echo "About to RESTORE portal/backups/$(DATE) — this will overwrite the current database."
+	@printf "Type the date to confirm: "
+	@read CONFIRM && [ "$$CONFIRM" = "$(DATE)" ] || (echo "Mismatch, aborting"; exit 1)
+	@echo "Terminating active sessions (Laravel keeps connections open)..."
+	$(DC) exec postgres psql -U $${DB_USERNAME:-epos} -d postgres -c \
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$${DB_DATABASE:-epos_portal}' AND pid <> pg_backend_pid();" >/dev/null
+	@echo "Dropping + recreating database..."
+	$(DC) exec postgres dropdb -U $${DB_USERNAME:-epos} --if-exists $${DB_DATABASE:-epos_portal}
+	$(DC) exec postgres createdb -U $${DB_USERNAME:-epos} $${DB_DATABASE:-epos_portal}
+	@echo "Restoring DB dump..."
+	gunzip -c portal/backups/$(DATE)/$${DB_DATABASE:-epos_portal}.sql.gz | $(DC) exec -T postgres psql -U $${DB_USERNAME:-epos} -d $${DB_DATABASE:-epos_portal} >/dev/null
+	@if [ -f "portal/backups/$(DATE)/storage.tar.gz" ]; then \
+		echo "Restoring private storage..."; \
+		$(EXEC) sh -c "rm -rf storage/app/private/* && tar -xzf /var/www/portal/backups/$(DATE)/storage.tar.gz -C storage/app/private/"; \
+	fi
+	$(EXEC) php artisan cache:clear
+	@echo "Restore complete. Verify with: make tinker"
+
+backup-list: ## List available backups
+	@ls -la portal/backups/ 2>/dev/null || echo "No backups yet — run \`make backup\`"
 
 # ─── Site Monitoring ────────────────────────────────────────────────────────
 
