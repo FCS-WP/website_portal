@@ -154,11 +154,32 @@ class Epos_Agent_External_Plugin_Manager {
 
         if ($should_activate) {
             if (!is_plugin_active($plugin_file)) {
-                $activation_result = activate_plugin($plugin_file);
-                if (is_wp_error($activation_result)) {
-                    $activation_warning = 'Updated but activation failed: ' . $activation_result->get_error_message();
+                // activate_plugin() fires the plugin's `activate_*` hook in
+                // this same request. Some plugins (WooCommerce being the
+                // worst offender) have install-time hooks that require
+                // classes only registered by the new autoloader at next
+                // request boot — calling them here throws a fatal like
+                // "Class \"Automattic\\WooCommerce\\Enums\\TaxBasedOn\" not found".
+                //
+                // Wrap the call so a fatal inside the activation hook
+                // doesn't bubble out as a 500. If it throws, fall back to
+                // a *deferred* activation: write the plugin into
+                // `active_plugins` directly. WordPress will pick it up on
+                // the next request, the autoloader will resolve fully, and
+                // the install hook will run cleanly in that context.
+                try {
+                    $activation_result = activate_plugin($plugin_file);
+                    if (is_wp_error($activation_result)) {
+                        $activation_warning = 'Updated but activation failed: ' . $activation_result->get_error_message();
+                    }
+                } catch (\Throwable $e) {
+                    $active = (array) get_option('active_plugins', []);
+                    if (!in_array($plugin_file, $active, true)) {
+                        $active[] = $plugin_file;
+                        update_option('active_plugins', array_values(array_unique($active)));
+                    }
+                    $activation_warning = 'Updated; activation deferred to next request (plugin hook threw: ' . $e->getMessage() . ')';
                 }
-                // Re-check after activate_plugin — same cache concern.
                 wp_cache_delete('alloptions', 'options');
                 wp_cache_delete('active_plugins', 'options');
             }

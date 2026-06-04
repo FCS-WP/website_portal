@@ -223,6 +223,15 @@ class Epos_Agent_Health_Check {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
         }
 
+        // The 2-min and 5-min delayed health checks run in their own WP_Cron
+        // requests, but if an object cache backend is in play (Redis,
+        // Memcached, even WP's per-request cache via wp_cache_*), reads of
+        // active_plugins can return stale state. False-negative here is the
+        // primary trigger for the "Plugin deactivated after installation"
+        // auto-rollback noise. Bust the cache before each check.
+        wp_cache_delete('alloptions', 'options');
+        wp_cache_delete('active_plugins', 'options');
+
         $plugins = get_plugins();
         foreach ($plugins as $file => $data) {
             if (strpos($file, $plugin_slug . '/') === 0) {

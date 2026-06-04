@@ -172,6 +172,16 @@ class Epos_Agent_Plugin_Installer {
         // activate_plugin() targets the correct file.
         $plugin_file = self::resolve_plugin_file($plugin_slug) ?? $plugin_file;
 
+        // Plugin_Upgrader can deactivate the plugin mid-install but the
+        // in-process options cache stays warm with the pre-install
+        // active_plugins value. A stale is_plugin_active() then reports
+        // `true` and we skip the re-activation we actually need, so the
+        // post-deploy health check fires "plugin_active=false" and the
+        // deployment gets auto-rolled-back for what was a successful
+        // install. Bust the cache before each is_plugin_active() call.
+        wp_cache_delete('alloptions', 'options');
+        wp_cache_delete('active_plugins', 'options');
+
         // Activate the plugin if it was previously active or is a fresh install.
         //
         // Self-update guard: when the slug IS the agent itself and it was
@@ -185,6 +195,9 @@ class Epos_Agent_Plugin_Installer {
         if ($should_activate && !($is_self_update && $was_active)) {
             if (!is_plugin_active($plugin_file)) {
                 activate_plugin($plugin_file);
+                // Same cache concern as above — re-check needs fresh state.
+                wp_cache_delete('alloptions', 'options');
+                wp_cache_delete('active_plugins', 'options');
             }
         }
 
