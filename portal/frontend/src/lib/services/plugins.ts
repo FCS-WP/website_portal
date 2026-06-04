@@ -27,6 +27,8 @@ export const pluginService = {
     api.delete(`/plugin-versions/${versionId}`),
   promoteVersion: (versionId: number | string) =>
     api.post(`/plugin-versions/${versionId}/promote`),
+  markVersionAsLatest: (versionId: number | string) =>
+    api.post(`/plugin-versions/${versionId}/mark-latest`),
   betaStatus: (versionId: number | string) =>
     api.get(`/plugin-versions/${versionId}/beta-status`),
 };

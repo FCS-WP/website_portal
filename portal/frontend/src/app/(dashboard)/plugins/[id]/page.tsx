@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -130,7 +130,8 @@ export default function PluginDetailPage() {
     try {
       const res = await pluginService.versions(id);
       setVersions(res.data.data || []);
-    } catch {
+    } catch (err) {
+      console.error("fetch versions failed:", err);
       toast.error("Failed to load versions");
     }
   }, [id]);
@@ -153,8 +154,15 @@ export default function PluginDetailPage() {
       toast.success("Plugin updated successfully");
       setEditDialogOpen(false);
       fetchPlugin();
-    } catch {
-      toast.error("Failed to update plugin");
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ?? (err as any)?.message
+        ?? "Failed to update plugin";
+      toast.error(message);
+      console.error("update plugin failed:", err);
     } finally {
       setEditSubmitting(false);
     }
@@ -230,10 +238,27 @@ export default function PluginDetailPage() {
       setPromoteDialogOpen(false);
       setPromoteVersion(null);
       fetchVersions();
-    } catch {
-      toast.error("Failed to promote version");
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to promote version";
+      toast.error(message);
     } finally {
       setPromoting(false);
+    }
+  };
+
+  const handleMarkAsLatest = async (version: PluginVersion) => {
+    try {
+      const res = await pluginService.markVersionAsLatest(version.id);
+      toast.success(res.data?.message ?? `v${version.version} is now the latest stable.`);
+      fetchVersions();
+      fetchPlugin();
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to mark as latest";
+      toast.error(message);
     }
   };
 
@@ -342,10 +367,18 @@ export default function PluginDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Versions Tab */}
+      {/* Versions / Sites / Upload Tabs */}
       <Tabs defaultValue="versions">
         <TabsList>
           <TabsTrigger value="versions">Versions</TabsTrigger>
+          <TabsTrigger value="sites">
+            Installed Sites
+            {plugin.installed_sites && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-muted text-foreground/80 px-1.5 text-[10px] leading-4 min-w-4">
+                {plugin.installed_sites.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="upload">Upload New Version</TabsTrigger>
         </TabsList>
 
@@ -469,6 +502,18 @@ export default function PluginDetailPage() {
                                   Promote
                                 </Button>
                               )}
+                              {version.track !== 'beta' && !version.is_stable && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-green-300 text-green-700 hover:bg-green-50 gap-1"
+                                  onClick={() => handleMarkAsLatest(version)}
+                                  title="Mark this version as the latest stable release"
+                                >
+                                  <Check className="h-4 w-4" />
+                                  Mark as latest
+                                </Button>
+                              )}
                               {version.track === 'beta' && (
                                 <Button
                                   variant="ghost"
@@ -539,6 +584,97 @@ export default function PluginDetailPage() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sites" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Installed Sites</CardTitle>
+              <CardDescription>
+                Which sites have this plugin and what version. Grouped by installed
+                version; rows below show details per site.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!plugin.installed_sites || plugin.installed_sites.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No sites have reported this plugin yet.
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {/* Version summary chips */}
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(
+                      plugin.installed_sites.reduce<Record<string, number>>((acc, s) => {
+                        const v = s.installed_version ?? "(unknown)";
+                        acc[v] = (acc[v] ?? 0) + 1;
+                        return acc;
+                      }, {})
+                    )
+                      .sort(([a], [b]) => b.localeCompare(a, undefined, { numeric: true }))
+                      .map(([version, count]) => (
+                        <Badge key={version} variant="secondary" className="text-xs">
+                          v{version}: {count} {count === 1 ? "site" : "sites"}
+                        </Badge>
+                      ))}
+                  </div>
+
+                  {/* Per-site table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Site</TableHead>
+                          <TableHead>Installed Version</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Synced</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {plugin.installed_sites.map((s) => (
+                          <TableRow key={s.site_id}>
+                            <TableCell>
+                              <div className="font-medium">{s.site_name}</div>
+                              <a
+                                href={s.site_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-muted-foreground hover:underline"
+                              >
+                                {s.site_url}
+                              </a>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono">
+                                  v{s.installed_version ?? "?"}
+                                </Badge>
+                                {s.needs_update && (
+                                  <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                                    update available
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={s.is_active ? "default" : "secondary"}>
+                                {s.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {s.last_synced_at
+                                ? new Date(s.last_synced_at).toLocaleString()
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
             </CardContent>

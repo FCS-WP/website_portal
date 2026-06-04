@@ -111,6 +111,7 @@ class PushPluginToSite implements ShouldQueue
             // All sites have reported back
             $successCount = $sites->whereIn('status', ['success', 'healthy'])->count();
             $failedCount = $sites->whereIn('status', ['failed', 'rolled_back'])->count();
+            $skippedCount = $sites->where('status', 'skipped')->count();
 
             $deploymentJob->update([
                 'status' => 'completed',
@@ -124,8 +125,9 @@ class PushPluginToSite implements ShouldQueue
             if ($pluginVersion && $pluginVersion->plugin) {
                 $plugin = $pluginVersion->plugin;
                 $version = $pluginVersion->version;
+                $skippedSuffix = $skippedCount > 0 ? " | ⏭ {$skippedCount} skipped (already at v{$version})" : '';
                 TelegramNotificationService::notifyAdminChannel(
-                    "🚀 Deployment complete: *{$plugin->name}* v{$version}\n✅ {$successCount} success | ❌ {$failedCount} failed"
+                    "🚀 Deployment complete: *{$plugin->name}* v{$version}\n✅ {$successCount} success | ❌ {$failedCount} failed{$skippedSuffix}"
                 );
             }
         }

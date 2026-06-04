@@ -262,6 +262,47 @@ class PluginVersionController extends Controller
     }
 
     /**
+     * POST /api/plugin-versions/{pluginVersion}/mark-latest
+     *
+     * Mark the given version as `is_stable=true` so Plugin::latestVersion()
+     * picks it up. Pure metadata change — no deployments triggered, unlike
+     * `promote` which is the beta-tester-out-of-beta flow.
+     *
+     * Used by the "Mark as latest" button on the Versions tab, primarily
+     * for fixing up rows that were uploaded without the stable checkbox.
+     */
+    public function markAsLatest(Request $request, PluginVersion $pluginVersion)
+    {
+        if ($pluginVersion->track === 'beta') {
+            return $this->errorResponse(
+                'Beta versions cannot be marked as latest. Use "Promote to Stable" instead.',
+                422
+            );
+        }
+
+        if ($pluginVersion->is_stable) {
+            return $this->errorResponse(
+                'This version is already marked as stable.',
+                422
+            );
+        }
+
+        $pluginVersion->update(['is_stable' => true]);
+
+        ActivityLogService::log(
+            'plugin.version_marked_latest',
+            $pluginVersion,
+            $request->user(),
+            $request->ip()
+        );
+
+        return $this->successResponse(
+            $pluginVersion->fresh(),
+            "v{$pluginVersion->version} is now marked as the latest stable release."
+        );
+    }
+
+    /**
      * DELETE /api/plugin-versions/{pluginVersion}
      * Admin only — delete a version.
      */

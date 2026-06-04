@@ -7,6 +7,7 @@ use App\Models\DeploymentJob;
 use App\Models\DeploymentJobSite;
 use App\Models\PluginVersion;
 use App\Models\Site;
+use App\Models\SitePlugin;
 use App\Traits\ApiResponse;
 use App\Traits\AuthorizesSiteAccess;
 use App\Services\ActivityLogService;
@@ -80,17 +81,46 @@ class DeploymentController extends Controller
             'created_at' => now(),
         ]);
 
-        // Create per-site records
+        // Pre-flight: skip sites already at the target version. Pulls one
+        // row per site from site_plugins (the agent's last reported state),
+        // matched by plugin_id. Sites without a row fall through to a
+        // normal deploy (treated as not-installed). is_active=false also
+        // falls through so a deactivated plugin is re-installed and
+        // re-activated by the agent.
+        $alreadyInstalledSiteIds = SitePlugin::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('plugin_id', $pluginVersion->plugin_id)
+            ->where('installed_version', $pluginVersion->version)
+            ->where('is_active', true)
+            ->pluck('site_id')
+            ->all();
+        $alreadyInstalledSet = array_flip($alreadyInstalledSiteIds);
+
+        $skippedReason = "Already at v{$pluginVersion->version}";
         foreach ($siteIds as $siteId) {
+            $isSkipped = isset($alreadyInstalledSet[$siteId]);
             DeploymentJobSite::create([
                 'deployment_job_id' => $job->id,
                 'site_id' => $siteId,
-                'status' => 'pending',
+                'status' => $isSkipped ? 'skipped' : 'pending',
+                'error_message' => $isSkipped ? $skippedReason : null,
+                'deployed_at' => $isSkipped ? now() : null,
             ]);
         }
 
-        // Only dispatch immediately if not scheduled
-        if (!$isScheduled) {
+        // If EVERY site was skipped, finalize the job inline — there is no
+        // work for DispatchBulkDeployment to do and the completion check
+        // in PushPluginToSite never fires (it only runs after a real push).
+        $hasWorkToDo = count($siteIds) > count($alreadyInstalledSiteIds);
+
+        if (!$hasWorkToDo) {
+            $job->update([
+                'status' => 'completed',
+                'success_count' => 0,
+                'failed_count' => 0,
+                'finished_at' => now(),
+            ]);
+        } elseif (!$isScheduled) {
             DispatchBulkDeployment::dispatch($job);
         }
 

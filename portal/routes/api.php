@@ -96,6 +96,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/plugin-versions/{pluginVersion}/download-url', [\App\Http\Controllers\Portal\PluginVersionController::class, 'downloadUrl']);
         Route::delete('/plugin-versions/{pluginVersion}', [\App\Http\Controllers\Portal\PluginVersionController::class, 'destroy']);
         Route::post('/plugin-versions/{pluginVersion}/promote', [\App\Http\Controllers\Portal\PluginVersionController::class, 'promote']);
+        Route::post('/plugin-versions/{pluginVersion}/mark-latest', [\App\Http\Controllers\Portal\PluginVersionController::class, 'markAsLatest']);
         Route::get('/plugin-versions/{pluginVersion}/beta-status', [\App\Http\Controllers\Portal\PluginVersionController::class, 'betaStatus']);
 
         // Site Plugins

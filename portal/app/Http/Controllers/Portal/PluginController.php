@@ -75,12 +75,41 @@ class PluginController extends Controller
 
     /**
      * GET /api/plugins/{plugin}
-     * Show plugin with versions and site count.
+     * Show plugin with versions, site count, and installed-sites breakdown.
      */
     public function show(Plugin $plugin)
     {
         $plugin->load(['versions', 'creator']);
         $plugin->loadCount('sitePlugins');
+
+        // Per-site installation rows. Used by the "Installed Sites" tab on
+        // the plugin detail page to show which sites are at which version.
+        $plugin->load(['sitePlugins.site:id,name,url,status']);
+
+        $latestStable = $plugin->versions
+            ->where('is_stable', true)
+            ->sortByDesc('released_at')
+            ->first();
+        $latestStableVersion = $latestStable?->version;
+
+        $installedSites = $plugin->sitePlugins
+            ->filter(fn ($sp) => $sp->site !== null)
+            ->map(fn ($sp) => [
+                'site_id'           => $sp->site->id,
+                'site_name'         => $sp->site->name,
+                'site_url'          => $sp->site->url,
+                'site_status'       => $sp->site->status,
+                'installed_version' => $sp->installed_version,
+                'is_active'         => (bool) $sp->is_active,
+                'last_synced_at'    => optional($sp->last_synced_at)->toIso8601String(),
+                'needs_update'      => $latestStableVersion
+                    && $sp->installed_version
+                    && version_compare($sp->installed_version, $latestStableVersion, '<'),
+            ])
+            ->values();
+
+        $plugin->setAttribute('installed_sites', $installedSites);
+        $plugin->unsetRelation('sitePlugins'); // omit raw relation from payload
 
         return $this->successResponse($plugin);
     }

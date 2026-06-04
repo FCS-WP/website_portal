@@ -81,6 +81,18 @@ export interface Plugin {
   updated_at: string;
   latest_version?: PluginVersion | null;
   site_plugins_count?: number;
+  installed_sites?: PluginInstalledSite[];
+}
+
+export interface PluginInstalledSite {
+  site_id: number;
+  site_name: string;
+  site_url: string;
+  site_status: string;
+  installed_version: string | null;
+  is_active: boolean;
+  last_synced_at: string | null;
+  needs_update: boolean;
 }
 
 export interface PluginVersion {
