@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EPOS Portal — Migrations &amp; Backups Runbook</title>
+  <style>
+    :root {
+      --bg: #fafaf9;
+      --fg: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #1ea551;
+      --accent-bg: #ecfdf5;
+      --warn-bg: #fffbeb;
+      --warn-fg: #92400e;
+      --danger-bg: #fef2f2;
+      --danger-fg: #991b1b;
+      --code-bg: #1e293b;
+      --code-fg: #f1f5f9;
+      --code-inline-bg: #f3f4f6;
+      --code-inline-fg: #db2777;
+      --max-w: 880px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    main {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 56px 32px 96px;
+    }
+
+    header.doc-header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 24px;
+      margin-bottom: 40px;
+    }
+
+    header.doc-header h1 {
+      font-size: 2.25rem;
+      line-height: 1.2;
+      margin: 0 0 8px;
+      letter-spacing: -0.01em;
+    }
+
+    header.doc-header .subtitle {
+      color: var(--muted);
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    nav.toc {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+
+    nav.toc h2 {
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 12px;
+      font-weight: 600;
+    }
+
+    nav.toc ol {
+      margin: 0;
+      padding-left: 1.4em;
+    }
+
+    nav.toc ol li {
+      margin: 4px 0;
+    }
+
+    nav.toc a {
+      color: var(--fg);
+      text-decoration: none;
+    }
+
+    nav.toc a:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    nav.toc ol ol {
+      margin-top: 4px;
+      list-style-type: lower-alpha;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      margin: 56px 0 16px;
+      letter-spacing: -0.005em;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+      scroll-margin-top: 16px;
+    }
+
+    h3 {
+      font-size: 1.18rem;
+      margin: 36px 0 10px;
+      scroll-margin-top: 16px;
+    }
+
+    h4 {
+      font-size: 1rem;
+      margin: 24px 0 8px;
+      color: var(--fg);
+    }
+
+    p { margin: 12px 0; }
+
+    ul, ol {
+      padding-left: 1.4em;
+      margin: 12px 0;
+    }
+
+    li { margin: 4px 0; }
+
+    code {
+      background: var(--code-inline-bg);
+      color: var(--code-inline-fg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 18px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.88rem;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    /* Light pseudo-syntax: highlight $ prompts and comments in shell blocks. */
+    pre .prompt { color: #94a3b8; user-select: none; }
+    pre .comment { color: #94a3b8; font-style: italic; }
+    pre .kw { color: #f0abfc; }
+    pre .str { color: #fde68a; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 16px 0;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-bg);
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+
+    .callout.warn {
+      border-left-color: #d97706;
+      background: var(--warn-bg);
+      color: var(--warn-fg);
+    }
+
+    .callout.danger {
+      border-left-color: #dc2626;
+      background: var(--danger-bg);
+      color: var(--danger-fg);
+    }
+
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    a { color: var(--accent); }
+    a:hover { color: #166534; }
+
+    footer.doc-footer {
+      margin-top: 80px;
+      padding-top: 24px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: var(--accent-bg);
+      color: #065f46;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    kbd {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+
+<body>
+<main>
+
+<header class="doc-header">
+  <h1>Migrations &amp; Backups Runbook</h1>
+  <p class="subtitle">EPOS Central Portal — operating procedures for schema changes and disaster recovery.</p>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#concepts">Concepts &amp; what's at risk</a></li>
+    <li><a href="#migrations">Database migrations</a>
+      <ol>
+        <li><a href="#mig-cycle">Day-to-day migration cycle</a></li>
+        <li><a href="#mig-fresh">Full reset (<code>migrate:fresh</code>)</a></li>
+        <li><a href="#mig-rollback">Rolling back a single migration</a></li>
+        <li><a href="#mig-prod">Migrating production safely</a></li>
+      </ol>
+    </li>
+    <li><a href="#backups">Backups</a>
+      <ol>
+        <li><a href="#backups-what">What gets backed up</a></li>
+        <li><a href="#backups-manual">Manual backup</a></li>
+        <li><a href="#backups-scheduled">Scheduled (daily) backup</a></li>
+        <li><a href="#backups-listing">Listing &amp; locating backups</a></li>
+      </ol>
+    </li>
+    <li><a href="#restore">Restore from a backup</a></li>
+    <li><a href="#disaster">Disaster recovery scenarios</a></li>
+    <li><a href="#offsite">Recommended: off-site sync (Tier 2)</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+    <li><a href="#dont-do">Things NOT to do</a></li>
+  </ol>
+</nav>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="concepts">1. Concepts &amp; what's at risk</h2>
+
+<p>Three persistent stores back the portal. Treat each as a separate failure domain.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Store</th>
+      <th>Lives at</th>
+      <th>Survives <code>make down</code>?</th>
+      <th>Survives disk failure?</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Postgres database</strong> (<code>epos_portal</code>, ~11 MB)</td>
+      <td>Docker named volume <code>website_portal_postgres-data</code></td>
+      <td>✅ Yes</td>
+      <td>❌ <strong>No</strong> — losing the laptop = losing the DB unless backed up</td>
+    </tr>
+    <tr>
+      <td><strong>Plugin zip storage</strong> (<code>storage/app/private/</code>)</td>
+      <td>Bind-mounted to <code>./portal/storage/</code> on host</td>
+      <td>✅ Yes</td>
+      <td>❌ No — same disk</td>
+    </tr>
+    <tr>
+      <td><strong>Encryption key</strong> (<code>VAULT_MASTER_KEY</code>)</td>
+      <td><code>./portal/.env</code> (gitignored)</td>
+      <td>✅ Yes</td>
+      <td>❌ No — and <strong>NOT in any backup</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout danger">
+  <strong>Lose <code>VAULT_MASTER_KEY</code> and the DB is half-bricked.</strong>
+  Every encrypted column (<code>sites.api_key_encrypted</code>, <code>site_smtp_settings.password_encrypted</code>, vault credentials) becomes permanently unrecoverable — even with a perfect DB restore. Store this value in a password manager <em>the moment you set it</em>, separately from the repo.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="migrations">2. Database migrations</h2>
+
+<p>Laravel 12 migrations live in <code>portal/database/migrations/</code>. Naming is the standard <code>YYYY_MM_DD_HHMMSS_description.php</code> pattern. Every migration runs inside <code>epos-app</code>; you don't invoke <code>php artisan</code> on the host.</p>
+
+<h3 id="mig-cycle">2a. Day-to-day migration cycle</h3>
+
+<p>Create a new migration:</p>
+
+<pre><code><span class="prompt">$</span> make artisan cmd=<span class="str">"make:migration add_x_to_sites_table"</span></code></pre>
+
+<p>Edit the file under <code>portal/database/migrations/</code>, then apply:</p>
+
+<pre><code><span class="prompt">$</span> make migrate</code></pre>
+
+<p>That runs <code>php artisan migrate</code> inside <code>epos-app</code>. Output prints each batch; success looks like:</p>
+
+<pre><code>   INFO  Running migrations.
+
+  2026_06_04_120000_add_x_to_sites_table .................. DONE</code></pre>
+
+<p>Always check the status afterwards if you migrated anything non-trivial:</p>
+
+<pre><code><span class="prompt">$</span> make artisan cmd=<span class="str">"migrate:status"</span></code></pre>
+
+<h3 id="mig-fresh">2b. Full reset (<code>migrate:fresh</code>)</h3>
+
+<p>Drops every table, re-runs all migrations from scratch, and re-seeds.</p>
+
+<pre><code><span class="prompt">$</span> make fresh                  <span class="comment"># migrate:fresh --seed + clear caches</span>
+<span class="prompt">$</span> make migrate-fresh           <span class="comment"># same, no caches cleared</span></code></pre>
+
+<div class="callout danger">
+  <strong>Destructive.</strong> <code>make fresh</code> wipes <em>everything</em>: sites, users, plugin versions, deployment history, activity logs. Take a backup first if anything matters:
+  <pre style="background:rgba(255,255,255,.6);color:#7c2d12;margin-top:12px"><code><span class="prompt">$</span> make backup        <span class="comment"># dumps to portal/backups/&lt;today&gt;/</span>
+<span class="prompt">$</span> make fresh</code></pre>
+</div>
+
+<h3 id="mig-rollback">2c. Rolling back a single migration</h3>
+
+<p>If a migration was bad but you haven't committed yet:</p>
+
+<pre><code><span class="prompt">$</span> make artisan cmd=<span class="str">"migrate:rollback --step=1"</span></code></pre>
+
+<p>Edit the migration file, then <code>make migrate</code> again. If the rollback also broke (e.g. you renamed a column and the <code>down()</code> doesn't reverse cleanly), restore from the most recent backup instead:</p>
+
+<pre><code><span class="prompt">$</span> make backup-list
+<span class="prompt">$</span> make restore DATE=<span class="str">2026-06-04</span></code></pre>
+
+<h3 id="mig-prod">2d. Migrating production safely</h3>
+
+<ol>
+  <li><strong>Always back up before touching prod.</strong> Production migrations are not auto-rollback-safe.
+    <pre style="background:#0f172a"><code><span class="prompt">$</span> make backup</code></pre>
+  </li>
+  <li><strong>Migrate in a maintenance window</strong> if the migration is long-running. Put the app in maintenance mode first:
+    <pre><code><span class="prompt">$</span> make artisan cmd=<span class="str">"down --secret=please-let-me-in"</span>
+<span class="prompt">$</span> make migrate
+<span class="prompt">$</span> make artisan cmd=<span class="str">"up"</span></code></pre>
+  </li>
+  <li><strong>Use <code>--force</code> in production CI</strong> (Laravel refuses to migrate in production without it):
+    <pre><code><span class="prompt">$</span> make artisan cmd=<span class="str">"migrate --force"</span></code></pre>
+  </li>
+  <li><strong>Test the rollback first</strong> on a copy of prod data restored to dev. <code>down()</code> methods are easy to write wrong.</li>
+</ol>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="backups">3. Backups</h2>
+
+<h3 id="backups-what">3a. What gets backed up</h3>
+
+<p>Every backup produces a directory under <code>portal/backups/&lt;YYYY-MM-DD&gt;/</code> containing three files:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>File</th>
+      <th>What</th>
+      <th>Size (typ.)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>epos_portal.sql.gz</code></td>
+      <td><code>pg_dump --format=plain</code> of the entire DB (schema + data), gzipped.</td>
+      <td>~17 KB now, will grow with sites/orders</td>
+    </tr>
+    <tr>
+      <td><code>storage.tar.gz</code></td>
+      <td>Tarball of <code>storage/app/private/</code> — plugin zip files uploaded to the repository.</td>
+      <td>~140 KB now</td>
+    </tr>
+    <tr>
+      <td><code>MANIFEST.txt</code></td>
+      <td>Small text file: timestamp, sizes, restore command. Human-readable proof that a backup ran.</td>
+      <td>&lt; 1 KB</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout warn">
+  <strong>Not in the backup:</strong> <code>portal/.env</code> (and therefore <code>VAULT_MASTER_KEY</code>), the agent plugin source, Redis cache, queued jobs in-flight. The <code>.env</code> file is excluded deliberately — secrets in a backup file are a leak vector. Manage it separately.
+</div>
+
+<h3 id="backups-manual">3b. Manual backup</h3>
+
+<p>One-shot backup of the current state:</p>
+
+<pre><code><span class="prompt">$</span> make backup</code></pre>
+
+<p>Output:</p>
+
+<pre><code>Backing up to: /var/www/portal/backups/2026-06-04
+  ✓ DB dump: epos_portal.sql.gz (17.5 KB)
+  ✓ storage: storage.tar.gz (136.7 KB)
+Backup complete.</code></pre>
+
+<p>Options:</p>
+
+<pre><code><span class="prompt">$</span> make artisan cmd=<span class="str">"db:backup --skip-storage"</span>       <span class="comment"># DB only (faster)</span>
+<span class="prompt">$</span> make artisan cmd=<span class="str">"db:backup --retention=30"</span>       <span class="comment"># keep 30 days instead of 14</span></code></pre>
+
+<h3 id="backups-scheduled">3c. Scheduled (daily) backup</h3>
+
+<p>The scheduler entry in <code>portal/routes/console.php</code> fires <code>db:backup</code> daily at <strong>03:30</strong>:</p>
+
+<pre><code>Schedule::command('db:backup')-&gt;dailyAt('03:30')-&gt;withoutOverlapping();</code></pre>
+
+<p>This runs inside the <code>epos-scheduler</code> container, which must be up:</p>
+
+<pre><code><span class="prompt">$</span> make workers-up       <span class="comment"># queue + scheduler containers</span>
+<span class="prompt">$</span> make workers-logs     <span class="comment"># tail to confirm cron fires</span></code></pre>
+
+<p>To test the scheduled task without waiting for 03:30:</p>
+
+<pre><code><span class="prompt">$</span> make schedule-run     <span class="comment"># runs whatever is due right now</span></code></pre>
+
+<p><strong>Retention.</strong> Default is 14 days. The artisan command itself prunes directories named <code>YYYY-MM-DD</code> older than that. Anything else in <code>portal/backups/</code> is left untouched.</p>
+
+<h3 id="backups-listing">3d. Listing &amp; locating backups</h3>
+
+<pre><code><span class="prompt">$</span> make backup-list</code></pre>
+
+<p>Backups live on disk at:</p>
+
+<pre><code>./portal/backups/&lt;YYYY-MM-DD&gt;/
+  epos_portal.sql.gz
+  storage.tar.gz
+  MANIFEST.txt</code></pre>
+
+<p>Inspect a backup without restoring:</p>
+
+<pre><code><span class="prompt">$</span> cat portal/backups/2026-06-04/MANIFEST.txt
+<span class="prompt">$</span> gunzip -c portal/backups/2026-06-04/epos_portal.sql.gz | head -50
+<span class="prompt">$</span> tar -tzf portal/backups/2026-06-04/storage.tar.gz | head</code></pre>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="restore">4. Restore from a backup</h2>
+
+<p>The <code>make restore</code> target handles the full sequence: terminate active DB sessions → drop &amp; recreate the database → pipe the SQL dump back in → un-tar storage → clear Laravel caches. <strong>It prompts you to type the date as confirmation</strong> so you don't restore by accident.</p>
+
+<pre><code><span class="prompt">$</span> make restore DATE=<span class="str">2026-06-04</span>
+
+About to RESTORE portal/backups/2026-06-04 — this will overwrite the current database.
+Type the date to confirm: <span class="str">2026-06-04</span>
+Terminating active sessions (Laravel keeps connections open)...
+Dropping + recreating database...
+Restoring DB dump...
+Restoring private storage...
+   INFO  Application cache cleared successfully.
+Restore complete. Verify with: make tinker</code></pre>
+
+<p>After restore, sanity-check a few row counts:</p>
+
+<pre><code><span class="prompt">$</span> make tinker
+<span class="prompt">&gt;&gt;&gt;</span> App\Models\Site::count();
+<span class="prompt">&gt;&gt;&gt;</span> App\Models\Plugin::count();
+<span class="prompt">&gt;&gt;&gt;</span> App\Models\DeploymentJob::count();</code></pre>
+
+<div class="callout warn">
+  <strong>If anything is connected to the DB at restore time</strong> (e.g. queue workers, a Tinker shell, a stray <code>psql</code>), the restore terminates those sessions with <code>pg_terminate_backend</code>. The connections die mid-statement; in-flight queries are rolled back. Idempotent jobs will retry; non-idempotent ones (e.g. a half-sent Telegram message) may be lost. Restore during a quiet window if you can.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="disaster">5. Disaster recovery scenarios</h2>
+
+<h3>Scenario A — Accidentally ran <code>make fresh</code>, DB is empty</h3>
+<pre><code><span class="prompt">$</span> make backup-list                  <span class="comment"># find most recent backup</span>
+<span class="prompt">$</span> make restore DATE=<span class="str">2026-06-04</span></code></pre>
+<p>You're back to that morning's 03:30 state. Anything created after that is lost.</p>
+
+<h3>Scenario B — A migration corrupted production data</h3>
+<ol>
+  <li>Take a fresh backup of the current (broken) state for forensics: <code>make backup</code>.</li>
+  <li>Restore the previous day's backup: <code>make restore DATE=...</code></li>
+  <li>Fix the migration locally, test against a copy.</li>
+  <li>Re-apply: <code>make migrate</code>.</li>
+</ol>
+
+<h3>Scenario C — Docker volume removed (<code>docker volume rm</code>)</h3>
+<p>Bring the stack back up:</p>
+<pre><code><span class="prompt">$</span> make up
+<span class="prompt">$</span> make migrate                       <span class="comment"># initial schema</span>
+<span class="prompt">$</span> make restore DATE=<span class="str">2026-06-04</span>    <span class="comment"># overlays the dump</span></code></pre>
+
+<h3>Scenario D — Laptop dead / disk failure</h3>
+<p>The Docker volume and <code>portal/backups/</code> are both gone. Recovery requires off-site copies of:</p>
+<ol>
+  <li>The full repository (from GitHub: <code>git clone</code>).</li>
+  <li>The <code>portal/backups/</code> directory — only available if you set up Tier 2 sync.</li>
+  <li><code>VAULT_MASTER_KEY</code> — from your password manager. <strong>Without this, every encrypted credential is permanently unrecoverable, even after a perfect DB restore.</strong></li>
+</ol>
+<p>If you don't have Tier 2 yet, see the next section.</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="offsite">6. Recommended: off-site sync (Tier 2)</h2>
+
+<p>Daily local backups protect against accidental data loss; they do <strong>not</strong> protect against disk failure or stolen hardware. For real disaster recovery, mirror <code>portal/backups/</code> to an off-host destination.</p>
+
+<p>Cheapest reliable option: <strong>Backblaze B2</strong> + <code>rclone</code>. Costs about $0.006/GB/month — for the current backup size (~150 KB/day, 14 days = ~2 MB), this is effectively free.</p>
+
+<h4>Setup (one-time):</h4>
+
+<pre><code><span class="prompt">$</span> sudo apt install rclone
+<span class="prompt">$</span> rclone config                       <span class="comment"># create remote "b2-backup"</span></code></pre>
+
+<h4>Daily sync (add to host cron, OR to the Laravel scheduler with a shell-out):</h4>
+
+<pre><code><span class="comment"># /etc/cron.d/epos-backup-sync — runs after the 03:30 backup completes</span>
+35 3 * * * shin cd /home/shin/Documents/My\ data/Develop/Services/website_portal &amp;&amp; rclone sync portal/backups/ b2-backup:epos-portal-backups/ &gt;&gt; /var/log/epos-backup-sync.log 2&gt;&amp;1</code></pre>
+
+<h4>Restore from off-site:</h4>
+
+<pre><code><span class="prompt">$</span> rclone copy b2-backup:epos-portal-backups/2026-06-04/ portal/backups/2026-06-04/
+<span class="prompt">$</span> make restore DATE=<span class="str">2026-06-04</span></code></pre>
+
+<div class="callout">
+  <strong>Equally important:</strong> also store <code>VAULT_MASTER_KEY</code> off-host. A password manager entry next to your other infrastructure secrets is fine. <em>This single value</em> is the difference between "lost everything for two hours" and "lost everything forever."
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="troubleshooting">7. Troubleshooting</h2>
+
+<h3><code>pg_dump: error: connection to server ... failed</code></h3>
+<p>The <code>epos-postgres</code> container isn't running, or <code>DB_HOST</code> isn't <code>postgres</code>. Check:</p>
+<pre><code><span class="prompt">$</span> docker ps | grep postgres
+<span class="prompt">$</span> grep DB_HOST portal/.env       <span class="comment"># expect: postgres (not localhost)</span></code></pre>
+
+<h3><code>dropdb: database "epos_portal" is being accessed by other users</code></h3>
+<p>The restore Make target already terminates other sessions, but if a stale Tinker shell or queue worker reconnects between termination and drop, you can hit this. Stop workers first:</p>
+<pre><code><span class="prompt">$</span> make workers-down
+<span class="prompt">$</span> make restore DATE=<span class="str">...</span>
+<span class="prompt">$</span> make workers-up</code></pre>
+
+<h3><code>ERROR: unrecognized configuration parameter "transaction_timeout"</code> during restore</h3>
+<p>Harmless. <code>pg_dump 17</code> (from the apt package in <code>epos-app</code>) emits one <code>SET transaction_timeout</code> line that Postgres 15 doesn't recognize. The line is skipped, the restore continues. Don't chase it.</p>
+
+<h3>Backup runs but no files appear on host</h3>
+<p>Older symptom: backups landed at <code>/var/www/backups</code> inside the container (not bind-mounted). Fixed in the current code — backups go to <code>portal/backups/</code> via <code>base_path('backups')</code>, which is the bind-mounted <code>./portal/</code> mount. If you see this regress, check the path in <code>app/Console/Commands/DatabaseBackup.php</code>.</p>
+
+<h3>Scheduler isn't running the daily backup</h3>
+<pre><code><span class="prompt">$</span> make ps                          <span class="comment"># is epos-scheduler running?</span>
+<span class="prompt">$</span> make workers-logs                <span class="comment"># tail for "db:backup" entries</span>
+<span class="prompt">$</span> make schedule-run                <span class="comment"># force-run due tasks now</span></code></pre>
+<p>If <code>epos-scheduler</code> isn't up, no scheduled tasks fire — including <code>sites:ping</code>, vulnerability scans, etc. On prod, <code>make up-prod</code> stacks the <code>worker</code> profile automatically; on dev you need <code>make workers-up</code> explicitly.</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<h2 id="dont-do">8. Things NOT to do</h2>
+
+<ul>
+  <li><strong>Don't <code>rm -rf portal/backups/</code></strong> in any cleanup script. The directory is gitignored, easy to wipe by accident. If you must clean up, use <code>--retention=N</code> on the command.</li>
+  <li><strong>Don't store <code>portal/.env</code> in a backup.</strong> It contains <code>VAULT_MASTER_KEY</code> in plaintext — a leaked backup file would expose every encrypted credential. The backup deliberately skips it. Keep it in a password manager.</li>
+  <li><strong>Don't run <code>make fresh</code> without backing up first.</strong> It's idempotent for code (re-runs migrations) but destructive for data. Take the 5 seconds: <code>make backup &amp;&amp; make fresh</code>.</li>
+  <li><strong>Don't <code>migrate:fresh</code> on prod.</strong> Ever. Use <code>migrate</code> only.</li>
+  <li><strong>Don't restore in the middle of a deployment</strong> — let any in-flight <code>WpOrgPluginJob</code> or <code>PushPluginToSite</code> finish first, otherwise sites end up in inconsistent state versus the restored portal view.</li>
+  <li><strong>Don't run <code>pg_dump</code> against prod from your laptop</strong> bypassing the artisan command. The Make target handles password env-var safety, locking, and storage layout. Ad-hoc dumps end up in places you can't find later.</li>
+  <li><strong>Don't add migrations that can't be rolled back</strong> (e.g. <code>DROP COLUMN</code> with no <code>down()</code> body). If the change truly is one-way, write that explicitly in the <code>down()</code> method as a thrown exception so the rollback fails loudly.</li>
+</ul>
+
+<footer class="doc-footer">
+  <p>Doc lives at <code>docs/migration-and-backup.html</code>. Pair with <code>CLAUDE.md</code> at the repo root for broader conventions. Open with any browser — no server required.</p>
+</footer>
+
+</main>
+</body>
+</html>
