@@ -77,7 +77,12 @@ class DatabaseSeeder extends Seeder
             ['slug' => 'zippy-core',      'name' => 'Zippy Core'],
             // The agent plugin itself — registering it makes Portal push
             // updates possible (treated like any other company plugin).
-            ['slug' => 'wp-portal-agent', 'name' => 'EPOS WP Agent'],
+            // Slug MUST match the WP plugin folder name (`agent/epos-wp-agent/`)
+            // because the agent's ping reports get_plugins() keyed by folder.
+            // SitePluginIngestService matches on Plugin.slug to set plugin_id
+            // and classify as `internal` — a mismatch leaves rows with a null
+            // plugin_id and the Installed Sites count reads 0.
+            ['slug' => 'epos-wp-agent', 'name' => 'EPOS WP Agent'],
         ];
         foreach ($zippyPlugins as $p) {
             \App\Models\Plugin::firstOrCreate(

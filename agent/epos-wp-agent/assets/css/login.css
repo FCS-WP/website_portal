@@ -99,9 +99,18 @@ body.epos-login-page .epos-grain {
 /* ── Glass shell ──────────────────────────────────────────────────── */
 body.epos-login-page .epos-auth-shell {
   width: min(1180px, 100%);
-  min-height: min(760px, calc(100vh - 48px));
+  /* Cap the shell to viewport height (minus the page padding) so the
+     login card NEVER triggers a vertical scrollbar on standard laptop
+     viewports. The previous `min-height: 760px` forced the card to be
+     at least 760px tall even on a 720px laptop screen, which pushed
+     content past the viewport and showed a scrollbar. */
+  max-height: calc(100vh - 32px);
   display: grid;
-  grid-template-columns: minmax(340px, 4fr) minmax(0, 6fr);
+  /* Form column min 280px (down from 340) so it doesn't squeeze the
+     banner off-screen on borderline viewports between the 1-col
+     breakpoint and full desktop. minmax(0, 6fr) on the banner allows
+     it to actually shrink instead of forcing horizontal scroll. */
+  grid-template-columns: minmax(280px, 4fr) minmax(0, 6fr);
   background: rgba(255, 255, 255, .58);
   border: 1px solid rgba(255, 255, 255, .72);
   box-shadow: var(--epos-shadow);
@@ -481,7 +490,9 @@ body.epos-login-page .epos-banner-column {
   isolation: isolate;
   display: grid;
   align-content: stretch;
-  min-height: 560px;
+  /* min-height removed — was pinning to 560px which forced the shell
+     past viewport height on shorter laptops and triggered a scrollbar.
+     The illustration's own max-height handles the visual rhythm. */
   padding: clamp(28px, 4vw, 58px);
   background:
     linear-gradient(145deg, rgba(7, 141, 69, .94), rgba(6, 185, 87, .82) 50%, rgba(17, 34, 26, .96)),
@@ -587,6 +598,44 @@ body.epos-login-page .epos-banner-kicker {
   font-size: .9rem;
 }
 
+/* Illustrated banner — kicker chip at the top, hero illustration centered
+   below filling most of the right pane. Overrides the default
+   .epos-banner-content left-align + max-width clamp. */
+body.epos-login-page .epos-banner-content--illustrated {
+  justify-items: center;
+  align-content: start;
+  text-align: center;
+  max-width: none;
+  padding: 24px 16px 16px;
+  gap: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+body.epos-login-page .epos-banner-content--illustrated .epos-banner-kicker {
+  margin-bottom: 0;
+}
+body.epos-login-page .epos-banner-illustration {
+  width: auto;
+  height: 100%;
+  max-height: min(70vh, 540px);
+  max-width: 100%;
+  object-fit: contain;
+  align-self: center;
+  justify-self: center;
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.22));
+  /* Subtle float so it doesn't feel static. Re-uses the existing
+     epos-orbit keyframes? No — keep it simple, gentle vertical drift. */
+  animation: epos-illustration-drift 6.5s ease-in-out infinite;
+}
+@keyframes epos-illustration-drift {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.epos-login-page .epos-banner-illustration { animation: none; }
+}
+
 /* The big "zippy" word — DM Sans heavy-black, NOT Fraunces. The
    reference uses font-weight: 950 which is non-standard; DM Sans tops
    out at 1000 in variable mode, so 900 is the safe ceiling here. */
@@ -685,7 +734,11 @@ body.epos-login-page .epos-toast > span > span {
   body.epos-login-page .epos-floating-card,
   body.epos-login-page .epos-toast { display: none; }
 }
-@media (max-width: 900px) {
+/* Below 1024px the 2-column shell starts to squeeze the banner off the
+   right edge (form col 280px min + banner content + side padding) so
+   collapse to a single column earlier. This catches narrow laptop
+   windows, sidebars-half-screen setups, and tablet-portrait viewports. */
+@media (max-width: 1024px) {
   body.epos-login-page .epos-login-page {
     padding: 0;
     place-items: stretch;
@@ -708,6 +761,12 @@ body.epos-login-page .epos-toast > span > span {
   }
   body.epos-login-page .epos-banner-content {
     max-width: 600px;
+  }
+  body.epos-login-page .epos-banner-content--illustrated {
+    max-width: none;
+  }
+  body.epos-login-page .epos-banner-illustration {
+    max-height: 320px;
   }
   body.epos-login-page .epos-zippy-word {
     font-size: clamp(3.4rem, 17vw, 6.4rem);
