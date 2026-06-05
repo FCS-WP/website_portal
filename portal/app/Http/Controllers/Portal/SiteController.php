@@ -54,7 +54,15 @@ class SiteController extends Controller
             });
         }
 
-        $sites = $query->orderBy('created_at', 'desc')->paginate(20);
+        // Allow the client to pick a page size from a fixed allow-list. We
+        // cap the choices so a typo'd ?per_page=999999 can't blow up the
+        // table render or the DB roundtrip.
+        $perPage = (int) $request->input('per_page', 25);
+        if (!in_array($perPage, [25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        $sites = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         return $this->paginatedResponse($sites);
     }

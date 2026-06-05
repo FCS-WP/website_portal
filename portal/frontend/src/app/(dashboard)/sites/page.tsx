@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { PageLoader } from "@/components/ui/page-loader";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
 import { useRouter } from "next/navigation";
@@ -27,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, ExternalLink } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -59,6 +58,8 @@ import { Site, Hosting } from "@/types";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+
+const PER_PAGE_OPTIONS = [25, 50, 100];
 
 // Color-code Last Ping by recency. Anything older than 2h likely needs
 // attention — the cron pings every 5 min so a healthy site shows <15 min.
@@ -78,18 +79,36 @@ export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [hostings, setHostings] = useState<Hosting[]>([]);
   const [loading, setLoading] = useState(true);
-  const showLoader = useDelayedLoading(loading);
+  // Show the page skeleton only on the very first load — paging / filtering
+  // refetches keep the table visible and fade in a subtle overlay instead.
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const showLoader = useDelayedLoading(loading && !initialLoaded);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [newApiKey, setNewApiKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Filter / pagination state. Search is held separately from the value
+  // we actually ship to the server — the latter is updated through a
+  // 300ms debounce so we don't fire a request on every keystroke.
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterHosting, setFilterHosting] = useState<string>("all");
-  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [siteToEdit, setSiteToEdit] = useState<Site | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", url: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -102,51 +121,90 @@ export default function SitesPage() {
 
   // Only admins can read /api/hostings (it's a CRUD endpoint, not a dropdown
   // source). For non-admin roles we skip the call entirely — the hosting
-  // filter is hidden for them too, so an empty array is fine. We also fetch
-  // sites + hostings independently so a single failed call doesn't blank
-  // the whole page (previously Promise.all + 403 wiped the sites list).
+  // filter is hidden for them too, so an empty array is fine.
   const userRole = useAuthStore((s) => s.user?.role);
   const canFetchHostings = userRole === "admin";
   // Site creation is admin+dev per route middleware; MKT can't create sites,
   // so hide the Add button for them.
   const canCreateSite = userRole === "admin" || userRole === "dev";
+  const canEditSite = userRole === "admin" || userRole === "dev";
 
-  const fetchData = useCallback(async () => {
+  // Debounce search input -> committed `search`. 300ms feels responsive
+  // without flooding the API while the user is typing.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1); // any new query resets to page 1
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchInput]);
+
+  const fetchSites = useCallback(async () => {
     setLoading(true);
+    try {
+      const params: Record<string, unknown> = {
+        page,
+        per_page: perPage,
+      };
+      if (search) params.search = search;
+      if (filterStatus !== "all") params.status = filterStatus;
+      if (filterHosting !== "all") params.hosting_id = filterHosting;
 
-    siteService.list()
-      .then((res) => setSites(res.data.data || []))
-      .catch(() => toast.error("Failed to load sites"));
-
-    if (canFetchHostings) {
-      hostingService.list()
-        .then((res) => setHostings(res.data.data || []))
-        .catch(() => {
-          // Hosting filter just won't have entries — non-blocking.
-        });
-    } else {
-      setHostings([]);
+      const res = await siteService.list(params);
+      setSites(res.data.data || []);
+      const pagination = res.data.meta?.pagination;
+      if (pagination) {
+        setLastPage(pagination.last_page);
+        setTotal(pagination.total);
+      } else {
+        setLastPage(1);
+        setTotal((res.data.data || []).length);
+      }
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to load sites";
+      toast.error(message);
+      console.error("sites list failed:", err);
+    } finally {
+      setLoading(false);
+      setInitialLoaded(true);
     }
-
-    setLoading(false);
-  }, [canFetchHostings]);
+  }, [page, perPage, search, filterStatus, filterHosting]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchSites();
+  }, [fetchSites]);
 
-  const filteredSites = sites.filter((site) => {
-    if (filterStatus !== "all" && site.status !== filterStatus) return false;
-    if (filterHosting !== "all" && String(site.hosting_id) !== filterHosting) return false;
-    if (search) {
-      const s = search.toLowerCase();
-      return (
-        site.name.toLowerCase().includes(s) ||
-        site.url.toLowerCase().includes(s)
-      );
+  useEffect(() => {
+    if (!canFetchHostings) {
+      return;
     }
-    return true;
-  });
+    hostingService.list()
+      .then((res) => setHostings(res.data.data || []))
+      .catch(() => {
+        // Hosting filter just won't have entries — non-blocking.
+      });
+  }, [canFetchHostings]);
+
+  // Changing a filter / per-page resets to page 1 so we don't end up
+  // requesting a page that's now past the new last_page.
+  const onStatusChange = (val: string | null) => {
+    setFilterStatus(val ?? "all");
+    setPage(1);
+  };
+  const onHostingChange = (val: string | null) => {
+    setFilterHosting(val ?? "all");
+    setPage(1);
+  };
+  const onPerPageChange = (v: number) => {
+    setPerPage(v);
+    setPage(1);
+  };
 
   const handleCreate = async () => {
     setSubmitting(true);
@@ -174,14 +232,56 @@ export default function SitesPage() {
         setApiKeyDialogOpen(true);
       }
 
-      fetchData();
-    } catch {
-      toast.error("Failed to create site");
+      fetchSites();
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to create site";
+      toast.error(message);
+      console.error("site create failed:", err);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const openEditDialog = (site: Site) => {
+    setSiteToEdit(site);
+    setEditForm({ name: site.name, url: site.url });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!siteToEdit) return;
+    const name = editForm.name.trim();
+    const url = editForm.url.trim();
+    if (!name || !url) {
+      toast.error("Name and URL are required");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const payload: Record<string, unknown> = {};
+      if (name !== siteToEdit.name) payload.name = name;
+      if (url !== siteToEdit.url) payload.url = url;
+      if (Object.keys(payload).length === 0) {
+        setEditDialogOpen(false);
+        return;
+      }
+      await siteService.update(siteToEdit.id, payload);
+      toast.success("Site updated");
+      setEditDialogOpen(false);
+      setSiteToEdit(null);
+      fetchSites();
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to update site";
+      toast.error(message);
+      console.error("site update failed:", err);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!siteToDelete) return;
@@ -191,9 +291,13 @@ export default function SitesPage() {
       toast.success(`Site "${siteToDelete.name}" deleted successfully`);
       setDeleteDialogOpen(false);
       setSiteToDelete(null);
-      fetchData();
-    } catch {
-      toast.error("Failed to delete site");
+      fetchSites();
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to delete site";
+      toast.error(message);
+      console.error("site delete failed:", err);
     } finally {
       setDeleting(false);
     }
@@ -321,8 +425,12 @@ export default function SitesPage() {
                           } else {
                             toast.error("No redirect URL returned");
                           }
-                        } catch {
-                          toast.error("Failed to open WP Admin");
+                        } catch (err) {
+                          const message =
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (err as any)?.response?.data?.message ?? "Failed to open WP Admin";
+                          toast.error(message);
+                          console.error("autologin failed:", err);
                         }
                       }}
                     >
@@ -340,6 +448,12 @@ export default function SitesPage() {
                 <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {canEditSite && (
+                  <DropdownMenuItem onClick={() => openEditDialog(row.original)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={() => {
@@ -385,11 +499,11 @@ export default function SitesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Input
           placeholder="Search by name or URL..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="w-full sm:max-w-xs"
         />
-        <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val ?? "all")}>
+        <Select value={filterStatus} onValueChange={onStatusChange}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -401,7 +515,7 @@ export default function SitesPage() {
           </SelectContent>
         </Select>
         {hostings.length > 0 && (
-          <Select value={filterHosting} onValueChange={(val) => setFilterHosting(val ?? "all")}>
+          <Select value={filterHosting} onValueChange={onHostingChange}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Hosting" />
             </SelectTrigger>
@@ -417,7 +531,20 @@ export default function SitesPage() {
         )}
       </div>
 
-      <DataTable columns={columns} data={filteredSites} pageSize={20} />
+      <DataTable
+        columns={columns}
+        data={sites}
+        loading={loading}
+        serverPagination={{
+          currentPage: page,
+          perPage,
+          total,
+          lastPage,
+          onPageChange: setPage,
+          onPerPageChange: onPerPageChange,
+          perPageOptions: PER_PAGE_OPTIONS,
+        }}
+      />
 
       {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -490,6 +617,75 @@ export default function SitesPage() {
             </Button>
             <Button onClick={handleCreate} disabled={submitting || !formData.name || !formData.url}>
               Create Site
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Site Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setSiteToEdit(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Site</DialogTitle>
+            <DialogDescription>
+              Update the site name or URL if it was entered incorrectly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-site-name">
+                Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="edit-site-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-site-url">
+                URL <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="edit-site-url"
+                type="url"
+                value={editForm.url}
+                onChange={(e) => setEditForm({ ...editForm, url: e.target.value })}
+                placeholder="https://example.com"
+                required
+              />
+            </div>
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Changing the URL only updates the portal record. You must also
+                update <strong>WP Admin → Settings → General</strong> on the
+                WordPress site so its <em>WordPress Address</em> and{" "}
+                <em>Site Address</em> match — otherwise the agent will keep
+                pinging from the old URL.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={savingEdit}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSave}
+              disabled={savingEdit || !editForm.name.trim() || !editForm.url.trim()}
+            >
+              {savingEdit ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

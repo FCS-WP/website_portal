@@ -15,6 +15,7 @@ class UpdateSiteRequest extends FormRequest
     {
         return [
             'name' => 'sometimes|string|max:255',
+            'url' => 'sometimes|url|max:2048',
             'hosting_id' => 'nullable|exists:hostings,id',
             'description' => 'nullable|string',
             'tags' => 'nullable|array',
