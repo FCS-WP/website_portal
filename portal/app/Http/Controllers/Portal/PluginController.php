@@ -79,7 +79,7 @@ class PluginController extends Controller
      */
     public function show(Plugin $plugin)
     {
-        $plugin->load(['versions', 'creator']);
+        $plugin->load(['versions', 'creator', 'latestVersion']);
         $plugin->loadCount('sitePlugins');
 
         // Per-site installation rows. Used by the "Installed Sites" tab on
