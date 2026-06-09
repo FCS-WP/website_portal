@@ -14,6 +14,7 @@ use App\Services\ActivityLogService;
 use App\Jobs\DispatchBulkDeployment;
 use App\Jobs\PushPluginToSite;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class DeploymentController extends Controller
 {
@@ -30,7 +31,13 @@ class DeploymentController extends Controller
         $request->validate([
             'plugin_version_id' => 'required|exists:plugin_versions,id',
             'site_ids' => 'required_without:all_sites|array',
-            'site_ids.*' => 'exists:sites,id',
+            // Laravel's stock `exists:sites,id` ignores the deleted_at column,
+            // so a soft-deleted site_id would pass validation, get written to
+            // deployment_job_sites, and then fail at PushPluginToSite because
+            // the belongsTo loader respects soft-deletes ($site === null) —
+            // the UI rendered those rows as "Site #43 — Site not found".
+            // The whereNull guard rejects them up front.
+            'site_ids.*' => [Rule::exists('sites', 'id')->whereNull('deleted_at')],
             'all_sites' => 'required_without:site_ids|boolean',
             'note' => 'nullable|string|max:500',
             'scheduled_at' => 'nullable|date|after:now',
@@ -63,6 +70,24 @@ class DeploymentController extends Controller
                 }
             }
         }
+
+        // Defense-in-depth: even after validation, re-confirm against the DB
+        // that every site_id still maps to a live (non-soft-deleted) row.
+        // The Site model's global SoftDeletes scope filters trashed rows
+        // automatically, so this whereIn returns only "alive" IDs. Without
+        // this, a site soft-deleted between validation and dispatch would
+        // still write a deployment_job_sites row that fails downstream as
+        // "Site not found".
+        $aliveSiteIds = Site::whereIn('id', $siteIds)->pluck('id')->all();
+        $missing = array_values(array_diff($siteIds, $aliveSiteIds));
+        if (!empty($missing)) {
+            return $this->errorResponse(
+                'One or more selected sites no longer exist or were removed.',
+                422,
+                ['missing_site_ids' => $missing]
+            );
+        }
+        $siteIds = $aliveSiteIds;
 
         if (empty($siteIds)) {
             return $this->errorResponse('No sites selected for deployment.', 422);
