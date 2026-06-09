@@ -66,8 +66,12 @@ ps: ## Show running containers (any profile)
 
 # ─── Production ──────────────────────────────────────────────────────────────
 
+# Number of parallel queue workers in prod. Pings 200+ sites in ~8 min
+# at 4 workers; bump if PingSiteJob backlog grows.
+QUEUE_REPLICAS ?= 4
+
 up-prod: ## Start PROD stack (next build + start). Run `make use-prod-env` first.
-	$(DC_PROD) up -d
+	$(DC_PROD) up -d --scale queue=$(QUEUE_REPLICAS)
 
 down-prod: ## Stop PROD containers
 	$(DC_PROD) down
@@ -76,7 +80,7 @@ restart-prod: ## Restart PROD containers
 	$(DC_PROD) restart
 
 rebuild-prod: ## Rebuild + restart PROD
-	$(DC_PROD) up -d --build
+	$(DC_PROD) up -d --build --scale queue=$(QUEUE_REPLICAS)
 
 logs-prod: ## Tail PROD logs
 	$(DC_PROD) logs -f
