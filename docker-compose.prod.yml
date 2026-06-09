@@ -43,9 +43,15 @@ services:
       - "127.0.0.1:${REDIS_PORT:-6380}:6379"
 
   # In prod, queue + scheduler are always-on (override the dev `profiles:` gate).
+  # The queue runs as N parallel replicas to handle 200+ sites in PingSiteJob
+  # within the 5-min ping window. container_name is dropped because compose
+  # can't reuse a single name across replicas — use `docker compose ps queue`
+  # instead. Adjust the replica count via `--scale queue=N` on `up`.
   queue:
     profiles: []
     restart: unless-stopped
+    deploy:
+      replicas: 4
 
   scheduler:
     profiles: []

@@ -8,8 +8,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('sites:ping')->everyFiveMinutes();
-Schedule::command('sites:check-health')->everyFiveMinutes();
+Schedule::command('sites:ping')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('deployments:dispatch-scheduled')->everyMinute();
 Schedule::command('security:sync-vulnerabilities')->dailyAt('02:00');
 Schedule::command('security:scan-file-integrity')->dailyAt('03:00');

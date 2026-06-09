@@ -109,10 +109,13 @@ services:
     build:
       context: .
       dockerfile: docker/php/Dockerfile
-    container_name: epos-queue
+    # container_name is only set in dev (docker-compose.dev override comes
+    # implicitly via the single-instance default) — in prod the queue runs
+    # as N replicas and can't share one name, so we omit it here and let
+    # docker compose generate names like website_portal-queue-1, -2, etc.
     user: root
     working_dir: /var/www/portal
-    command: php artisan queue:work --queue=default,deployments --tries=3 --timeout=90 --sleep=3
+    command: php artisan queue:work --queue=pings,default,deployments --tries=3 --timeout=90 --sleep=3
     volumes:
       - ./portal:/var/www/portal
     networks:

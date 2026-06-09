@@ -26,6 +26,8 @@ class Site extends Model
         'php_version',
         'woo_active',
         'last_ping_at',
+        'consecutive_ping_failures',
+        'last_disconnect_alert_at',
         'tags',
         'created_by',
         'is_beta_tester',
@@ -34,6 +36,7 @@ class Site extends Model
     protected $casts = [
         'woo_active' => 'boolean',
         'last_ping_at' => 'datetime',
+        'last_disconnect_alert_at' => 'datetime',
         'tags' => 'array',
         'is_beta_tester' => 'boolean',
     ];
