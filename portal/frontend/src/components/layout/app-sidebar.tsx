@@ -279,7 +279,7 @@ function SidebarNavSections({
                           : "bg-muted-foreground/20 text-muted-foreground"
                       )}
                     >
-                      {item.badge > 99 ? "99+" : item.badge}
+                      {item.badge}
                     </span>
                   )}
                 </Link>
