@@ -92,7 +92,8 @@ export default function PluginDetailPage() {
   });
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // Upload form state
+  // --- Upload dialog state ---
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadVersion, setUploadVersion] = useState("");
   const [uploadChangelog, setUploadChangelog] = useState("");
@@ -101,6 +102,17 @@ export default function PluginDetailPage() {
   const [uploadIsStable, setUploadIsStable] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const resetUploadForm = () => {
+    setUploadFile(null);
+    setUploadVersion("");
+    setUploadChangelog("");
+    setUploadType("feature");
+    setUploadTrack('stable');
+    setUploadIsStable(true);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   // Deploy dialog state
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
@@ -191,14 +203,8 @@ export default function PluginDetailPage() {
       });
 
       toast.success("Version uploaded successfully");
-      setUploadFile(null);
-      setUploadVersion("");
-      setUploadChangelog("");
-      setUploadType("feature");
-      setUploadTrack('stable');
-      setUploadIsStable(true);
-      setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      resetUploadForm();
+      setUploadDialogOpen(false);
       fetchVersions();
       fetchPlugin();
     } catch (err) {
@@ -323,10 +329,16 @@ export default function PluginDetailPage() {
             </p>
           )}
         </div>
-        <Button variant="outline" onClick={openEditDialog}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={openEditDialog}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          <Button onClick={() => setUploadDialogOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload New Version
+          </Button>
+        </div>
       </div>
 
       {/* Plugin Info */}
@@ -339,15 +351,44 @@ export default function PluginDetailPage() {
             </div>
             <div>
               <dt className="font-medium text-muted-foreground">
-                Latest Version
+                Latest Stable Version
               </dt>
               <dd className="mt-1">
                 {plugin.latest_version ? (
                   <Badge variant="secondary">
                     {plugin.latest_version.version}
                   </Badge>
+                ) : versions.length > 0 ? (
+                  (() => {
+                    const stableNonLatest = versions.find(
+                      (v) => v.track !== 'beta' && !v.is_stable
+                    );
+                    const onlyBeta = versions.every((v) => v.track === 'beta');
+                    return (
+                      <div className="text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
+                        <div className="font-medium">No stable release yet.</div>
+                        {onlyBeta ? (
+                          <div className="text-muted-foreground">
+                            All versions are on the beta track — promote one to stable using
+                            the <span className="font-medium">Promote</span> button in the Versions tab.
+                          </div>
+                        ) : stableNonLatest ? (
+                          <div className="text-muted-foreground">
+                            Go to the <span className="font-medium">Versions</span> tab and click the green{" "}
+                            <span className="font-medium">&ldquo;Mark as latest&rdquo;</span> button on the
+                            version you want to publish (e.g. v{stableNonLatest.version}).
+                          </div>
+                        ) : (
+                          <div className="text-muted-foreground">
+                            Upload a new version with the <span className="font-medium">Mark as stable release</span> checkbox enabled,
+                            or use the Versions tab to mark an existing one.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 ) : (
-                  "—"
+                  <span className="text-xs text-muted-foreground">No versions yet</span>
                 )}
               </dd>
             </div>
@@ -367,10 +408,10 @@ export default function PluginDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Versions / Sites / Upload Tabs */}
+      {/* --- Versions / Sites tabs --- */}
       <Tabs defaultValue="versions">
         <TabsList>
-          <TabsTrigger value="versions">Versions</TabsTrigger>
+          <TabsTrigger value="versions" id="versions-tab-trigger">Versions</TabsTrigger>
           <TabsTrigger value="sites">
             Installed Sites
             {plugin.installed_sites && (
@@ -379,7 +420,6 @@ export default function PluginDetailPage() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="upload">Upload New Version</TabsTrigger>
         </TabsList>
 
         <TabsContent value="versions" className="mt-6">
@@ -681,112 +721,127 @@ export default function PluginDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="upload" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Upload New Version
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="version-file">Plugin File (.zip)</Label>
-                <Input
-                  id="version-file"
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".zip"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    setUploadFile(file);
-                  }}
-                />
-                {uploadFile && (
-                  <p className="text-xs text-muted-foreground">
-                    {uploadFile.name} ({formatFileSize(uploadFile.size)})
-                  </p>
-                )}
-              </div>
+      </Tabs>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="version-number">
-                    Version <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="version-number"
-                    value={uploadVersion}
-                    onChange={(e) => setUploadVersion(e.target.value)}
-                    placeholder="1.0.0"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="version-type">Type</Label>
-                  <Select value={uploadType} onValueChange={(val) => setUploadType(val ?? "feature")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="feature">Feature</SelectItem>
-                      <SelectItem value="bugfix">Bugfix</SelectItem>
-                      <SelectItem value="security">Security</SelectItem>
-                      <SelectItem value="breaking">Breaking</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+      {/* --- Upload dialog --- */}
+      <Dialog
+        open={uploadDialogOpen}
+        onOpenChange={(open) => {
+          setUploadDialogOpen(open);
+          if (!open && !uploading) resetUploadForm();
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Upload New Version
+            </DialogTitle>
+            <DialogDescription>
+              Upload a new .zip release. Mark it as stable to make it the latest available version for sites.
+            </DialogDescription>
+          </DialogHeader>
 
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="version-file">
+                Plugin File (.zip) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="version-file"
+                ref={fileInputRef}
+                type="file"
+                accept=".zip"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setUploadFile(file);
+                }}
+              />
+              {uploadFile && (
+                <p className="text-xs text-muted-foreground">
+                  {uploadFile.name} ({formatFileSize(uploadFile.size)})
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="version-changelog">
-                  Changelog <span className="text-destructive">*</span>
+                <Label htmlFor="version-number">
+                  Version <span className="text-destructive">*</span>
                 </Label>
-                <Textarea
-                  id="version-changelog"
-                  value={uploadChangelog}
-                  onChange={(e) => setUploadChangelog(e.target.value)}
-                  placeholder="Describe the changes in this version..."
-                  rows={4}
+                <Input
+                  id="version-number"
+                  value={uploadVersion}
+                  onChange={(e) => setUploadVersion(e.target.value)}
+                  placeholder="1.0.0"
                   required
                 />
               </div>
-
               <div className="space-y-2">
-                <Label>Release Track</Label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="track"
-                      value="stable"
-                      checked={uploadTrack === 'stable'}
-                      onChange={() => setUploadTrack('stable')}
-                      className="h-4 w-4"
-                    />
-                    <span>Stable</span>
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">STABLE</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="track"
-                      value="beta"
-                      checked={uploadTrack === 'beta'}
-                      onChange={() => setUploadTrack('beta')}
-                      className="h-4 w-4"
-                    />
-                    <span>Beta</span>
-                    <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">BETA</span>
-                  </label>
-                </div>
-                {uploadTrack === 'beta' && (
-                  <p className="text-amber-600 text-sm mt-1">This version will only be pushed to beta tester sites.</p>
-                )}
+                <Label htmlFor="version-type">Type</Label>
+                <Select value={uploadType} onValueChange={(val) => setUploadType(val ?? "feature")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feature">Feature</SelectItem>
+                    <SelectItem value="bugfix">Bugfix</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
+                    <SelectItem value="breaking">Breaking</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
 
-              {uploadTrack === 'stable' && (
+            <div className="space-y-2">
+              <Label htmlFor="version-changelog">
+                Changelog <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="version-changelog"
+                value={uploadChangelog}
+                onChange={(e) => setUploadChangelog(e.target.value)}
+                placeholder="Describe the changes in this version..."
+                rows={4}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Release Track</Label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="track"
+                    value="stable"
+                    checked={uploadTrack === 'stable'}
+                    onChange={() => setUploadTrack('stable')}
+                    className="h-4 w-4"
+                  />
+                  <span>Stable</span>
+                  <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">STABLE</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="track"
+                    value="beta"
+                    checked={uploadTrack === 'beta'}
+                    onChange={() => setUploadTrack('beta')}
+                    className="h-4 w-4"
+                  />
+                  <span>Beta</span>
+                  <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">BETA</span>
+                </label>
+              </div>
+              {uploadTrack === 'beta' && (
+                <p className="text-amber-600 text-sm mt-1">This version will only be pushed to beta tester sites.</p>
+              )}
+            </div>
+
+            {uploadTrack === 'stable' && (
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="version-stable"
@@ -794,37 +849,44 @@ export default function PluginDetailPage() {
                   onChange={(e) => setUploadIsStable(e.target.checked)}
                 />
                 <Label htmlFor="version-stable" className="cursor-pointer">
-                  Mark as stable release
+                  Mark as stable release (makes this the latest)
                 </Label>
               </div>
-              )}
+            )}
 
-              {uploading && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
+            {uploading && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>Uploading...</span>
+                  <span>{uploadProgress}%</span>
                 </div>
-              )}
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
-              <Button
-                onClick={handleUpload}
-                disabled={uploading || !uploadFile || !uploadVersion || !uploadChangelog.trim()}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {uploading ? "Uploading..." : "Upload Version"}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={uploading || !uploadFile || !uploadVersion || !uploadChangelog.trim()}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {uploading ? "Uploading..." : "Upload Version"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Plugin Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
