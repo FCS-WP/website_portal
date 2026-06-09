@@ -28,6 +28,7 @@ class ExternalPluginController extends Controller
         $perPage = max(1, min($perPage, 200));
 
         $query = SitePlugin::where('plugin_type', 'wporg')
+            ->whereHas('site')
             ->selectRaw('
                 plugin_slug,
                 MAX(plugin_name) as plugin_name,
@@ -111,14 +112,16 @@ class ExternalPluginController extends Controller
     {
         $sites = SitePlugin::where('plugin_slug', $slug)
             ->where('plugin_type', 'wporg')
+            ->whereHas('site')
             ->with('site:id,name,url,status')
             ->get()
+            ->filter(fn ($sp) => $sp->site !== null)
             ->map(function ($sp) {
                 return [
                     'site_id' => $sp->site_id,
-                    'site_name' => $sp->site?->name,
-                    'site_url' => $sp->site?->url,
-                    'site_status' => $sp->site?->status,
+                    'site_name' => $sp->site->name,
+                    'site_url' => $sp->site->url,
+                    'site_status' => $sp->site->status,
                     'installed_version' => $sp->installed_version,
                     'latest_version' => $sp->latest_version,
                     'update_available' => $sp->update_available,
@@ -126,7 +129,8 @@ class ExternalPluginController extends Controller
                     'plugin_file' => $sp->plugin_file,
                     'last_synced_at' => $sp->last_synced_at,
                 ];
-            });
+            })
+            ->values();
 
         return $this->successResponse($sites);
     }
