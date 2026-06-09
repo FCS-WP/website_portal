@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,9 @@ import {
   AlertTriangle,
   Eye,
   ArrowDownToLine,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 import { externalPluginService } from "@/lib/services/external-plugins";
 import type {
@@ -86,6 +89,7 @@ export default function PluginUpdatesPage() {
   const [drawerPlugin, setDrawerPlugin] = useState<PluginUpdateRow | null>(null);
   const [drawerSites, setDrawerSites] = useState<PluginSiteVersion[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
   // --- Confirm modal ---
   const [confirmModal, setConfirmModal] = useState<{
@@ -202,6 +206,7 @@ export default function PluginUpdatesPage() {
   const openDrawer = async (plugin: PluginUpdateRow) => {
     setDrawerPlugin(plugin);
     setDrawerSites([]);
+    setExpandedVersion(null);
     setDrawerLoading(true);
     try {
       const res = await externalPluginService.getUpdateSites(plugin.slug);
@@ -584,12 +589,13 @@ export default function PluginUpdatesPage() {
             if (!open) {
               setDrawerPlugin(null);
               setDrawerSites([]);
+              setExpandedVersion(null);
             }
           }}
         >
           <SheetContent
             side="right"
-            className="w-full sm:max-w-2xl overflow-y-auto"
+            className="w-full data-[side=right]:sm:max-w-3xl overflow-y-auto"
           >
             {drawerPlugin && (
               <>
@@ -608,13 +614,17 @@ export default function PluginUpdatesPage() {
                     </div>
                   ) : (
                     <>
-                      {/* --- Version breakdown --- */}
+                      {/* --- Version breakdown (expandable per row) --- */}
                       <div>
                         <h4 className="text-sm font-semibold mb-2">Version Breakdown</h4>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Click a row to see which sites are at that version.
+                        </p>
                         <div className="rounded-md border">
                           <Table>
                             <TableHeader>
                               <TableRow>
+                                <TableHead className="w-8"></TableHead>
                                 <TableHead>Version</TableHead>
                                 <TableHead>Sites</TableHead>
                                 <TableHead>Action</TableHead>
@@ -628,43 +638,106 @@ export default function PluginUpdatesPage() {
                                     acc[v] = (acc[v] || 0) + 1;
                                     return acc;
                                   }, {})
-                                ).map(([version, site_count]) => ({ version, site_count }));
+                                )
+                                  .map(([version, site_count]) => ({ version, site_count }))
+                                  .sort((a, b) => b.site_count - a.site_count);
                                 if (versionBreakdown.length === 0) {
                                   return (
                                     <TableRow>
-                                      <TableCell colSpan={3} className="text-center text-muted-foreground py-4">
+                                      <TableCell colSpan={4} className="text-center text-muted-foreground py-4">
                                         No sites
                                       </TableCell>
                                     </TableRow>
                                   );
                                 }
-                                return versionBreakdown.map((vb) => (
-                                  <TableRow key={vb.version}>
-                                    <TableCell>
-                                      <Badge variant="outline">v{vb.version}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                      {vb.site_count} site{vb.site_count !== 1 ? "s" : ""}
-                                    </TableCell>
-                                    <TableCell>
-                                      {vb.version !== drawerPlugin.latest_version ? (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() =>
-                                            handleUpdateVersionGroup(drawerPlugin, vb.version, vb.site_count)
-                                          }
-                                        >
-                                          Update to v{drawerPlugin.latest_version}
-                                        </Button>
-                                      ) : (
-                                        <span className="text-sm text-emerald-600 flex items-center gap-1">
-                                          <CheckCircle2 className="h-3 w-3" /> Up to date
-                                        </span>
+                                return versionBreakdown.map((vb) => {
+                                  const isExpanded = expandedVersion === vb.version;
+                                  const sitesAtVersion = drawerSites.filter(
+                                    (s) => (s.installed_version || "unknown") === vb.version
+                                  );
+                                  const isLatest = vb.version === drawerPlugin.latest_version;
+                                  return (
+                                    <Fragment key={vb.version}>
+                                      <TableRow
+                                        className="cursor-pointer hover:bg-muted/40"
+                                        onClick={() =>
+                                          setExpandedVersion(isExpanded ? null : vb.version)
+                                        }
+                                      >
+                                        <TableCell>
+                                          {isExpanded ? (
+                                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                          ) : (
+                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                          )}
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge variant="outline">v{vb.version}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                          {vb.site_count} site{vb.site_count !== 1 ? "s" : ""}
+                                        </TableCell>
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                          {!isLatest ? (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() =>
+                                                handleUpdateVersionGroup(drawerPlugin, vb.version, vb.site_count)
+                                              }
+                                            >
+                                              Update to v{drawerPlugin.latest_version}
+                                            </Button>
+                                          ) : (
+                                            <span className="text-sm text-emerald-600 flex items-center gap-1">
+                                              <CheckCircle2 className="h-3 w-3" /> Up to date
+                                            </span>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                      {isExpanded && (
+                                        <TableRow className="hover:bg-transparent">
+                                          <TableCell colSpan={4} className="bg-muted/30 p-0">
+                                            <ul className="divide-y divide-border">
+                                              {sitesAtVersion.map((s) => (
+                                                <li
+                                                  key={s.site_id}
+                                                  className="flex items-center justify-between px-4 py-2 text-sm"
+                                                >
+                                                  <div className="min-w-0 flex-1">
+                                                    <div className="font-medium truncate">{s.site_name}</div>
+                                                    <a
+                                                      href={s.site_url}
+                                                      target="_blank"
+                                                      rel="noopener noreferrer"
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline truncate"
+                                                    >
+                                                      <span className="truncate">{s.site_url}</span>
+                                                      <ExternalLink className="h-3 w-3 shrink-0" />
+                                                    </a>
+                                                  </div>
+                                                  {!isLatest && s.update_available && (
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleUpdateSingle(s, drawerPlugin);
+                                                      }}
+                                                    >
+                                                      Update
+                                                    </Button>
+                                                  )}
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </TableCell>
+                                        </TableRow>
                                       )}
-                                    </TableCell>
-                                  </TableRow>
-                                ));
+                                    </Fragment>
+                                  );
+                                });
                               })()}
                             </TableBody>
                           </Table>
