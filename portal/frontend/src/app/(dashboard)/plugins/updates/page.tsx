@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageLoader } from "@/components/ui/page-loader";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
+import { DataTable } from "@/components/data-table";
 import {
   Table,
   TableBody,
@@ -31,11 +33,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   RefreshCw,
-  Search,
   Star,
-  ChevronDown,
-  ChevronRight,
   CheckCircle2,
   AlertTriangle,
   Eye,
@@ -44,8 +50,6 @@ import {
 import { externalPluginService } from "@/lib/services/external-plugins";
 import type {
   PluginUpdateRow,
-  PluginUpdatesSummary,
-  PluginUpdatesResponse,
   PluginSiteVersion,
   ExternalPluginCacheStatus,
 } from "@/types/external-plugins";
@@ -55,20 +59,35 @@ import { format } from "date-fns";
 type FilterTab = "all" | "has_updates" | "up_to_date" | "abandoned";
 type SortOption = "most_affected" | "name";
 
+const PER_PAGE_OPTIONS = [25, 50, 100];
+
 export default function PluginUpdatesPage() {
-  const [data, setData] = useState<PluginUpdatesResponse | null>(null);
+  // --- Data state ---
+  const [plugins, setPlugins] = useState<PluginUpdateRow[]>([]);
   const [cacheStatus, setCacheStatus] = useState<ExternalPluginCacheStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const showLoader = useDelayedLoading(loading);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const showLoader = useDelayedLoading(loading && !initialLoaded);
   const [refreshing, setRefreshing] = useState(false);
+
+  // --- Filters ---
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterTab>("all");
   const [sort, setSort] = useState<SortOption>("most_affected");
-  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
-  const [sitesData, setSitesData] = useState<Record<string, PluginSiteVersion[]>>({});
-  const [sitesLoading, setSitesLoading] = useState<string | null>(null);
 
-  // Confirmation modal state
+  // --- Pagination ---
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // --- Details drawer ---
+  const [drawerPlugin, setDrawerPlugin] = useState<PluginUpdateRow | null>(null);
+  const [drawerSites, setDrawerSites] = useState<PluginSiteVersion[]>([]);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+
+  // --- Confirm modal ---
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     slug: string;
@@ -88,16 +107,28 @@ export default function PluginUpdatesPage() {
   });
   const [updating, setUpdating] = useState(false);
 
+  // --- Debounced search ---
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchInput]);
+
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const [updatesRes, cacheRes] = await Promise.all([
-        externalPluginService.getUpdates({ search, filter, sort }),
+        externalPluginService.getUpdates({ search, filter, sort, page, per_page: perPage }),
         externalPluginService.getCacheStatus(),
       ]);
-      // Backend returns a flat array of plugin rows in data.data,
-      // transform into { stats, plugins } shape the UI expects
-      const rawPlugins = (updatesRes.data as any).data || [];
-      const plugins: PluginUpdateRow[] = rawPlugins.map((p: any) => ({
+      const rawPlugins = updatesRes.data.data || [];
+      const mapped: PluginUpdateRow[] = rawPlugins.map((p: any) => ({
         slug: p.slug,
         name: p.name,
         rating: p.rating ?? null,
@@ -109,23 +140,46 @@ export default function PluginUpdatesPage() {
         needs_update_count: p.needs_update_count ?? 0,
         version_breakdown: [],
       }));
-      const stats: PluginUpdatesSummary = {
-        plugins_with_updates: plugins.filter((p) => p.needs_update_count > 0).length,
-        sites_with_outdated: plugins.filter((p) => p.needs_update_count > 0).reduce((sum, p) => sum + p.needs_update_count, 0),
-        total_outdated_instances: plugins.reduce((sum, p) => sum + p.needs_update_count, 0),
-      };
-      setData({ stats, plugins });
+      setPlugins(mapped);
+
+      const pagination = updatesRes.data.meta?.pagination;
+      if (pagination) {
+        setLastPage(pagination.last_page);
+        setTotal(pagination.total);
+      } else {
+        setLastPage(1);
+        setTotal(mapped.length);
+      }
+
       setCacheStatus(cacheRes.data.data);
-    } catch {
-      toast.error("Failed to load plugin updates");
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to load plugin updates";
+      toast.error(message);
+      console.error("plugin updates list failed:", err);
     } finally {
       setLoading(false);
+      setInitialLoaded(true);
     }
-  }, [search, filter, sort]);
+  }, [search, filter, sort, page, perPage]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const onFilterChange = (val: FilterTab) => {
+    setFilter(val);
+    setPage(1);
+  };
+  const onSortChange = (val: SortOption) => {
+    setSort(val);
+    setPage(1);
+  };
+  const onPerPageChange = (n: number) => {
+    setPerPage(n);
+    setPage(1);
+  };
 
   const handleRefreshCache = async () => {
     setRefreshing(true);
@@ -133,38 +187,41 @@ export default function PluginUpdatesPage() {
       await externalPluginService.refreshCache();
       toast.success("Version cache refresh started");
       await fetchData();
-    } catch {
-      toast.error("Failed to refresh cache");
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to refresh cache";
+      toast.error(message);
+      console.error("refresh cache failed:", err);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const handleExpandRow = async (slug: string) => {
-    if (expandedSlug === slug) {
-      setExpandedSlug(null);
-      return;
-    }
-    setExpandedSlug(slug);
-    if (!sitesData[slug]) {
-      setSitesLoading(slug);
-      try {
-        const res = await externalPluginService.getUpdateSites(slug);
-        setSitesData((prev) => ({ ...prev, [slug]: res.data.data }));
-      } catch {
-        toast.error("Failed to load site details");
-      } finally {
-        setSitesLoading(null);
-      }
+  // --- Drawer ---
+  const openDrawer = async (plugin: PluginUpdateRow) => {
+    setDrawerPlugin(plugin);
+    setDrawerSites([]);
+    setDrawerLoading(true);
+    try {
+      const res = await externalPluginService.getUpdateSites(plugin.slug);
+      setDrawerSites(res.data.data);
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to load site details";
+      toast.error(message);
+      console.error("drawer sites failed:", err);
+    } finally {
+      setDrawerLoading(false);
     }
   };
 
+  // --- Update actions ---
   const handleUpdateAll = (plugin: PluginUpdateRow) => {
-    // Compute version breakdown from sites data if available
-    const sites = sitesData[plugin.slug] || [];
-    const fromVersions = sites.length > 0
+    const fromVersions = drawerSites.length > 0 && drawerPlugin?.slug === plugin.slug
       ? Object.entries(
-          sites
+          drawerSites
             .filter((s) => s.update_available)
             .reduce<Record<string, number>>((acc, s) => {
               const v = s.installed_version || "unknown";
@@ -196,36 +253,10 @@ export default function PluginUpdatesPage() {
     });
   };
 
-  const handleConfirmUpdate = async () => {
-    setUpdating(true);
-    try {
-      await externalPluginService.update({
-        slug: confirmModal.slug,
-        site_ids: confirmModal.siteIds,
-      });
-      toast.success("Update job created", {
-        description: "Check the Deployments page for progress.",
-      });
-      setConfirmModal((prev) => ({ ...prev, open: false }));
-      // Refresh data
-      await fetchData();
-      // Refresh site data if expanded
-      if (expandedSlug === confirmModal.slug) {
-        const res = await externalPluginService.getUpdateSites(confirmModal.slug);
-        setSitesData((prev) => ({ ...prev, [confirmModal.slug]: res.data.data }));
-      }
-    } catch {
-      toast.error("Failed to dispatch update");
-    } finally {
-      setUpdating(false);
-    }
-  };
-
   const handleUpdateVersionGroup = (plugin: PluginUpdateRow, version: string, siteCount: number) => {
-    const sites = sitesData[plugin.slug]?.filter(
-      (s) => s.installed_version === version && s.update_available
-    );
-    const siteIds = sites ? sites.map((s) => s.site_id) : [];
+    const siteIds = drawerSites
+      .filter((s) => s.installed_version === version && s.update_available)
+      .map((s) => s.site_id);
     setConfirmModal({
       open: true,
       slug: plugin.slug,
@@ -237,22 +268,32 @@ export default function PluginUpdatesPage() {
     });
   };
 
-  // Filter & sort
-  const filteredPlugins = (data?.plugins || []).filter((p) => {
-    if (search) {
-      const s = search.toLowerCase();
-      if (!p.name.toLowerCase().includes(s) && !p.slug.toLowerCase().includes(s)) return false;
+  const handleConfirmUpdate = async () => {
+    setUpdating(true);
+    try {
+      await externalPluginService.update({
+        slug: confirmModal.slug,
+        site_ids: confirmModal.siteIds,
+      });
+      toast.success("Update job created", {
+        description: "Check the Deployments page for progress.",
+      });
+      setConfirmModal((prev) => ({ ...prev, open: false }));
+      await fetchData();
+      if (drawerPlugin?.slug === confirmModal.slug) {
+        const res = await externalPluginService.getUpdateSites(confirmModal.slug);
+        setDrawerSites(res.data.data);
+      }
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to dispatch update";
+      toast.error(message);
+      console.error("update dispatch failed:", err);
+    } finally {
+      setUpdating(false);
     }
-    if (filter === "has_updates") return p.needs_update_count > 0;
-    if (filter === "up_to_date") return p.needs_update_count === 0 && !p.is_abandoned;
-    if (filter === "abandoned") return p.is_abandoned;
-    return true;
-  });
-
-  const sortedPlugins = [...filteredPlugins].sort((a, b) => {
-    if (sort === "most_affected") return b.needs_update_count - a.needs_update_count;
-    return a.name.localeCompare(b.name);
-  });
+  };
 
   const renderStars = (rating: number | null) => {
     if (rating === null) return <span className="text-muted-foreground text-xs">—</span>;
@@ -279,254 +320,80 @@ export default function PluginUpdatesPage() {
     { value: "abandoned", label: "Abandoned" },
   ];
 
-  if (showLoader) {
-    return <PageLoader variant="cards" />;
-  }
-
-  const stats = data?.stats;
-
-  return (
-    <div className="page-content space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Plugin Updates</h1>
-          <p className="text-muted-foreground text-sm">
-            Last version check:{" "}
-            {cacheStatus?.last_synced_at
-              ? format(new Date(cacheStatus.last_synced_at), "MMM d, yyyy HH:mm")
-              : "Never"}
-          </p>
-        </div>
-        <Button onClick={handleRefreshCache} disabled={refreshing}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh Versions
-        </Button>
-      </div>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{stats?.plugins_with_updates ?? 0}</div>
-            <p className="text-sm text-muted-foreground">Plugins with updates</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{stats?.sites_with_outdated ?? 0}</div>
-            <p className="text-sm text-muted-foreground">Sites with outdated plugins</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{stats?.total_outdated_instances ?? 0}</div>
-            <p className="text-sm text-muted-foreground">Total outdated instances</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search plugins..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
-          {filterTabs.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setFilter(tab.value)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                filter === tab.value
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortOption)}
-          className="h-8 rounded-lg border border-input bg-transparent px-3 text-sm"
-        >
-          <option value="most_affected">Most Affected</option>
-          <option value="name">Plugin Name</option>
-        </select>
-      </div>
-
-      {/* Main Table */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8"></TableHead>
-              <TableHead>Plugin</TableHead>
-              <TableHead>Versions</TableHead>
-              <TableHead>Sites</TableHead>
-              <TableHead>Needs Update</TableHead>
-              <TableHead>Latest</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedPlugins.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No plugins found
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedPlugins.map((plugin) => (
-                <PluginRow
-                  key={plugin.slug}
-                  plugin={plugin}
-                  expanded={expandedSlug === plugin.slug}
-                  sitesLoading={sitesLoading === plugin.slug}
-                  sites={sitesData[plugin.slug]}
-                  onToggleExpand={() => handleExpandRow(plugin.slug)}
-                  onUpdateAll={() => handleUpdateAll(plugin)}
-                  onUpdateSingle={(site) => handleUpdateSingle(site, plugin)}
-                  onUpdateVersionGroup={(version, count) =>
-                    handleUpdateVersionGroup(plugin, version, count)
-                  }
-                  renderStars={renderStars}
-                />
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Confirmation Modal */}
-      <Dialog
-        open={confirmModal.open}
-        onOpenChange={(open) => setConfirmModal((prev) => ({ ...prev, open }))}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Update</DialogTitle>
-            <DialogDescription>
-              You are about to update <strong>{confirmModal.pluginName}</strong> on{" "}
-              {confirmModal.siteCount} site{confirmModal.siteCount !== 1 ? "s" : ""}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2 text-sm">
-            <div>
-              <span className="font-medium">From:</span>{" "}
-              {confirmModal.fromVersions.join(", ")}
-            </div>
-            <div>
-              <span className="font-medium">To:</span>{" "}
-              <Badge variant="secondary">v{confirmModal.toVersion}</Badge>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmUpdate} disabled={updating}>
-              {updating ? "Dispatching..." : "Confirm Update"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// ─── Plugin Row Component ────────────────────────────────────────────────────
-
-interface PluginRowProps {
-  plugin: PluginUpdateRow;
-  expanded: boolean;
-  sitesLoading: boolean;
-  sites?: PluginSiteVersion[];
-  onToggleExpand: () => void;
-  onUpdateAll: () => void;
-  onUpdateSingle: (site: PluginSiteVersion) => void;
-  onUpdateVersionGroup: (version: string, siteCount: number) => void;
-  renderStars: (rating: number | null) => React.ReactNode;
-}
-
-function PluginRow({
-  plugin,
-  expanded,
-  sitesLoading,
-  sites,
-  onToggleExpand,
-  onUpdateAll,
-  onUpdateSingle,
-  onUpdateVersionGroup,
-  renderStars,
-}: PluginRowProps) {
-  return (
-    <>
-      <TableRow className="group">
-        <TableCell>
-          <button onClick={onToggleExpand} className="p-1 rounded hover:bg-muted">
-            {expanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </button>
-        </TableCell>
-        <TableCell>
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium">{plugin.name}</span>
-            <span className="text-xs text-muted-foreground font-mono">{plugin.slug}</span>
+  // --- Columns ---
+  const columns: ColumnDef<PluginUpdateRow>[] = [
+    {
+      accessorKey: "name",
+      header: "Plugin",
+      cell: ({ row }) => {
+        const p = row.original;
+        return (
+          <div className="min-w-0 max-w-[320px]">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="block truncate font-medium text-left cursor-default">
+                    {p.name}
+                  </span>
+                }
+              />
+              <TooltipContent>{p.name}</TooltipContent>
+            </Tooltip>
+            <span className="block truncate text-xs text-muted-foreground font-mono">
+              {p.slug}
+            </span>
             <div className="flex items-center gap-2 mt-0.5">
-              {renderStars(plugin.rating)}
-              {plugin.active_installs && (
-                <span className="text-xs text-muted-foreground">
-                  {plugin.active_installs} installs
+              {renderStars(p.rating)}
+              {p.active_installs && (
+                <span className="text-xs text-muted-foreground truncate">
+                  {p.active_installs} installs
                 </span>
               )}
             </div>
-            {plugin.last_updated_wporg && (
-              <span className="text-xs text-muted-foreground">
-                WP.org: {format(new Date(plugin.last_updated_wporg), "MMM d, yyyy")}
+            {p.last_updated_wporg && (
+              <span className="block text-xs text-muted-foreground truncate">
+                WP.org: {format(new Date(p.last_updated_wporg), "MMM d, yyyy")}
               </span>
             )}
           </div>
-        </TableCell>
-        <TableCell>
-          <span className="text-sm">{sites ? [...new Set(sites.map((s) => s.installed_version))].length : "—"}</span>
-        </TableCell>
-        <TableCell>
-          <span className="text-sm">{plugin.installed_on_sites}</span>
-        </TableCell>
-        <TableCell>
-          {plugin.needs_update_count > 0 ? (
-            <Badge variant="destructive">{plugin.needs_update_count}</Badge>
-          ) : (
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          )}
-        </TableCell>
-        <TableCell>
-          {plugin.latest_version ? (
-            <Badge variant="secondary">v{plugin.latest_version}</Badge>
-          ) : (
-            <span className="text-muted-foreground text-sm">—</span>
-          )}
-        </TableCell>
-        <TableCell>
-          {plugin.is_abandoned ? (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
+        );
+      },
+    },
+    {
+      accessorKey: "installed_on_sites",
+      header: "Sites",
+      cell: ({ row }) => <span className="text-sm">{row.original.installed_on_sites}</span>,
+    },
+    {
+      accessorKey: "needs_update_count",
+      header: "Needs Update",
+      cell: ({ row }) =>
+        row.original.needs_update_count > 0 ? (
+          <Badge variant="destructive">{row.original.needs_update_count}</Badge>
+        ) : (
+          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+        ),
+    },
+    {
+      accessorKey: "latest_version",
+      header: "Latest",
+      cell: ({ row }) =>
+        row.original.latest_version ? (
+          <Badge variant="secondary">v{row.original.latest_version}</Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">—</span>
+        ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const p = row.original;
+        if (p.is_abandoned) {
+          return (
+            <Tooltip>
+              <TooltipTrigger
+                render={
                   <Badge
                     variant="outline"
                     className="border-amber-300 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
@@ -534,172 +401,370 @@ function PluginRow({
                     <AlertTriangle className="h-3 w-3 mr-1" />
                     Abandoned
                   </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  This plugin has not been updated in over 2 years on WP.org
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          ) : plugin.needs_update_count > 0 ? (
-            <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
+                }
+              />
+              <TooltipContent>
+                This plugin has not been updated in over 2 years on WP.org
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
+        if (p.needs_update_count > 0) {
+          return (
+            <Badge
+              variant="outline"
+              className="border-blue-300 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400"
+            >
               Update available
             </Badge>
-          ) : (
-            <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-              Up to date
-            </Badge>
-          )}
-        </TableCell>
-        <TableCell>
-          <div className="flex items-center gap-2">
-            {plugin.needs_update_count > 0 && (
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onUpdateAll} title="Update all sites">
-                <ArrowDownToLine className="h-4 w-4" />
-              </Button>
+          );
+        }
+        return (
+          <Badge
+            variant="outline"
+            className="border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+          >
+            Up to date
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => {
+        const p = row.original;
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {p.needs_update_count > 0 && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateAll(p);
+                      }}
+                    >
+                      <ArrowDownToLine className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Update all sites</TooltipContent>
+              </Tooltip>
             )}
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onToggleExpand} title="View sites">
-              <Eye className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDrawer(p);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                }
+              />
+              <TooltipContent>View sites</TooltipContent>
+            </Tooltip>
           </div>
-        </TableCell>
-      </TableRow>
+        );
+      },
+    },
+  ];
 
-      {/* Expanded content */}
-      {expanded && (
-        <TableRow>
-          <TableCell colSpan={8} className="bg-muted/30 p-4">
-            {sitesLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-3/4" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Version Breakdown - computed from sites data */}
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Version Breakdown</h4>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Version</TableHead>
-                          <TableHead>Sites</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(() => {
-                          const versionBreakdown = sites
-                            ? Object.entries(
-                                sites.reduce<Record<string, number>>((acc, s) => {
-                                  const v = s.installed_version || "unknown";
-                                  acc[v] = (acc[v] || 0) + 1;
-                                  return acc;
-                                }, {})
-                              ).map(([version, site_count]) => ({ version, site_count }))
-                            : [];
-                          return versionBreakdown.map((vb) => (
-                            <TableRow key={vb.version}>
-                              <TableCell>
-                                <Badge variant="outline">v{vb.version}</Badge>
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {vb.site_count} site{vb.site_count !== 1 ? "s" : ""}
-                              </TableCell>
-                              <TableCell>
-                                {vb.version !== plugin.latest_version ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => onUpdateVersionGroup(vb.version, vb.site_count)}
-                                  >
-                                    Update all {vb.site_count} to v{plugin.latest_version}
-                                  </Button>
-                                ) : (
-                                  <span className="text-sm text-emerald-600 flex items-center gap-1">
-                                    <CheckCircle2 className="h-3 w-3" /> Up to date
-                                  </span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ));
-                        })()}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
+  if (showLoader) {
+    return <PageLoader variant="cards" />;
+  }
 
-                {/* Site-level table */}
-                {sites && sites.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold mb-2">Sites</h4>
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Site</TableHead>
-                            <TableHead>Installed</TableHead>
-                            <TableHead>Latest</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {sites.map((site) => (
-                            <TableRow key={site.site_id}>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-sm">{site.site_name}</span>
-                                  <span className="text-xs text-muted-foreground">{site.site_url}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">
-                                  v{site.installed_version || "—"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary">
-                                  v{site.latest_version || "—"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {site.update_available ? (
-                                  <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
-                                    Update available
-                                  </Badge>
-                                ) : (
-                                  <span className="text-sm text-emerald-600 flex items-center gap-1">
-                                    <CheckCircle2 className="h-3 w-3" /> Up to date
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {site.update_available ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => onUpdateSingle(site)}
-                                  >
-                                    Update
-                                  </Button>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">—</span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+  const pluginsWithUpdates = plugins.filter((p) => p.needs_update_count > 0).length;
+  const totalOutdated = plugins.reduce((sum, p) => sum + p.needs_update_count, 0);
+
+  return (
+    <TooltipProvider delay={120}>
+      <div className="page-content space-y-6">
+        {/* --- Header --- */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Plugin Updates</h1>
+            <p className="text-muted-foreground text-sm">
+              Last version check:{" "}
+              {cacheStatus?.last_synced_at
+                ? format(new Date(cacheStatus.last_synced_at), "MMM d, yyyy HH:mm")
+                : "Never"}
+            </p>
+          </div>
+          <Button onClick={handleRefreshCache} disabled={refreshing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh Versions
+          </Button>
+        </div>
+
+        {/* --- Stats --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-0">
+              <div className="text-2xl font-bold">{pluginsWithUpdates}</div>
+              <p className="text-sm text-muted-foreground">Plugins with updates (this page)</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-0">
+              <div className="text-2xl font-bold">{totalOutdated}</div>
+              <p className="text-sm text-muted-foreground">Outdated instances (this page)</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-0">
+              <div className="text-2xl font-bold">{total}</div>
+              <p className="text-sm text-muted-foreground">Total plugins matching filter</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* --- Filters --- */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="relative max-w-xs flex-1">
+            <Input
+              placeholder="Search plugins..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
+            {filterTabs.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => onFilterChange(tab.value)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  filter === tab.value
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <select
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value as SortOption)}
+            className="h-8 rounded-lg border border-input bg-transparent px-3 text-sm"
+          >
+            <option value="most_affected">Most Affected</option>
+            <option value="name">Plugin Name</option>
+          </select>
+        </div>
+
+        {/* --- Table --- */}
+        <DataTable
+          columns={columns}
+          data={plugins}
+          loading={loading}
+          serverPagination={{
+            currentPage: page,
+            perPage,
+            total,
+            lastPage,
+            onPageChange: setPage,
+            onPerPageChange,
+            perPageOptions: PER_PAGE_OPTIONS,
+          }}
+        />
+
+        {/* --- Detail drawer --- */}
+        <Sheet
+          open={drawerPlugin !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDrawerPlugin(null);
+              setDrawerSites([]);
+            }
+          }}
+        >
+          <SheetContent
+            side="right"
+            className="w-full sm:max-w-2xl overflow-y-auto"
+          >
+            {drawerPlugin && (
+              <>
+                <SheetHeader>
+                  <SheetTitle className="truncate">{drawerPlugin.name}</SheetTitle>
+                  <SheetDescription className="font-mono text-xs truncate">
+                    {drawerPlugin.slug}
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="p-4 space-y-6">
+                  {drawerLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-full" />
+                      <Skeleton className="h-6 w-full" />
+                      <Skeleton className="h-6 w-3/4" />
                     </div>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <>
+                      {/* --- Version breakdown --- */}
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Version Breakdown</h4>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Version</TableHead>
+                                <TableHead>Sites</TableHead>
+                                <TableHead>Action</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(() => {
+                                const versionBreakdown = Object.entries(
+                                  drawerSites.reduce<Record<string, number>>((acc, s) => {
+                                    const v = s.installed_version || "unknown";
+                                    acc[v] = (acc[v] || 0) + 1;
+                                    return acc;
+                                  }, {})
+                                ).map(([version, site_count]) => ({ version, site_count }));
+                                if (versionBreakdown.length === 0) {
+                                  return (
+                                    <TableRow>
+                                      <TableCell colSpan={3} className="text-center text-muted-foreground py-4">
+                                        No sites
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                }
+                                return versionBreakdown.map((vb) => (
+                                  <TableRow key={vb.version}>
+                                    <TableCell>
+                                      <Badge variant="outline">v{vb.version}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      {vb.site_count} site{vb.site_count !== 1 ? "s" : ""}
+                                    </TableCell>
+                                    <TableCell>
+                                      {vb.version !== drawerPlugin.latest_version ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            handleUpdateVersionGroup(drawerPlugin, vb.version, vb.site_count)
+                                          }
+                                        >
+                                          Update to v{drawerPlugin.latest_version}
+                                        </Button>
+                                      ) : (
+                                        <span className="text-sm text-emerald-600 flex items-center gap-1">
+                                          <CheckCircle2 className="h-3 w-3" /> Up to date
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ));
+                              })()}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+
+                      {/* --- Sites --- */}
+                      {drawerSites.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2">Sites</h4>
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Site</TableHead>
+                                  <TableHead>Installed</TableHead>
+                                  <TableHead>Latest</TableHead>
+                                  <TableHead>Action</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {drawerSites.map((site) => (
+                                  <TableRow key={site.site_id}>
+                                    <TableCell>
+                                      <div className="flex flex-col min-w-0 max-w-50">
+                                        <span className="font-medium text-sm truncate">{site.site_name}</span>
+                                        <span className="text-xs text-muted-foreground truncate">{site.site_url}</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline">v{site.installed_version || "—"}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="secondary">v{site.latest_version || "—"}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {site.update_available ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleUpdateSingle(site, drawerPlugin)}
+                                        >
+                                          Update
+                                        </Button>
+                                      ) : (
+                                        <span className="text-muted-foreground text-sm">—</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
             )}
-          </TableCell>
-        </TableRow>
-      )}
-    </>
+          </SheetContent>
+        </Sheet>
+
+        {/* --- Confirm modal --- */}
+        <Dialog
+          open={confirmModal.open}
+          onOpenChange={(open) => setConfirmModal((prev) => ({ ...prev, open }))}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Update</DialogTitle>
+              <DialogDescription>
+                You are about to update <strong>{confirmModal.pluginName}</strong> on{" "}
+                {confirmModal.siteCount} site{confirmModal.siteCount !== 1 ? "s" : ""}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2 text-sm">
+              <div>
+                <span className="font-medium">From:</span>{" "}
+                {confirmModal.fromVersions.join(", ")}
+              </div>
+              <div>
+                <span className="font-medium">To:</span>{" "}
+                <Badge variant="secondary">v{confirmModal.toVersion}</Badge>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmUpdate} disabled={updating}>
+                {updating ? "Dispatching..." : "Confirm Update"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }

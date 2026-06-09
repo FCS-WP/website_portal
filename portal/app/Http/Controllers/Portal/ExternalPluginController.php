@@ -21,12 +21,12 @@ class ExternalPluginController extends Controller
     use ApiResponse;
     use AuthorizesSiteAccess;
 
-    /**
-     * GET /plugins/external/updates
-     * Updates dashboard: aggregate site_plugins grouped by slug where plugin_type = 'wporg'.
-     */
+    // GET /plugins/external/updates
     public function updates(Request $request)
     {
+        $perPage = (int) $request->input('per_page', 25);
+        $perPage = max(1, min($perPage, 200));
+
         $query = SitePlugin::where('plugin_type', 'wporg')
             ->selectRaw('
                 plugin_slug,
@@ -39,7 +39,7 @@ class ExternalPluginController extends Controller
             ')
             ->groupBy('plugin_slug');
 
-        // Search filter
+        // --- Search ---
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
@@ -48,32 +48,33 @@ class ExternalPluginController extends Controller
             });
         }
 
-        // Status filter
-        if ($request->filled('status')) {
-            match ($request->input('status')) {
-                'has_updates' => $query->havingRaw('SUM(CASE WHEN update_available = true THEN 1 ELSE 0 END) > 0'),
-                'up_to_date' => $query->havingRaw('SUM(CASE WHEN update_available = true THEN 1 ELSE 0 END) = 0'),
-                default => null,
-            };
-        }
-
-        // Sort
-        $sort = $request->input('sort', 'most_affected');
-        match ($sort) {
-            'name' => $query->orderBy('plugin_slug'),
-            'most_affected' => $query->orderByDesc('needs_update_count'),
-            default => $query->orderByDesc('needs_update_count'),
+        // --- Status filter ---
+        $status = $request->input('filter', $request->input('status'));
+        match ($status) {
+            'has_updates' => $query->havingRaw('SUM(CASE WHEN update_available = true THEN 1 ELSE 0 END) > 0'),
+            'up_to_date'  => $query->havingRaw('SUM(CASE WHEN update_available = true THEN 1 ELSE 0 END) = 0'),
+            'abandoned'   => $query->whereIn(
+                'plugin_slug',
+                ExternalPluginCache::where('is_abandoned', true)->pluck('slug')
+            ),
+            default => null,
         };
 
-        $results = $query->get();
+        // --- Sort ---
+        $sort = $request->input('sort', 'most_affected');
+        match ($sort) {
+            'name'          => $query->orderBy('plugin_slug'),
+            'most_affected' => $query->orderByDesc('needs_update_count'),
+            default         => $query->orderByDesc('needs_update_count'),
+        };
 
-        // Enrich with ExternalPluginCache metadata
-        $slugs = $results->pluck('plugin_slug')->toArray();
-        $cacheData = ExternalPluginCache::whereIn('slug', $slugs)
-            ->get()
-            ->keyBy('slug');
+        $paginator = $query->paginate($perPage);
 
-        $data = $results->map(function ($row) use ($cacheData) {
+        // --- Enrich page rows with cache metadata ---
+        $slugs = collect($paginator->items())->pluck('plugin_slug')->toArray();
+        $cacheData = ExternalPluginCache::whereIn('slug', $slugs)->get()->keyBy('slug');
+
+        $data = collect($paginator->items())->map(function ($row) use ($cacheData) {
             $cache = $cacheData->get($row->plugin_slug);
             $rawName = $cache->name ?? $row->plugin_name ?? $row->plugin_slug;
             return [
@@ -92,12 +93,14 @@ class ExternalPluginController extends Controller
             ];
         });
 
-        // Apply abandoned filter after enrichment
-        if ($request->input('status') === 'abandoned') {
-            $data = $data->filter(fn($item) => $item['is_abandoned'])->values();
-        }
-
-        return $this->successResponse($data);
+        return $this->successResponse($data, null, 200, [
+            'pagination' => [
+                'total'        => $paginator->total(),
+                'per_page'     => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page'    => $paginator->lastPage(),
+            ],
+        ]);
     }
 
     /**

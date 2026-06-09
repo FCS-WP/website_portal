@@ -1,6 +1,6 @@
 import api from "@/lib/api";
 import type {
-  PluginUpdatesResponse,
+  PluginUpdateRow,
   PluginSiteVersion,
   WpOrgSearchResult,
   WpOrgPluginInfo,
@@ -10,8 +10,11 @@ import type {
 
 export const externalPluginService = {
   // Updates Dashboard
-  getUpdates: (params?: { search?: string; filter?: string; sort?: string }) =>
-    api.get<{ data: PluginUpdatesResponse }>("/plugins/external/updates", { params }),
+  getUpdates: (params?: { search?: string; filter?: string; sort?: string; page?: number; per_page?: number }) =>
+    api.get<{
+      data: PluginUpdateRow[];
+      meta?: { pagination: { total: number; per_page: number; current_page: number; last_page: number } };
+    }>("/plugins/external/updates", { params }),
 
   getUpdateSites: (slug: string) =>
     api.get<{ data: PluginSiteVersion[] }>(`/plugins/external/updates/${slug}/sites`),
