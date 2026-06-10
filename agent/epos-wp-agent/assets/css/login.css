@@ -739,16 +739,28 @@ body.epos-login-page .epos-toast > span > span {
    collapse to a single column earlier. This catches narrow laptop
    windows, sidebars-half-screen setups, and tablet-portrait viewports. */
 @media (max-width: 1024px) {
+  /* Critical: on narrow viewports the content is taller than 100vh, so
+     the desktop's max-height + overflow:hidden combo on .epos-auth-shell
+     would clip the form and trap scroll. Release both here and let the
+     page itself scroll naturally. */
+  html:has(body.epos-login-page),
+  body.epos-login-page {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
   body.epos-login-page .epos-login-page {
     padding: 0;
     place-items: stretch;
+    min-height: 100dvh;
   }
   body.epos-login-page .epos-auth-shell {
-    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: none;
     width: 100%;
     border-radius: 0;
     grid-template-columns: 1fr;
     box-shadow: none;
+    overflow: visible;
   }
   body.epos-login-page .epos-form-pane {
     order: 2;
@@ -774,20 +786,38 @@ body.epos-login-page .epos-toast > span > span {
 }
 @media (max-width: 560px) {
   body.epos-login-page .epos-form-pane {
-    padding: 26px 20px 30px;
+    padding: 26px 20px 40px;
+    gap: 20px;
   }
   body.epos-login-page .epos-banner-column {
-    padding: 28px 20px 64px;
-    min-height: 320px;
+    padding: 24px 20px 48px;
+    min-height: 260px;
+  }
+  body.epos-login-page .epos-banner-illustration {
+    max-height: 240px;
+  }
+  body.epos-login-page #epos-login-title {
+    font-size: clamp(1.6rem, 7vw, 2.2rem);
   }
   body.epos-login-page .epos-row-meta {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
   }
   body.epos-login-page .epos-form-wrap { max-width: none; }
   body.epos-login-page .epos-footer-links {
     flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
+  }
+  /* Touch target boost: WP's inputs default to ~36px high which is
+     below the 44px iOS HIG / Material Touch Target recommendation. */
+  body.epos-login-page input[type="text"],
+  body.epos-login-page input[type="email"],
+  body.epos-login-page input[type="password"],
+  body.epos-login-page .button-primary {
+    min-height: 48px;
+    font-size: 16px; /* 16px+ keeps iOS Safari from auto-zooming on focus */
   }
 }
 

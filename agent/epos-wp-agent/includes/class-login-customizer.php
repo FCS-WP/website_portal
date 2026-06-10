@@ -245,7 +245,7 @@ class Epos_Agent_Login_Customizer {
               <div class="epos-mesh-lines" aria-hidden="true"></div>
 
               <div class="epos-banner-content epos-banner-content--illustrated">
-                <span class="epos-banner-kicker">Website Portal &bull; Admin area</span>
+                <span class="epos-banner-kicker">Website Dashboard</span>
                 <img
                   class="epos-banner-illustration"
                   src="<?php echo esc_url($banner_image_url); ?>"
