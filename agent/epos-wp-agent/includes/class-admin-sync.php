@@ -206,9 +206,9 @@ class Epos_Agent_Admin_Sync {
     /**
      * Resolve the admin login URL the Portal should display.
      *
-     * When the /fcs_admin customizer is active, the plugin's site_url
+     * When the /epos-login customizer is active, the plugin's site_url
      * filter has already rewritten wp_login_url() output, so the value we
-     * return here naturally points at /fcs_admin. When disabled, we fall
+     * return here naturally points at /epos-login. When disabled, we fall
      * back to whatever wp_login_url() returns (typically /wp-login.php),
      * which is still the correct URL for that site.
      */

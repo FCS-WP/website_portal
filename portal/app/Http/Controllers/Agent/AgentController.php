@@ -387,8 +387,8 @@ class AgentController extends Controller
                 ]);
 
                 // Prefer the login URL provided by the agent (the agent knows
-                // whether the /fcs_admin customizer is active and emits the
-                // appropriate URL). Fall back to {site_url}/fcs_admin when
+                // whether the /epos-login customizer is active and emits the
+                // appropriate URL). Fall back to {site_url}/epos-login when
                 // the agent didn't include it (older plugin versions).
                 $adminUrl = $this->resolveAdminLoginUrl($site, $credData['login_url'] ?? null);
 
@@ -542,7 +542,7 @@ class AgentController extends Controller
         }
 
         // Refresh the Admin URL so older credentials migrate from the legacy
-        // /wp-admin value to the agent-supplied /fcs_admin URL on next sync.
+        // /wp-admin value to the agent-supplied /epos-login URL on next sync.
         if ($site !== null) {
             $adminUrl = $this->resolveAdminLoginUrl($site, $credData['login_url'] ?? null);
             $urlField = $credential->fields()->where('field_key', 'url')->first();
@@ -571,9 +571,9 @@ class AgentController extends Controller
      *
      * Preference order:
      *   1. The login URL provided by the agent plugin (it knows whether the
-     *      /fcs_admin customizer is enabled and what the canonical URL is,
+     *      /epos-login customizer is enabled and what the canonical URL is,
      *      including any host.docker.internal rewriting baked into get_site_url()).
-     *   2. {site->url}/fcs_admin as a sensible default — every site running
+     *   2. {site->url}/epos-login as a sensible default — every site running
      *      this agent ships the customizer enabled by default.
      */
     private function resolveAdminLoginUrl($site, ?string $agentSuppliedUrl): string
@@ -583,6 +583,6 @@ class AgentController extends Controller
             return $candidate;
         }
 
-        return rtrim($site->url, '/') . '/fcs_admin';
+        return rtrim($site->url, '/') . '/epos-login';
     }
 }

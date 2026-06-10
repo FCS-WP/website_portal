@@ -1,14 +1,13 @@
 <?php
 /**
- * Hides wp-login.php behind /fcs_admin and replaces the stock login UI
+ * Hides wp-login.php behind /epos-login and replaces the stock login UI
  * with a Zippy-branded two-column page. Toggle off per-site by setting
- * wp_option `fcs_login_customizer_enabled` to '0'.
+ * wp_option `epos_login_customizer_enabled` to '0'.
  */
 class Epos_Agent_Login_Customizer {
 
-    const LOGIN_SLUG  = 'fcs_admin';
-    const LEGACY_SLUG = 'epos-login';
-    const OPT_ENABLED = 'fcs_login_customizer_enabled';
+    const LOGIN_SLUG  = 'epos-login';
+    const OPT_ENABLED = 'epos_login_customizer_enabled';
 
     /**
      * Set to true by serve_login_on_slug() when the request entered
@@ -29,10 +28,6 @@ class Epos_Agent_Login_Customizer {
         // synchronously instead.
         self::register_rewrite();
         add_filter('query_vars', [self::class, 'register_query_var']);
-
-        // Legacy /epos-login -> /fcs_admin 301. Fires before serve_login_on_slug
-        // so the redirect happens before WP tries to resolve a non-existent rule.
-        add_action('parse_request', [self::class, 'redirect_legacy_slug'], 5);
 
         // parse_request runs before redirect_canonical, so the slug can't
         // be 301'd into a trailing-slash variant before we hand off.
@@ -70,38 +65,12 @@ class Epos_Agent_Login_Customizer {
         return $vars;
     }
 
-    // 301 the legacy /epos-login URL to /fcs_admin, preserving query string.
-    // Runs on parse_request priority 5 so it fires before serve_login_on_slug
-    // and before WP would otherwise resolve the path to a 404.
-    public static function redirect_legacy_slug($wp) {
-        $request_uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
-        if ($request_uri === '') {
-            return;
-        }
-
-        $path = (string) wp_parse_url($request_uri, PHP_URL_PATH);
-        $legacy = '/' . self::LEGACY_SLUG;
-        $match = ($path === $legacy) || ($path === $legacy . '/');
-        if (!$match) {
-            return;
-        }
-
-        $query = (string) wp_parse_url($request_uri, PHP_URL_QUERY);
-        $target = home_url('/' . self::LOGIN_SLUG);
-        if ($query !== '') {
-            $target .= '?' . $query;
-        }
-
-        wp_redirect($target, 301);
-        exit;
-    }
-
     public static function serve_login_on_slug($wp) {
         if (empty($wp->query_vars[self::LOGIN_SLUG]) || $wp->query_vars[self::LOGIN_SLUG] !== '1') {
             return;
         }
 
-        // Mark this request as routed through /fcs_admin so
+        // Mark this request as routed through /epos-login so
         // block_direct_wp_login() lets it through. We deliberately do NOT
         // touch $_GET/$_POST/$_REQUEST — wp-login.php treats a non-empty
         // $_POST as a form submission and emits "username field is empty"
