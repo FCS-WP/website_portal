@@ -1092,29 +1092,24 @@ export default function PluginDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Upgrade</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm">
-                <p>
-                  Upgrade <strong>{plugin?.name}</strong> on{" "}
-                  <strong>{upgradeConfirm.sites.length}</strong> site
-                  {upgradeConfirm.sites.length === 1 ? "" : "s"}.
-                </p>
-                <div className="rounded-md border bg-muted/30 p-3 space-y-1 max-h-48 overflow-y-auto">
-                  {upgradeConfirm.sites.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between text-xs"
-                    >
-                      <span className="truncate">{s.name}</span>
-                      <span className="text-muted-foreground shrink-0 ml-2">
-                        v{s.installed_version ?? "?"} → v{upgradeConfirm.targetVersion}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <AlertDialogDescription>
+              Upgrade {plugin?.name} on {upgradeConfirm.sites.length} site
+              {upgradeConfirm.sites.length === 1 ? "" : "s"}.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="rounded-md border bg-muted/30 p-3 space-y-1 max-h-48 overflow-y-auto text-sm">
+            {upgradeConfirm.sites.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between text-xs"
+              >
+                <span className="truncate">{s.name}</span>
+                <span className="text-muted-foreground shrink-0 ml-2">
+                  v{s.installed_version ?? "?"} → v{upgradeConfirm.targetVersion}
+                </span>
+              </div>
+            ))}
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={upgrading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
