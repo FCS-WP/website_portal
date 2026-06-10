@@ -117,6 +117,10 @@ export default function PluginDetailPage() {
   // Deploy dialog state
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [deployVersion, setDeployVersion] = useState<PluginVersion | null>(null);
+  const [deployPreselected, setDeployPreselected] = useState<{
+    ids: number[];
+    summary: Map<number, { name: string; url: string }>;
+  } | null>(null);
 
   // Promote dialog state
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
@@ -286,6 +290,23 @@ export default function PluginDetailPage() {
       });
       setEditDialogOpen(true);
     }
+  };
+
+  // --- Quick upgrade from Installed Sites tab ---
+  const openUpgradeFor = (siteIds: Array<{ id: number; name: string; url: string }>) => {
+    if (!plugin?.latest_version) {
+      toast.error("No stable release available to push.");
+      return;
+    }
+    if (siteIds.length === 0) {
+      toast.info("No outdated sites to upgrade.");
+      return;
+    }
+    const summary = new Map<number, { name: string; url: string }>();
+    siteIds.forEach((s) => summary.set(s.id, { name: s.name, url: s.url }));
+    setDeployPreselected({ ids: siteIds.map((s) => s.id), summary });
+    setDeployVersion(plugin.latest_version);
+    setDeployDialogOpen(true);
   };
 
   if (showLoader) {
@@ -632,12 +653,29 @@ export default function PluginDetailPage() {
 
         <TabsContent value="sites" className="mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Installed Sites</CardTitle>
-              <CardDescription>
-                Which sites have this plugin and what version. Grouped by installed
-                version; rows below show details per site.
-              </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle>Installed Sites</CardTitle>
+                <CardDescription>
+                  Which sites have this plugin and what version. Grouped by installed
+                  version; rows below show details per site.
+                </CardDescription>
+              </div>
+              {plugin.installed_sites && plugin.installed_sites.some((s) => s.needs_update) && plugin.latest_version && (
+                <Button
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    const outdated = plugin.installed_sites!
+                      .filter((s) => s.needs_update)
+                      .map((s) => ({ id: s.site_id, name: s.site_name, url: s.site_url }));
+                    openUpgradeFor(outdated);
+                  }}
+                >
+                  <ArrowUpCircle className="mr-2 h-4 w-4" />
+                  Upgrade outdated ({plugin.installed_sites.filter((s) => s.needs_update).length})
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {!plugin.installed_sites || plugin.installed_sites.length === 0 ? (
@@ -646,7 +684,7 @@ export default function PluginDetailPage() {
                 </p>
               ) : (
                 <div className="space-y-6">
-                  {/* Version summary chips */}
+                  {/* Version chips */}
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(
                       plugin.installed_sites.reduce<Record<string, number>>((acc, s) => {
@@ -672,6 +710,7 @@ export default function PluginDetailPage() {
                           <TableHead>Installed Version</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Last Synced</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -709,6 +748,25 @@ export default function PluginDetailPage() {
                               {s.last_synced_at
                                 ? new Date(s.last_synced_at).toLocaleString()
                                 : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {s.needs_update && plugin.latest_version ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-green-300 text-green-700 hover:bg-green-50"
+                                  onClick={() =>
+                                    openUpgradeFor([
+                                      { id: s.site_id, name: s.site_name, url: s.site_url },
+                                    ])
+                                  }
+                                >
+                                  <ArrowUpCircle className="mr-1 h-3.5 w-3.5" />
+                                  Upgrade
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -983,7 +1041,13 @@ export default function PluginDetailPage() {
           pluginName={plugin.name}
           version={deployVersion.version}
           open={deployDialogOpen}
-          onOpenChange={setDeployDialogOpen}
+          onOpenChange={(open) => {
+            setDeployDialogOpen(open);
+            if (!open) setDeployPreselected(null);
+          }}
+          defaultSiteIds={deployPreselected?.ids}
+          defaultSiteSummary={deployPreselected?.summary}
+          lockMode={deployPreselected ? "select" : undefined}
         />
       )}
 
