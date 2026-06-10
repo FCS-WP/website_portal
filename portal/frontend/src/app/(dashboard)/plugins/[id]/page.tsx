@@ -59,6 +59,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { pluginService } from "@/lib/services/plugins";
+import { deploymentsService } from "@/lib/services/deployments";
 import { Plugin, PluginVersion, BetaStatus } from "@/types";
 import { formatFileSize } from "@/lib/utils";
 import { toast } from "sonner";
@@ -117,10 +118,14 @@ export default function PluginDetailPage() {
   // Deploy dialog state
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [deployVersion, setDeployVersion] = useState<PluginVersion | null>(null);
-  const [deployPreselected, setDeployPreselected] = useState<{
-    ids: number[];
-    summary: Map<number, { name: string; url: string }>;
-  } | null>(null);
+
+  // Quick upgrade confirm state
+  const [upgradeConfirm, setUpgradeConfirm] = useState<{
+    open: boolean;
+    sites: Array<{ id: number; name: string; installed_version: string | null }>;
+    targetVersion: string;
+  }>({ open: false, sites: [], targetVersion: "" });
+  const [upgrading, setUpgrading] = useState(false);
 
   // Promote dialog state
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
@@ -293,20 +298,46 @@ export default function PluginDetailPage() {
   };
 
   // --- Quick upgrade from Installed Sites tab ---
-  const openUpgradeFor = (siteIds: Array<{ id: number; name: string; url: string }>) => {
+  const openUpgradeFor = (
+    sites: Array<{ id: number; name: string; installed_version: string | null }>
+  ) => {
     if (!plugin?.latest_version) {
       toast.error("No stable release available to push.");
       return;
     }
-    if (siteIds.length === 0) {
+    if (sites.length === 0) {
       toast.info("No outdated sites to upgrade.");
       return;
     }
-    const summary = new Map<number, { name: string; url: string }>();
-    siteIds.forEach((s) => summary.set(s.id, { name: s.name, url: s.url }));
-    setDeployPreselected({ ids: siteIds.map((s) => s.id), summary });
-    setDeployVersion(plugin.latest_version);
-    setDeployDialogOpen(true);
+    setUpgradeConfirm({
+      open: true,
+      sites,
+      targetVersion: plugin.latest_version.version,
+    });
+  };
+
+  const handleConfirmUpgrade = async () => {
+    if (!plugin?.latest_version) return;
+    setUpgrading(true);
+    try {
+      await deploymentsService.create({
+        plugin_version_id: plugin.latest_version.id,
+        site_ids: upgradeConfirm.sites.map((s) => s.id),
+      });
+      toast.success(
+        `Upgrade dispatched for ${upgradeConfirm.sites.length} site${upgradeConfirm.sites.length === 1 ? "" : "s"}.`
+      );
+      setUpgradeConfirm({ open: false, sites: [], targetVersion: "" });
+      fetchPlugin();
+    } catch (err) {
+      const message =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.response?.data?.message ?? "Failed to dispatch upgrade";
+      toast.error(message);
+      console.error("upgrade failed:", err);
+    } finally {
+      setUpgrading(false);
+    }
   };
 
   if (showLoader) {
@@ -668,7 +699,11 @@ export default function PluginDetailPage() {
                   onClick={() => {
                     const outdated = plugin.installed_sites!
                       .filter((s) => s.needs_update)
-                      .map((s) => ({ id: s.site_id, name: s.site_name, url: s.site_url }));
+                      .map((s) => ({
+                        id: s.site_id,
+                        name: s.site_name,
+                        installed_version: s.installed_version,
+                      }));
                     openUpgradeFor(outdated);
                   }}
                 >
@@ -754,15 +789,17 @@ export default function PluginDetailPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="border-green-300 text-green-700 hover:bg-green-50"
                                   onClick={() =>
                                     openUpgradeFor([
-                                      { id: s.site_id, name: s.site_name, url: s.site_url },
+                                      {
+                                        id: s.site_id,
+                                        name: s.site_name,
+                                        installed_version: s.installed_version,
+                                      },
                                     ])
                                   }
                                 >
-                                  <ArrowUpCircle className="mr-1 h-3.5 w-3.5" />
-                                  Upgrade
+                                  Update to v{plugin.latest_version.version}
                                 </Button>
                               ) : (
                                 <span className="text-xs text-muted-foreground">—</span>
@@ -1041,15 +1078,54 @@ export default function PluginDetailPage() {
           pluginName={plugin.name}
           version={deployVersion.version}
           open={deployDialogOpen}
-          onOpenChange={(open) => {
-            setDeployDialogOpen(open);
-            if (!open) setDeployPreselected(null);
-          }}
-          defaultSiteIds={deployPreselected?.ids}
-          defaultSiteSummary={deployPreselected?.summary}
-          lockMode={deployPreselected ? "select" : undefined}
+          onOpenChange={setDeployDialogOpen}
         />
       )}
+
+      {/* Quick upgrade confirm */}
+      <AlertDialog
+        open={upgradeConfirm.open}
+        onOpenChange={(open) =>
+          !upgrading && setUpgradeConfirm((prev) => ({ ...prev, open }))
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Upgrade</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  Upgrade <strong>{plugin?.name}</strong> on{" "}
+                  <strong>{upgradeConfirm.sites.length}</strong> site
+                  {upgradeConfirm.sites.length === 1 ? "" : "s"}.
+                </p>
+                <div className="rounded-md border bg-muted/30 p-3 space-y-1 max-h-48 overflow-y-auto">
+                  {upgradeConfirm.sites.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between text-xs"
+                    >
+                      <span className="truncate">{s.name}</span>
+                      <span className="text-muted-foreground shrink-0 ml-2">
+                        v{s.installed_version ?? "?"} → v{upgradeConfirm.targetVersion}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={upgrading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmUpgrade}
+              disabled={upgrading}
+            >
+              {upgrading ? "Dispatching..." : "Confirm Upgrade"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Promote to Stable Confirmation Dialog */}
       <AlertDialog open={promoteDialogOpen} onOpenChange={setPromoteDialogOpen}>
