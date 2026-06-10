@@ -763,11 +763,11 @@ body.epos-login-page .epos-toast > span > span {
     overflow: visible;
   }
   body.epos-login-page .epos-form-pane {
-    order: 2;
+    order: 1;
     border-right: 0;
   }
   body.epos-login-page .epos-banner-column {
-    order: 1;
+    order: 2;
     min-height: 360px;
     padding-bottom: 70px;
   }
