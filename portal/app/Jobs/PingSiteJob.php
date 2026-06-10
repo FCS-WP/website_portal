@@ -20,10 +20,12 @@ class PingSiteJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 1;
-    public int $timeout = 20;
+    public int $timeout = 50;
 
     // --- Tunables ---
-    private const HTTP_TIMEOUT_SECONDS = 10;
+    private const CONNECT_TIMEOUT_SECONDS = 5;
+    private const HTTP_TIMEOUT_SECONDS = 15;
+    private const RETRY_DELAY_SECONDS = 5;
     private const DISCONNECT_AT_FAILURES = 3;
     private const ALERT_COOLDOWN_MINUTES = 60;
 
@@ -39,28 +41,39 @@ class PingSiteJob implements ShouldQueue
             return;
         }
 
-        try {
-            $response = Http::timeout(self::HTTP_TIMEOUT_SECONDS)
-                ->withHeaders([
-                    'X-Agent-Key' => decrypt($site->api_key_encrypted),
-                    'Accept' => 'application/json',
-                ])
-                ->get(rtrim($site->url, '/') . '/wp-json/epos-agent/v1/status');
-
-            if ($response->successful()) {
-                $this->handleSuccess($site, $response->json() ?? []);
-                return;
+        $lastError = '';
+        foreach ([0, self::RETRY_DELAY_SECONDS] as $delay) {
+            if ($delay > 0) {
+                sleep($delay);
             }
+            try {
+                $response = Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
+                    ->timeout(self::HTTP_TIMEOUT_SECONDS)
+                    ->withHeaders([
+                        'X-Agent-Key' => decrypt($site->api_key_encrypted),
+                        'Accept' => 'application/json',
+                    ])
+                    ->get(rtrim($site->url, '/') . '/wp-json/epos-agent/v1/status');
 
-            $this->handleFailure($site, "HTTP {$response->status()}");
-        } catch (\Throwable $e) {
-            $this->handleFailure($site, $e->getMessage());
+                if ($response->successful()) {
+                    $this->handleSuccess($site, $response->json() ?? []);
+                    return;
+                }
+
+                $lastError = "HTTP {$response->status()}";
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+            }
         }
+
+        $this->handleFailure($site, $lastError);
     }
 
     private function handleSuccess(Site $site, array $data): void
     {
         $wasDisconnected = $site->status === 'disconnected';
+        $offlineAlertWasSent = $site->last_disconnect_alert_at
+            && (!$site->last_ping_at || $site->last_disconnect_alert_at->gt($site->last_ping_at));
 
         $site->update([
             'status' => 'connected',
@@ -88,10 +101,12 @@ class PingSiteJob implements ShouldQueue
             SitePluginSyncService::syncAll($site, $data['all_plugins']);
         }
 
-        // --- Recovery alert ---
+        // --- Recovery alert (only when the matching 🔴 was sent) ---
         if ($wasDisconnected) {
             ActivityLogService::log('site.recovered', $site);
-            $this->notify("🟢 Site *{$site->name}* is back online.");
+            if ($offlineAlertWasSent) {
+                $this->notify("🟢 Site *{$site->name}* is back online.");
+            }
         }
     }
 

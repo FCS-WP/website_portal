@@ -21,11 +21,12 @@ class PingSites extends Command
 
         $sync = (bool) $this->option('sync');
 
+        // --- Jittered dispatch ---
         foreach ($siteIds as $id) {
             if ($sync) {
                 PingSiteJob::dispatchSync($id);
             } else {
-                PingSiteJob::dispatch($id);
+                PingSiteJob::dispatch($id)->delay(now()->addSeconds(random_int(0, 240)));
             }
         }
 
