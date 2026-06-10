@@ -17,9 +17,12 @@ class Epos_Agent_Activator {
         add_option('epos_agent_portal_url', '');
         add_option('epos_agent_api_key', '');
         add_option('epos_agent_connection_status', 'pending');
-        add_option('epos_login_customizer_enabled', '1');
 
-        // Pre-register the slug before flush so /epos-login resolves without
+        // --- Login slug rename migration (epos_login_customizer_enabled -> fcs_login_customizer_enabled) ---
+        self::migrate_login_option();
+        add_option('fcs_login_customizer_enabled', '1');
+
+        // Pre-register the slug before flush so /fcs_admin resolves without
         // requiring a manual permalinks re-save.
         if (class_exists('Epos_Agent_Login_Customizer')) {
             Epos_Agent_Login_Customizer::register_rewrite();
@@ -125,6 +128,21 @@ class Epos_Agent_Activator {
             'message' => $errMsg,
             'site_url_sent' => $site_url,
         ] : false;
+    }
+
+    // Copy the legacy `epos_login_customizer_enabled` value to the new
+    // `fcs_login_customizer_enabled` key, then drop the old key. Idempotent —
+    // safe to call multiple times. Also runs on in-place plugin upgrade via
+    // Epos_Agent_Login_Customizer::maybe_run_migrations() because activation
+    // hooks don't fire on update.
+    public static function migrate_login_option() {
+        $legacy = get_option('epos_login_customizer_enabled', null);
+        if ($legacy !== null && get_option('fcs_login_customizer_enabled', null) === null) {
+            update_option('fcs_login_customizer_enabled', $legacy);
+        }
+        if ($legacy !== null) {
+            delete_option('epos_login_customizer_enabled');
+        }
     }
 
     /**

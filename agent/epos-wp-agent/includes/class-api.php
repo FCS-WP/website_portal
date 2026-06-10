@@ -256,7 +256,7 @@ class Epos_Agent_Api {
         // Also push the full admin-credential set so the Portal vault stays
         // in sync (login_url, username, email, etc.). The ping above only
         // covers plugins/orders; without this call, hook-driven credential
-        // changes (e.g. /epos-login URL migration) never propagate on a
+        // changes (e.g. /fcs_admin URL migration) never propagate on a
         // manual "Sync Now".
         $admin_sync_result = null;
         try {
