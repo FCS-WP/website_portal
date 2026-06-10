@@ -1,5 +1,20 @@
 # Repo orientation
 
+## ⚠️ Code style: NO explanatory comments
+
+**Marker comments only.** Use `// Auth routes`, `// --- Bulk actions ---`, etc. to label sections or features. NEVER write multi-line explanatory blocks describing what code does, why a choice was made, or how an algorithm works. Well-named identifiers explain WHAT; commit messages and PR descriptions explain WHY. If a future reader would not be confused without the comment, do not write it.
+
+Examples of what is NOT allowed:
+- Multi-paragraph docstrings on functions
+- Inline comments like `// loops over the array and increments the counter`
+- Comments that restate the next line of code
+- "Why we picked X over Y" essays inside the code (put it in the commit message)
+- Workaround/bug-history narratives (put a one-line marker, full story in git blame / PR)
+
+Applies to PHP, TypeScript/JavaScript, CSS, YAML, all languages in this repo. This rule overrides any default behavior to "be helpful by explaining."
+
+---
+
 This is a monorepo with **three components** that talk to each other over HTTP:
 
 | Path | What it is | Stack |
