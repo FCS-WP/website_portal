@@ -30,8 +30,9 @@ class Epos_Agent_Login_Customizer {
         self::register_rewrite();
         add_filter('query_vars', [self::class, 'register_query_var']);
 
-        // Alias /fcs_admin -> /epos-login 301. Fires before serve_login_on_slug.
-        add_action('parse_request', [self::class, 'redirect_alias_slug'], 5);
+        // Alias /fcs_admin -> /epos-login 301. Synchronous (we're at init:10)
+        // so it beats hide-login plugins that intercept at wp_loaded.
+        self::redirect_alias_slug();
 
         // parse_request runs before redirect_canonical, so the slug can't
         // be 301'd into a trailing-slash variant before we hand off.
@@ -70,9 +71,7 @@ class Epos_Agent_Login_Customizer {
     }
 
     // 301 the /fcs_admin alias to /epos-login, preserving query string.
-    // Runs on parse_request priority 5 so it fires before serve_login_on_slug
-    // and before WP would otherwise resolve the path to a 404.
-    public static function redirect_alias_slug($wp) {
+    public static function redirect_alias_slug() {
         $request_uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
         if ($request_uri === '') {
             return;
