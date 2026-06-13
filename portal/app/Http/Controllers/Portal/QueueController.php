@@ -62,7 +62,7 @@ class QueueController extends Controller
                 'queue' => $row->queue,
                 'job_class' => $jobClass,
                 'error_summary' => $errorSummary,
-                'failed_at' => $row->failed_at,
+                'failed_at' => $row->failed_at ? \Illuminate\Support\Carbon::parse($row->failed_at)->toIso8601String() : null,
             ];
         })->all();
 
@@ -89,11 +89,16 @@ class QueueController extends Controller
             'connection' => $row->connection,
             'queue' => $row->queue,
             'job_class' => $payload['displayName'] ?? null,
-            'attempts' => $payload['attempts'] ?? null,
-            'data' => $payload['data'] ?? null,
-            'payload' => $payload,
             'exception' => $row->exception,
-            'failed_at' => $row->failed_at,
+            'failed_at' => $row->failed_at ? \Illuminate\Support\Carbon::parse($row->failed_at)->toIso8601String() : null,
+            'payload' => $row->payload,
+            'parsed_payload' => [
+                'displayName' => $payload['displayName'] ?? null,
+                'job' => is_string($payload['job'] ?? null) ? $payload['job'] : null,
+                'maxTries' => $payload['maxTries'] ?? null,
+                'attempts' => $payload['attempts'] ?? null,
+                'data' => $payload['data'] ?? null,
+            ],
         ];
 
         return $this->successResponse($data);
@@ -170,7 +175,7 @@ class QueueController extends Controller
         return $this->successResponse([
             'failed_count' => $failedCount,
             'pending_count' => $pendingCount,
-            'last_failure_at' => $lastFailure,
+            'last_failure_at' => $lastFailure ? \Illuminate\Support\Carbon::parse($lastFailure)->toIso8601String() : null,
         ]);
     }
 }

@@ -41,7 +41,16 @@ const shortClass = (fqcn?: string) => {
   return idx >= 0 ? fqcn.slice(idx + 1) : fqcn;
 };
 
-const safeJson = (raw: string) => {
+const safeJson = (raw: unknown): string => {
+  if (raw == null) return "";
+  if (typeof raw === "object") {
+    try {
+      return JSON.stringify(raw, null, 2);
+    } catch {
+      return String(raw);
+    }
+  }
+  if (typeof raw !== "string") return String(raw);
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
@@ -141,7 +150,9 @@ export default function FailedJobDetailPage() {
   }
 
   const jobClass = parsed?.displayName || parsed?.job || job.job_class;
-  const failedAt = new Date(job.failed_at);
+  const failedAtDate = job.failed_at ? new Date(job.failed_at) : null;
+  const failedAt =
+    failedAtDate && !Number.isNaN(failedAtDate.getTime()) ? failedAtDate : null;
 
   return (
     <div className="page-content space-y-6">
@@ -175,7 +186,9 @@ export default function FailedJobDetailPage() {
             </button>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
-              Failed {formatDistanceToNow(failedAt, { addSuffix: true })}
+              {failedAt
+                ? `Failed ${formatDistanceToNow(failedAt, { addSuffix: true })}`
+                : "Failed at unknown time"}
             </span>
           </div>
         </div>
@@ -250,12 +263,18 @@ export default function FailedJobDetailPage() {
         </Meta>
         <Meta label="Failed at">
           <div className="leading-tight">
-            <p className="text-sm font-medium text-foreground">
-              {format(failedAt, "MMM d, yyyy")}
-            </p>
-            <p className="font-mono text-xs text-muted-foreground">
-              {format(failedAt, "HH:mm:ss")}
-            </p>
+            {failedAt ? (
+              <>
+                <p className="text-sm font-medium text-foreground">
+                  {format(failedAt, "MMM d, yyyy")}
+                </p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {format(failedAt, "HH:mm:ss")}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">—</p>
+            )}
           </div>
         </Meta>
         <Meta label="Job ID">
@@ -310,7 +329,7 @@ export default function FailedJobDetailPage() {
                     </span>
                   </Meta>
                 )}
-                {parsed.job && (
+                {parsed.job && typeof parsed.job === "string" && (
                   <Meta label="Job">
                     <span className="break-all font-mono text-sm">{parsed.job}</span>
                   </Meta>

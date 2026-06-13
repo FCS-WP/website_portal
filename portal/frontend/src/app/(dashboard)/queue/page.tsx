@@ -54,6 +54,22 @@ import { queueService } from "@/lib/services/queueService";
 import type { FailedJob, QueueStats } from "@/types";
 import { cn } from "@/lib/utils";
 
+function parseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function safeRelative(value: string | null | undefined): string {
+  const d = parseDate(value);
+  return d ? formatDistanceToNow(d, { addSuffix: true }) : "—";
+}
+
+function safeAbsolute(value: string | null | undefined): string {
+  const d = parseDate(value);
+  return d ? format(d, "MMM d, yyyy · HH:mm:ss") : "Unknown";
+}
+
 const QUEUE_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "All queues" },
   { value: "default", label: "default" },
@@ -292,8 +308,8 @@ export default function FailedJobsPage() {
             tone="danger"
             loading={statsLoading}
             sub={
-              stats?.last_failure_at
-                ? `Last ${formatDistanceToNow(new Date(stats.last_failure_at), { addSuffix: true })}`
+              parseDate(stats?.last_failure_at)
+                ? `Last ${safeRelative(stats?.last_failure_at)}`
                 : "No recent failures"
             }
           />
@@ -398,14 +414,12 @@ export default function FailedJobsPage() {
                           <TooltipTrigger
                             render={
                               <span className="cursor-default font-medium text-foreground/90">
-                                {formatDistanceToNow(new Date(job.failed_at), {
-                                  addSuffix: true,
-                                })}
+                                {safeRelative(job.failed_at)}
                               </span>
                             }
                           />
                           <TooltipContent>
-                            {format(new Date(job.failed_at), "MMM d, yyyy · HH:mm:ss")}
+                            {safeAbsolute(job.failed_at)}
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
