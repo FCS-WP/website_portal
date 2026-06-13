@@ -9,6 +9,34 @@ export interface DashboardStats {
   sites_with_updates: number;
   recent_sites: RecentSite[];
   recent_activity: RecentActivity[];
+  sites_online_trend: SitesOnlinePoint[];
+  orders_this_week: OrdersThisWeek;
+}
+
+export interface SitesOnlinePoint {
+  date: string;
+  label: string;
+  online: number;
+}
+
+export interface OrdersThisWeek {
+  total: number;
+  days: OrdersDayPoint[];
+}
+
+export interface OrdersDayPoint {
+  date: string;
+  label: string;
+  count: number;
+  revenue: number;
+  by_site: OrdersSiteBreakdown[];
+}
+
+export interface OrdersSiteBreakdown {
+  site_id: number;
+  site_name: string;
+  count: number;
+  revenue: number;
 }
 
 export interface RecentSite {

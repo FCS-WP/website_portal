@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useAuthStore } from "@/stores/auth-store";
 import { PinSetupBanner } from "@/components/vault/pin-setup-banner";
+import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -53,6 +54,8 @@ export default function DashboardPage() {
         sites_with_updates: 0,
         recent_sites: [],
         recent_activity: [],
+        sites_online_trend: [],
+        orders_this_week: { total: 0, days: [] },
       });
     } finally {
       setLoading(false);
@@ -132,6 +135,14 @@ export default function DashboardPage() {
           loading={loading}
         />
       </div>
+
+      {/* Charts: Sites online trend + Orders this week */}
+      <DashboardCharts
+        totalSites={stats?.total_sites ?? 0}
+        sitesTrend={stats?.sites_online_trend}
+        orders={stats?.orders_this_week}
+        loading={loading}
+      />
 
       {/* Middle Section: Site Status + Recent Activity */}
       <div className="grid gap-4 lg:grid-cols-2">
