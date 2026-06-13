@@ -11,6 +11,19 @@ export interface DashboardStats {
   recent_activity: RecentActivity[];
   sites_online_trend: SitesOnlinePoint[];
   orders_this_week: OrdersThisWeek;
+  recent_orders: RecentOrder[];
+}
+
+export interface RecentOrder {
+  id: number;
+  site_id: number;
+  site_name: string | null;
+  order_number: string;
+  status: string;
+  total: number;
+  currency: string;
+  customer_name: string | null;
+  order_date: string | null;
 }
 
 export interface SitesOnlinePoint {

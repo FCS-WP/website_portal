@@ -24,12 +24,22 @@ import {
   type DashboardStats,
   type RecentSite,
   type RecentActivity,
+  type RecentOrder,
 } from "@/lib/services/dashboard";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useAuthStore } from "@/stores/auth-store";
 import { PinSetupBanner } from "@/components/vault/pin-setup-banner";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
+import { OrderStatusBadge } from "@/components/orders/order-status-badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -56,6 +66,7 @@ export default function DashboardPage() {
         recent_activity: [],
         sites_online_trend: [],
         orders_this_week: { total: 0, days: [] },
+        recent_orders: [],
       });
     } finally {
       setLoading(false);
@@ -221,15 +232,41 @@ export default function DashboardPage() {
           </Link>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <div className="text-center space-y-2">
-              <ShoppingCart className="h-8 w-8 mx-auto opacity-50" />
-              <p className="text-sm font-medium">Coming in Phase 3</p>
-              <p className="text-xs text-muted-foreground/70">
-                Order tracking across all sites will be available here
-              </p>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
-          </div>
+          ) : stats?.recent_orders && stats.recent_orders.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Site</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.recent_orders.map((order) => (
+                  <OrderRow key={order.id} order={order} />
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <div className="text-center space-y-2">
+                <ShoppingCart className="h-8 w-8 mx-auto opacity-50" />
+                <p className="text-sm font-medium">No orders yet</p>
+                <p className="text-xs text-muted-foreground/70">
+                  Orders synced from your sites will appear here
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -356,5 +393,38 @@ function ActivityRow({ activity }: { activity: RecentActivity }) {
         <p className="text-xs text-muted-foreground mt-0.5">{timeAgo}</p>
       </div>
     </div>
+  );
+}
+
+function OrderRow({ order }: { order: RecentOrder }) {
+  const dateAgo = order.order_date
+    ? formatDistanceToNow(new Date(order.order_date), { addSuffix: true })
+    : "—";
+  const total = order.total.toLocaleString(undefined, {
+    style: "currency",
+    currency: order.currency || "USD",
+  });
+
+  return (
+    <TableRow>
+      <TableCell>
+        <Link href="/orders" className="font-medium text-primary hover:underline">
+          {order.order_number}
+        </Link>
+      </TableCell>
+      <TableCell className="text-sm text-muted-foreground truncate max-w-40">
+        {order.site_name ?? "—"}
+      </TableCell>
+      <TableCell className="text-sm truncate max-w-40">
+        {order.customer_name ?? "—"}
+      </TableCell>
+      <TableCell>
+        <OrderStatusBadge status={order.status} />
+      </TableCell>
+      <TableCell className="text-right font-medium tabular-nums">{total}</TableCell>
+      <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+        {dateAgo}
+      </TableCell>
+    </TableRow>
   );
 }

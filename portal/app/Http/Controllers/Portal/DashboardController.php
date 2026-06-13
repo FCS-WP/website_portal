@@ -94,7 +94,32 @@ class DashboardController extends Controller
             'recent_activity' => $recentActivity,
             'sites_online_trend' => $this->sitesOnlineTrend($onlineSites),
             'orders_this_week' => $this->ordersThisWeek($user),
+            'recent_orders' => $this->recentOrders($user),
         ]);
+    }
+
+    // --- Recent orders across all accessible sites ---
+    private function recentOrders(\App\Models\User $user): array
+    {
+        return Order::whereHas('site', function ($q) use ($user) {
+            $q->accessibleBy($user);
+        })
+            ->with('site:id,name,url')
+            ->orderByDesc('order_date')
+            ->limit(8)
+            ->get()
+            ->map(fn ($o) => [
+                'id' => $o->id,
+                'site_id' => $o->site_id,
+                'site_name' => $o->site?->name,
+                'order_number' => $o->order_number ?? ('#' . $o->woo_order_id),
+                'status' => $o->status,
+                'total' => (float) $o->total,
+                'currency' => $o->currency,
+                'customer_name' => $o->customer_name,
+                'order_date' => $o->order_date?->toIso8601String(),
+            ])
+            ->all();
     }
 
     // --- Sites online: last 14 days, reconstructed from connect/disconnect logs ---
