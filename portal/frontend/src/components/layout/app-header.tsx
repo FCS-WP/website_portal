@@ -43,8 +43,9 @@ export function AppHeader() {
       <div className="flex min-w-0 items-center gap-2">
         <AppSidebarMobile />
         <div className="min-w-0 lg:hidden">
-          <p className="truncate text-sm font-semibold">EPOS Portal</p>
-          <p className="truncate text-[11px] text-muted-foreground">Central Platform</p>
+          <span className="text-xl font-extrabold lowercase tracking-tight text-primary">
+            zippy
+          </span>
         </div>
       </div>
 

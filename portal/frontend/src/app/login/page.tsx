@@ -11,7 +11,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
@@ -63,10 +62,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">EP</span>
-          </div>
-          <CardTitle className="text-2xl">EPOS Portal</CardTitle>
+          <span className="mx-auto mb-2 text-4xl font-extrabold lowercase tracking-tight text-primary">
+            zippy
+          </span>
           <CardDescription>
             Sign in to manage your WordPress sites
           </CardDescription>

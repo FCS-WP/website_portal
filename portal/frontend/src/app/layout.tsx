@@ -21,8 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EPOS Portal",
-  description: "EPOS WordPress Site Management Portal",
+  title: "Zippy",
+  description: "Zippy WordPress Site Management Portal",
 };
 
 export default function RootLayout({

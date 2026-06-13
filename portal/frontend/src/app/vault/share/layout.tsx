@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Shared Credentials — EPOS Portal",
+  title: "Shared Credentials — Zippy",
   description: "Securely view shared credentials",
 };
 
@@ -15,10 +15,9 @@ export default function VaultShareLayout({
       {/* Portal branding header */}
       <header className="border-b bg-white dark:bg-gray-900 px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center gap-2">
-          <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-xs font-bold text-primary-foreground">E</span>
-          </div>
-          <span className="font-semibold text-sm">EPOS Portal</span>
+          <span className="text-lg font-extrabold lowercase tracking-tight text-primary">
+            zippy
+          </span>
         </div>
       </header>
 
@@ -30,7 +29,7 @@ export default function VaultShareLayout({
       {/* Footer */}
       <footer className="border-t bg-white dark:bg-gray-900 px-6 py-3 text-center">
         <p className="text-xs text-muted-foreground">
-          Shared securely via EPOS Portal
+          Shared securely via Zippy
         </p>
       </footer>
     </div>
