@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,7 +34,6 @@ import {
   Package,
   Download,
   Trash2,
-  Power,
   ExternalLink,
   AlertTriangle,
   Loader2,
@@ -588,36 +588,13 @@ function PluginActions({
   // can't be removed from a single site by accident.
   if (plugin.plugin_type === "internal") {
     return (
-      <div className="flex items-center justify-end gap-1">
-        {plugin.is_active ? (
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => onDeactivate(plugin)}
-            disabled={isLoading("deactivate")}
-          >
-            {isLoading("deactivate") ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Power className="h-3 w-3" />
-            )}
-            Deactivate
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => onActivate(plugin)}
-            disabled={isLoading("activate")}
-          >
-            {isLoading("activate") ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Power className="h-3 w-3" />
-            )}
-            Activate
-          </Button>
-        )}
+      <div className="flex items-center justify-end gap-2">
+        <ActiveToggle
+          plugin={plugin}
+          onActivate={onActivate}
+          onDeactivate={onDeactivate}
+          isLoading={isLoading}
+        />
         {plugin.plugin_id && (
           <Link
             href={`/plugins/${plugin.plugin_id}`}
@@ -640,7 +617,7 @@ function PluginActions({
 
   // WP.org plugins
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-2">
       {/* Active + outdated: Update button */}
       {plugin.update_available && (
         <Button
@@ -658,54 +635,68 @@ function PluginActions({
         </Button>
       )}
 
-      {/* Active: show Deactivate */}
-      {plugin.is_active && (
+      <ActiveToggle
+        plugin={plugin}
+        onActivate={onActivate}
+        onDeactivate={onDeactivate}
+        isLoading={isLoading}
+      />
+
+      {/* Inactive: allow Uninstall */}
+      {!plugin.is_active && (
         <Button
-          variant="outline"
+          variant="destructive"
           size="xs"
-          onClick={() => onDeactivate(plugin)}
-          disabled={isLoading("deactivate")}
+          onClick={() => onUninstall(plugin)}
+          disabled={isLoading("uninstall")}
         >
-          {isLoading("deactivate") ? (
+          {isLoading("uninstall") ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <Power className="h-3 w-3" />
+            <Trash2 className="h-3 w-3" />
           )}
-          Deactivate
+          Uninstall
         </Button>
       )}
-
-      {/* Inactive: show Activate + Uninstall */}
-      {!plugin.is_active && (
-        <>
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => onActivate(plugin)}
-            disabled={isLoading("activate")}
-          >
-            {isLoading("activate") ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Power className="h-3 w-3" />
-            )}
-            Activate
-          </Button>
-          <Button
-            variant="destructive"
-            size="xs"
-            onClick={() => onUninstall(plugin)}
-            disabled={isLoading("uninstall")}
-          >
-            {isLoading("uninstall") ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Trash2 className="h-3 w-3" />
-            )}
-            Uninstall
-          </Button>
-        </>
-      )}
     </div>
+  );
+}
+
+function ActiveToggle({
+  plugin,
+  onActivate,
+  onDeactivate,
+  isLoading,
+}: {
+  plugin: SitePluginAll;
+  onActivate: (p: SitePluginAll) => void;
+  onDeactivate: (p: SitePluginAll) => void;
+  isLoading: (action: string) => boolean;
+}) {
+  const busy = isLoading("activate") || isLoading("deactivate");
+
+  if (busy) {
+    return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  }
+
+  const label = plugin.is_active ? "Active — click to deactivate" : "Inactive — click to activate";
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Switch
+              checked={plugin.is_active}
+              onCheckedChange={(checked) =>
+                checked ? onActivate(plugin) : onDeactivate(plugin)
+              }
+              aria-label={label}
+            />
+          }
+        />
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
