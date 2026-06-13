@@ -72,6 +72,10 @@ class Epos_Agent_Login_Customizer {
 
     // 301 the /fcs_admin alias to /epos-login, preserving query string.
     public static function redirect_alias_slug() {
+        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            return;
+        }
+
         $request_uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
         if ($request_uri === '') {
             return;

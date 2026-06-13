@@ -4,7 +4,7 @@ Tags: management, central control, portal, agent
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.2.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -28,6 +28,9 @@ EPOS WP Agent connects your WordPress site to the EPOS Central Control Portal, e
 5. Click "Test Connection" to verify
 
 == Changelog ==
+
+= 1.2.8 =
+* Fix login issues caused by 301 redirects and disabled submit button state.
 
 = 1.0.0 =
 * Initial release

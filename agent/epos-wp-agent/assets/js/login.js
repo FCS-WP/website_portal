@@ -100,9 +100,22 @@
 
     form.addEventListener('submit', function () {
       if (!submitBtn) return;
+
+      // Create a hidden input to preserve the submit value, since disabling the button
+      // prevents its name/value from being submitted in the POST request.
+      var hiddenSubmit = document.createElement('input');
+      hiddenSubmit.type = 'hidden';
+      hiddenSubmit.name = submitBtn.name || 'wp-submit';
+      hiddenSubmit.value = submitBtn.value || 'Log In';
+      form.appendChild(hiddenSubmit);
+
       submitBtn.classList.add('is-loading');
       submitBtn.setAttribute('aria-busy', 'true');
-      submitBtn.disabled = true;
+
+      // Disable button in the next tick to allow form submission to capture the action
+      setTimeout(function () {
+        submitBtn.disabled = true;
+      }, 0);
     });
   });
 })();
