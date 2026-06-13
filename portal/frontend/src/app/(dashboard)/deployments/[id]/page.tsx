@@ -22,7 +22,16 @@ import {
   ShieldCheck,
   Undo2,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,6 +92,8 @@ export default function DeploymentDetailPage() {
   const [tabFilter, setTabFilter] = useState<"all" | "success" | "failed">("all");
   const [selectedSites, setSelectedSites] = useState<Set<number>>(new Set());
   const [rollbackingSiteId, setRollbackingSiteId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
 
   const sites: DeploymentJobSite[] = deployment?.sites || [];
 
@@ -246,6 +257,18 @@ export default function DeploymentDetailPage() {
     }
     return filtered;
   }, [sites, tabFilter, searchQuery]);
+
+  // Pagination state derivations. The table renders a slice of
+  // filteredSites; the footer drives page + perPage.
+  const totalFiltered = filteredSites.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * perPage;
+  const pageEnd = Math.min(pageStart + perPage, totalFiltered);
+  const pagedSites = useMemo(
+    () => filteredSites.slice(pageStart, pageEnd),
+    [filteredSites, pageStart, pageEnd]
+  );
 
   // Live log events (derived from sites - most recently deployed first)
   const liveEvents = useMemo(() => {
@@ -506,18 +529,39 @@ export default function DeploymentDetailPage() {
               <Input
                 placeholder="Search site..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
                 className="pl-8 h-8 text-xs"
               />
             </div>
             <div className="flex items-center gap-1">
-              <TabButton active={tabFilter === "all"} onClick={() => setTabFilter("all")}>
+              <TabButton
+                active={tabFilter === "all"}
+                onClick={() => {
+                  setTabFilter("all");
+                  setPage(1);
+                }}
+              >
                 All ({allCount})
               </TabButton>
-              <TabButton active={tabFilter === "success"} onClick={() => setTabFilter("success")}>
+              <TabButton
+                active={tabFilter === "success"}
+                onClick={() => {
+                  setTabFilter("success");
+                  setPage(1);
+                }}
+              >
                 Success ({successCount})
               </TabButton>
-              <TabButton active={tabFilter === "failed"} onClick={() => setTabFilter("failed")}>
+              <TabButton
+                active={tabFilter === "failed"}
+                onClick={() => {
+                  setTabFilter("failed");
+                  setPage(1);
+                }}
+              >
                 <span className="text-red-400">Failed ({failedCount})</span>
               </TabButton>
             </div>
@@ -532,7 +576,7 @@ export default function DeploymentDetailPage() {
               <div>Actions</div>
             </div>
             {filteredSites.length > 0 ? (
-              filteredSites.slice(0, 8).map((siteJob) => (
+              pagedSites.map((siteJob) => (
                 <SiteRow
                   key={siteJob.id}
                   siteJob={siteJob}
@@ -559,10 +603,67 @@ export default function DeploymentDetailPage() {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-xs text-muted-foreground">
-              Showing {Math.min(filteredSites.length, 8)} of {filteredSites.length} sites
-            </span>
+          <div className="flex flex-col gap-3 pt-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span>
+                Showing{" "}
+                <span className="font-medium text-foreground">
+                  {totalFiltered === 0 ? 0 : pageStart + 1}&ndash;{pageEnd}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium text-foreground">{totalFiltered}</span>{" "}
+                sites
+              </span>
+              <div className="flex items-center gap-2">
+                <span>·</span>
+                <Select
+                  value={String(perPage)}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setPerPage(Number(val));
+                      setPage(1);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-7 w-20 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[25, 50, 100].map((opt) => (
+                      <SelectItem key={opt} value={String(opt)}>
+                        {opt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span>per page</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-xs tabular-nums">
+                  {safePage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="text-xs h-7" onClick={handleSelectAllFailed}>
                 Select all failed

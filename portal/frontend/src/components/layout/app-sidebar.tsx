@@ -22,8 +22,11 @@ import {
   Download,
   ListChecks,
   Menu,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
+import { useSidebarStore } from "@/stores/sidebar-store";
 import { User } from "@/types";
 import { cn } from "@/lib/utils";
 import { sidebarService, SidebarCounts } from "@/lib/services/sidebar";
@@ -36,6 +39,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Role = "admin" | "dev" | "mkt";
 
@@ -187,34 +196,62 @@ function getFilteredGroups(role: Role, counts: SidebarCounts | null) {
     .filter((group) => group.items.length > 0);
 }
 
-function BrandBlock() {
+function BrandBlock({ collapsed }: { collapsed?: boolean }) {
   return (
-    <Link href="/dashboard" className="flex items-center gap-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600">
-        <LayoutDashboard className="h-4 w-4 text-white" />
-      </div>
-      <div className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-semibold leading-tight">EPOS Portal</span>
-        <span className="truncate text-[11px] leading-tight text-muted-foreground">
-          Central Platform
-        </span>
-      </div>
+    <Link href="/dashboard" className="flex items-center justify-center w-full">
+      <span
+        className={cn(
+          "font-extrabold lowercase tracking-tight text-primary",
+          collapsed ? "text-xl" : "text-2xl"
+        )}
+      >
+        {collapsed ? "z" : "zippy"}
+      </span>
     </Link>
   );
 }
 
-function UserFooter({ user }: { user: User | null }) {
+function UserFooter({ user, collapsed }: { user: User | null; collapsed?: boolean }) {
   if (!user) return null;
+
+  const initials =
+    user.name
+      ?.split(" ")
+      .map((n: string) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "U";
+
+  if (collapsed) {
+    return (
+      <div className="flex justify-center">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <div className="flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                {initials}
+              </div>
+            }
+          />
+          <TooltipContent side="right">
+            {user.name}
+            <span className="ml-2 text-[11px] capitalize text-muted-foreground">
+              {user.role === "admin"
+                ? "Administrator"
+                : user.role === "dev"
+                  ? "Developer"
+                  : "Marketing"}
+            </span>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-3">
       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-        {user.name
-          ?.split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2) || "U"}
+        {initials}
       </div>
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm font-medium">{user.name}</span>
@@ -230,22 +267,109 @@ function UserFooter({ user }: { user: User | null }) {
   );
 }
 
+function NavItemLink({
+  item,
+  isActive,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  const hasBadge = item.badge !== undefined && item.badge > 0;
+
+  const linkClass = cn(
+    "flex w-full items-center rounded-md border-l-2 border-transparent py-2 text-sm font-medium transition-colors",
+    collapsed ? "justify-center px-0" : "gap-3 px-3",
+    isActive
+      ? "border-primary bg-primary/10 text-primary [&_svg]:text-primary"
+      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+  );
+
+  const content = (
+    <Link
+      href={item.href}
+      aria-current={isActive ? "page" : undefined}
+      aria-label={collapsed ? item.name : undefined}
+      onClick={onNavigate}
+      className={linkClass}
+    >
+      <span className="relative flex items-center">
+        <item.icon className="h-4 w-4 shrink-0" />
+        {collapsed && hasBadge && (
+          <span
+            className={cn(
+              "absolute -top-1 -right-1.5 inline-flex h-2 w-2 rounded-full ring-2 ring-sidebar",
+              item.badgeVariant === "warning" ? "bg-amber-500" : "bg-primary"
+            )}
+            aria-hidden="true"
+          />
+        )}
+      </span>
+      {!collapsed && (
+        <>
+          <span className="flex-1 truncate text-left">{item.name}</span>
+          {hasBadge && (
+            <span
+              className={cn(
+                "ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-none tabular-nums",
+                item.badgeVariant === "warning"
+                  ? "bg-amber-500 text-white dark:bg-amber-600"
+                  : "bg-muted-foreground/20 text-muted-foreground"
+              )}
+            >
+              {item.badge}
+            </span>
+          )}
+        </>
+      )}
+    </Link>
+  );
+
+  if (!collapsed) return content;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={content} />
+      <TooltipContent side="right">
+        <span>{item.name}</span>
+        {hasBadge && (
+          <span className="ml-2 text-[10px] tabular-nums text-muted-foreground">
+            {item.badge}
+          </span>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function SidebarNavSections({
   groups,
   pathname,
+  collapsed,
   onNavigate,
 }: {
   groups: NavGroup[];
   pathname: string;
+  collapsed: boolean;
   onNavigate?: () => void;
 }) {
   return (
     <>
-      {groups.map((group) => (
+      {groups.map((group, idx) => (
         <div key={group.label}>
-          <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-            {group.label}
-          </div>
+          {collapsed ? (
+            // Visual separator between groups instead of label text — the
+            // tooltip on each icon already says what the item is, so the
+            // category label loses utility once we're showing icons only.
+            idx > 0 && <div className="mx-3 mb-2 border-t border-border/60" />
+          ) : (
+            <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              {group.label}
+            </div>
+          )}
           <div className="space-y-0.5">
             {group.items.map((item) => {
               const isActive =
@@ -256,33 +380,13 @@ function SidebarNavSections({
                   ));
 
               return (
-                <Link
+                <NavItemLink
                   key={item.name}
-                  href={item.href}
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "border-primary bg-primary/10 text-primary [&_svg]:text-primary"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1 truncate text-left">{item.name}</span>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span
-                      className={cn(
-                        "ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-none tabular-nums",
-                        item.badgeVariant === "warning"
-                          ? "bg-amber-500 text-white dark:bg-amber-600"
-                          : "bg-muted-foreground/20 text-muted-foreground"
-                      )}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
+                  item={item}
+                  isActive={isActive}
+                  collapsed={collapsed}
+                  onNavigate={onNavigate}
+                />
               );
             })}
           </div>
@@ -298,23 +402,73 @@ export function AppSidebar() {
   const role = (user?.role ?? "mkt") as Role;
   const counts = useSidebarCounts();
   const filteredGroups = getFilteredGroups(role, counts);
+  const { collapsed, hydrated, hydrate, toggle } = useSidebarStore();
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  // Until hydrate() runs we render in the default (expanded) shape so the
+  // server markup matches the first client paint. Once hydrated we honor
+  // the persisted preference.
+  const isCollapsed = hydrated && collapsed;
 
   return (
-    <aside className="hidden border-r bg-sidebar lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex h-16 items-center border-b px-6">
-        <BrandBlock />
-      </div>
-
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-        <SidebarNavSections groups={filteredGroups} pathname={pathname} />
-      </nav>
-
-      {user && (
-        <div className="border-t px-4 py-3">
-          <UserFooter user={user} />
+    <TooltipProvider delay={150}>
+      <aside
+        data-collapsed={isCollapsed ? "true" : "false"}
+        className={cn(
+          "hidden border-r bg-sidebar transition-[width] duration-200 lg:fixed lg:inset-y-0 lg:flex lg:flex-col",
+          isCollapsed ? "lg:w-16" : "lg:w-64"
+        )}
+      >
+        <div
+          className={cn(
+            "relative flex h-16 items-center border-b",
+            isCollapsed ? "justify-center px-2" : "px-6"
+          )}
+        >
+          <BrandBlock collapsed={isCollapsed} />
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="absolute -right-3 top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground lg:flex"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronLeft className="h-3.5 w-3.5" />
+            )}
+          </button>
         </div>
-      )}
-    </aside>
+
+        <nav
+          className={cn(
+            "flex-1 space-y-6 overflow-y-auto py-4",
+            isCollapsed ? "px-2" : "px-3"
+          )}
+        >
+          <SidebarNavSections
+            groups={filteredGroups}
+            pathname={pathname}
+            collapsed={isCollapsed}
+          />
+        </nav>
+
+        {user && (
+          <div
+            className={cn(
+              "border-t py-3",
+              isCollapsed ? "px-2" : "px-4"
+            )}
+          >
+            <UserFooter user={user} collapsed={isCollapsed} />
+          </div>
+        )}
+
+      </aside>
+    </TooltipProvider>
   );
 }
 
@@ -354,6 +508,7 @@ export function AppSidebarMobile() {
           <SidebarNavSections
             groups={filteredGroups}
             pathname={pathname}
+            collapsed={false}
             onNavigate={() => setOpen(false)}
           />
         </nav>

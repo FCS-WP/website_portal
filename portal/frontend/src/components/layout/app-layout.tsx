@@ -3,10 +3,12 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
+import { useSidebarStore } from "@/stores/sidebar-store";
 import { AppSidebar } from "./app-sidebar";
 import { AppHeader } from "./app-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { canAccessPath, fallbackPathFor, type Role } from "@/lib/access-control";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -49,10 +51,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  return <AuthedShell>{children}</AuthedShell>;
+}
+
+function AuthedShell({ children }: { children: React.ReactNode }) {
+  const { collapsed, hydrated } = useSidebarStore();
+  const isCollapsed = hydrated && collapsed;
+
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col transition-[padding] duration-200",
+          isCollapsed ? "lg:pl-16" : "lg:pl-64"
+        )}
+      >
         <AppHeader />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {children}
